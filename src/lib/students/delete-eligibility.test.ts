@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { studentHasBlockingReferences } from "@/lib/students/delete-eligibility";
+import {
+  canDeleteStudent,
+  studentDeleteBlockedReason,
+  studentHasBlockingReferences,
+} from "@/lib/students/delete-eligibility";
 
 describe("studentHasBlockingReferences", () => {
   it("blocks delete when any reference count is positive", () => {
@@ -21,5 +25,17 @@ describe("studentHasBlockingReferences", () => {
     expect(
       studentHasBlockingReferences({ enrollments: null, invoices: null, payments: null }),
     ).toBe(false);
+  });
+});
+
+describe("canDeleteStudent", () => {
+  it("allows delete without blocking references", () => {
+    expect(canDeleteStudent(false)).toBe(true);
+    expect(studentDeleteBlockedReason(false)).toBeNull();
+  });
+
+  it("blocks delete with blocking references", () => {
+    expect(canDeleteStudent(true)).toBe(false);
+    expect(studentDeleteBlockedReason(true)).toContain("ลงทะเบียน");
   });
 });

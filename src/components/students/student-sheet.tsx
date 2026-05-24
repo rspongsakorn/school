@@ -59,6 +59,7 @@ type StudentSheetProps = {
     lastName: string;
     idCard: string | null;
     status: StudentStatus;
+    deletable?: boolean;
   };
 };
 
@@ -136,7 +137,8 @@ function StudentSheetBody({
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const isEditMode = mode === "edit";
-  const canDelete = isEditMode && !readOnly && Boolean(initial?.id);
+  const canDelete =
+    isEditMode && !readOnly && Boolean(initial?.id) && (initial?.deletable ?? true);
   const title = isEditMode ? "แก้ไขข้อมูลนักเรียน" : "เพิ่มนักเรียน";
   const description = isEditMode
     ? "ปรับข้อมูลประวัตินักเรียนและสถานะการเรียน"

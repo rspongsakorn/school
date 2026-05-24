@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { ActionState } from "@/lib/actions/academic-years";
 import { requireAdminAction } from "@/lib/auth/require-admin";
+import { getStudentReferenceCounts, isStudentDeletable } from "@/lib/data/students";
 import { studentHasBlockingReferences } from "@/lib/students/delete-eligibility";
 import {
   firstStudentFormError,
@@ -68,43 +69,76 @@ export async function updateStudent(id: string, input: StudentFormInput): Promis
   return { ok: true };
 }
 
+const STUDENT_DELETE_BLOCKED_MESSAGE =
+  "ไม่สามารถลบได้ — มีประวัติการลงทะเบียนหรือใบแจ้งชำระ กรุณาเปลี่ยนสถานะแทน";
+
+async function deleteStudentRecord(studentId: string): Promise<ActionState> {
+  const counts = await getStudentReferenceCounts(studentId);
+  if (!isStudentDeletable(counts)) {
+    return { ok: false, error: STUDENT_DELETE_BLOCKED_MESSAGE };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("students").delete().eq("id", studentId);
+  if (error) return { ok: false, error: "ไม่สามารถลบนักเรียนได้" };
+
+  return { ok: true };
+}
+
 export async function deleteStudent(id: string): Promise<ActionState> {
   const auth = await requireAdminAction();
   if (!auth.ok) return auth;
 
-  const supabase = await createClient();
+  const result = await deleteStudentRecord(id);
+  if (result.ok) revalidatePath("/students");
+  return result;
+}
 
+export type DeleteStudentsResult =
+  | { ok: true; deleted: number; skipped: number }
+  | { ok: false; error: string };
+
+export async function deleteStudents(studentIds: string[]): Promise<DeleteStudentsResult> {
+  const auth = await requireAdminAction();
+  if (!auth.ok) return auth;
+
+  const uniqueIds = [...new Set(studentIds.map((id) => id.trim()).filter(Boolean))];
+  if (uniqueIds.length === 0) {
+    return { ok: false, error: "กรุณาเลือกนักเรียนที่ต้องการลบ" };
+  }
+
+  const supabase = await createClient();
   const [enrollments, invoices, payments] = await Promise.all([
-    supabase
-      .from("student_enrollments")
-      .select("id", { count: "exact", head: true })
-      .eq("student_id", id),
-    supabase
-      .from("student_invoices")
-      .select("id", { count: "exact", head: true })
-      .eq("student_id", id),
-    supabase
-      .from("payments")
-      .select("id", { count: "exact", head: true })
-      .eq("student_id", id),
+    supabase.from("student_enrollments").select("student_id").in("student_id", uniqueIds),
+    supabase.from("student_invoices").select("student_id").in("student_id", uniqueIds),
+    supabase.from("payments").select("student_id").in("student_id", uniqueIds),
   ]);
 
-  if (
-    studentHasBlockingReferences({
-      enrollments: enrollments.count,
-      invoices: invoices.count,
-      payments: payments.count,
-    })
-  ) {
+  const blockedIds = new Set<string>();
+  for (const row of enrollments.data ?? []) blockedIds.add(row.student_id);
+  for (const row of invoices.data ?? []) blockedIds.add(row.student_id);
+  for (const row of payments.data ?? []) blockedIds.add(row.student_id);
+
+  const deletableIds = uniqueIds.filter((id) => !blockedIds.has(id));
+  const skipped = uniqueIds.length - deletableIds.length;
+
+  if (deletableIds.length === 0) {
     return {
       ok: false,
-      error: "ไม่สามารถลบได้ — มีประวัติการลงทะเบียนหรือใบแจ้งชำระ กรุณาเปลี่ยนสถานะแทน",
+      error: "ไม่สามารถลบได้ — นักเรียนที่เลือกมีประวัติการลงทะเบียนหรือการเงิน",
     };
   }
 
-  const { error } = await supabase.from("students").delete().eq("id", id);
-  if (error) return { ok: false, error: "ไม่สามารถลบนักเรียนได้" };
+  for (const studentId of deletableIds) {
+    const { error } = await supabase.from("students").delete().eq("id", studentId);
+    if (error) {
+      return { ok: false, error: "ไม่สามารถลบนักเรียนได้" };
+    }
+  }
 
   revalidatePath("/students");
-  return { ok: true };
+  revalidatePath("/registration");
+  revalidatePath("/invoices");
+  revalidatePath("/payments");
+  return { ok: true, deleted: deletableIds.length, skipped };
 }

@@ -1,5 +1,6 @@
 import { formatStudentName } from "@/lib/format";
 import { getStudentGradeMap } from "@/lib/data/enrollments";
+import { studentHasBlockingReferences } from "@/lib/students/delete-eligibility";
 import { buildStudentSearchOrFilter } from "@/lib/students/search";
 import {
   STUDENT_STATUS_LABELS,
@@ -18,6 +19,7 @@ export type StudentListRow = {
   statusRaw: StudentStatus;
   firstName: string;
   lastName: string;
+  deletable: boolean;
 };
 
 export type StudentListParams = {
@@ -45,6 +47,7 @@ function mapStudentRow(
     status: string;
   },
   gradeByStudent: Map<string, string>,
+  blockedStudentIds: Set<string>,
 ): StudentListRow {
   const statusRaw = s.status as StudentStatus;
   return {
@@ -57,7 +60,59 @@ function mapStudentRow(
     statusRaw,
     firstName: s.first_name,
     lastName: s.last_name,
+    deletable: !blockedStudentIds.has(s.id),
   };
+}
+
+async function loadStudentIdsWithBlockingReferences(studentIds: string[]): Promise<Set<string>> {
+  if (studentIds.length === 0) return new Set();
+
+  const supabase = await createClient();
+  const [enrollments, invoices, payments] = await Promise.all([
+    supabase.from("student_enrollments").select("student_id").in("student_id", studentIds),
+    supabase.from("student_invoices").select("student_id").in("student_id", studentIds),
+    supabase.from("payments").select("student_id").in("student_id", studentIds),
+  ]);
+
+  const blocked = new Set<string>();
+  for (const row of enrollments.data ?? []) blocked.add(row.student_id);
+  for (const row of invoices.data ?? []) blocked.add(row.student_id);
+  for (const row of payments.data ?? []) blocked.add(row.student_id);
+  return blocked;
+}
+
+export async function getStudentReferenceCounts(
+  studentId: string,
+): Promise<{ enrollments: number; invoices: number; payments: number }> {
+  const supabase = await createClient();
+  const [enrollments, invoices, payments] = await Promise.all([
+    supabase
+      .from("student_enrollments")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", studentId),
+    supabase
+      .from("student_invoices")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", studentId),
+    supabase
+      .from("payments")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", studentId),
+  ]);
+
+  return {
+    enrollments: enrollments.count ?? 0,
+    invoices: invoices.count ?? 0,
+    payments: payments.count ?? 0,
+  };
+}
+
+export function isStudentDeletable(counts: {
+  enrollments: number;
+  invoices: number;
+  payments: number;
+}): boolean {
+  return !studentHasBlockingReferences(counts);
 }
 
 export async function listStudents(semesterId: string | null): Promise<StudentListRow[]> {
@@ -74,7 +129,9 @@ export async function listStudents(semesterId: string | null): Promise<StudentLi
     ? await getStudentGradeMap(semesterId)
     : new Map<string, string>();
 
-  return students.map((s) => mapStudentRow(s, gradeByStudent));
+  const studentIds = students.map((s) => s.id);
+  const blockedStudentIds = await loadStudentIdsWithBlockingReferences(studentIds);
+  return students.map((s) => mapStudentRow(s, gradeByStudent, blockedStudentIds));
 }
 
 export async function listStudentsPaginated(
@@ -119,7 +176,9 @@ export async function listStudentsPaginated(
     return { rows: [], total: 0, page, pageSize, totalPages: 0 };
   }
 
-  const rows = students.map((s) => mapStudentRow(s, gradeByStudent));
+  const studentIds = students.map((s) => s.id);
+  const blockedStudentIds = await loadStudentIdsWithBlockingReferences(studentIds);
+  const rows = students.map((s) => mapStudentRow(s, gradeByStudent, blockedStudentIds));
   const total = count ?? 0;
 
   return {
