@@ -5,6 +5,7 @@ import { buildStudentSearchOrFilter } from "@/lib/students/search";
 import {
   STUDENT_STATUS_LABELS,
   STUDENTS_PAGE_SIZE,
+  type StudentGender,
   type StudentStatus,
 } from "@/lib/students/constants";
 import { createClient } from "@/lib/supabase/server";
@@ -19,6 +20,8 @@ export type StudentListRow = {
   statusRaw: StudentStatus;
   firstName: string;
   lastName: string;
+  gender: StudentGender | null;
+  dateOfBirth: string | null;
   deletable: boolean;
 };
 
@@ -44,6 +47,8 @@ function mapStudentRow(
     first_name: string;
     last_name: string;
     id_card: string | null;
+    gender: string | null;
+    date_of_birth: string | null;
     status: string;
   },
   gradeByStudent: Map<string, string>,
@@ -60,6 +65,8 @@ function mapStudentRow(
     statusRaw,
     firstName: s.first_name,
     lastName: s.last_name,
+    gender: (s.gender as StudentGender | null) ?? null,
+    dateOfBirth: s.date_of_birth ?? null,
     deletable: !blockedStudentIds.has(s.id),
   };
 }
@@ -68,24 +75,28 @@ async function loadStudentIdsWithBlockingReferences(studentIds: string[]): Promi
   if (studentIds.length === 0) return new Set();
 
   const supabase = await createClient();
-  const [enrollments, invoices, payments] = await Promise.all([
+  const [enrollments, invoices, activePayments] = await Promise.all([
     supabase.from("student_enrollments").select("student_id").in("student_id", studentIds),
     supabase.from("student_invoices").select("student_id").in("student_id", studentIds),
-    supabase.from("payments").select("student_id").in("student_id", studentIds),
+    supabase
+      .from("payments")
+      .select("student_id")
+      .in("student_id", studentIds)
+      .eq("status", "active"),
   ]);
 
   const blocked = new Set<string>();
   for (const row of enrollments.data ?? []) blocked.add(row.student_id);
   for (const row of invoices.data ?? []) blocked.add(row.student_id);
-  for (const row of payments.data ?? []) blocked.add(row.student_id);
+  for (const row of activePayments.data ?? []) blocked.add(row.student_id);
   return blocked;
 }
 
 export async function getStudentReferenceCounts(
   studentId: string,
-): Promise<{ enrollments: number; invoices: number; payments: number }> {
+): Promise<{ enrollments: number; invoices: number; activePayments: number }> {
   const supabase = await createClient();
-  const [enrollments, invoices, payments] = await Promise.all([
+  const [enrollments, invoices, activePayments] = await Promise.all([
     supabase
       .from("student_enrollments")
       .select("id", { count: "exact", head: true })
@@ -97,20 +108,21 @@ export async function getStudentReferenceCounts(
     supabase
       .from("payments")
       .select("id", { count: "exact", head: true })
-      .eq("student_id", studentId),
+      .eq("student_id", studentId)
+      .eq("status", "active"),
   ]);
 
   return {
     enrollments: enrollments.count ?? 0,
     invoices: invoices.count ?? 0,
-    payments: payments.count ?? 0,
+    activePayments: activePayments.count ?? 0,
   };
 }
 
 export function isStudentDeletable(counts: {
   enrollments: number;
   invoices: number;
-  payments: number;
+  activePayments: number;
 }): boolean {
   return !studentHasBlockingReferences(counts);
 }
@@ -120,7 +132,7 @@ export async function listStudents(semesterId: string | null): Promise<StudentLi
 
   const { data: students, error } = await supabase
     .from("students")
-    .select("id, student_code, first_name, last_name, id_card, status")
+    .select("id, student_code, first_name, last_name, id_card, gender, date_of_birth, status")
     .order("student_code", { ascending: true });
 
   if (error || !students) return [];
@@ -153,7 +165,10 @@ export async function listStudentsPaginated(
   const studentsPromise = (async () => {
     let query = supabase
       .from("students")
-      .select("id, student_code, first_name, last_name, id_card, status", { count: "exact" })
+      .select(
+        "id, student_code, first_name, last_name, id_card, gender, date_of_birth, status",
+        { count: "exact" },
+      )
       .order("student_code", { ascending: true });
 
     if (searchFilter) {

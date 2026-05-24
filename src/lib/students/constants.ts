@@ -16,3 +16,15 @@ export const STUDENT_STATUS_FILTER_OPTIONS = [
 ] as const;
 
 export const STUDENTS_PAGE_SIZE = 50;
+
+export type StudentGender = "male" | "female";
+
+export const STUDENT_GENDER_OPTIONS = [
+  { value: "male" as const, label: "ชาย" },
+  { value: "female" as const, label: "หญิง" },
+] as const;
+
+export const STUDENT_GENDER_LABELS: Record<StudentGender, string> = {
+  male: "ชาย",
+  female: "หญิง",
+};

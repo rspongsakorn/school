@@ -32,10 +32,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { BirthDatePicker } from "@/components/students/birth-date-picker";
 import {
+  STUDENT_GENDER_LABELS,
+  STUDENT_GENDER_OPTIONS,
   STUDENT_STATUS_FILTER_OPTIONS,
+  type StudentGender,
   type StudentStatus,
 } from "@/lib/students/constants";
+import { formatThaiBirthDate } from "@/lib/students/dates";
 import {
   createStudent,
   deleteStudent,
@@ -58,6 +63,8 @@ type StudentSheetProps = {
     firstName: string;
     lastName: string;
     idCard: string | null;
+    gender: StudentGender | null;
+    dateOfBirth: string | null;
     status: StudentStatus;
     deletable?: boolean;
   };
@@ -74,6 +81,8 @@ const initialForm: StudentFormState = {
   firstName: "",
   lastName: "",
   idCard: "",
+  gender: "",
+  dateOfBirth: "",
   status: "active",
 };
 
@@ -87,6 +96,8 @@ function buildInitialForm(
       firstName: initial.firstName,
       lastName: initial.lastName,
       idCard: initial.idCard ?? "",
+      gender: initial.gender ?? "",
+      dateOfBirth: initial.dateOfBirth ?? "",
       status: initial.status,
     };
   }
@@ -165,7 +176,13 @@ function StudentSheetBody({
   async function handleSave() {
     if (readOnly || submitting) return;
 
-    const validation = validateStudentForm(form);
+    const validation = validateStudentForm(form, {
+      mode: isEditMode ? "update" : "create",
+      existing:
+        isEditMode && initial
+          ? { gender: initial.gender, dateOfBirth: initial.dateOfBirth }
+          : undefined,
+    });
     if (!validation.ok) {
       setErrors(validation.errors);
       return;
@@ -252,6 +269,50 @@ function StudentSheetBody({
             aria-invalid={Boolean(errors.lastName)}
           />
           <FieldError message={errors.lastName} />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="student-gender">เพศ</Label>
+          {readOnly ? (
+            <p id="student-gender" className="text-sm">
+              {form.gender ? STUDENT_GENDER_LABELS[form.gender] : "ยังไม่ระบุ"}
+            </p>
+          ) : (
+            <Select
+              value={form.gender || undefined}
+              onValueChange={(value) => updateField("gender", value as StudentGender)}
+              disabled={submitting}
+              items={STUDENT_GENDER_OPTIONS}
+            >
+              <SelectTrigger id="student-gender" className="w-full" aria-invalid={Boolean(errors.gender)}>
+                <SelectValue placeholder="เลือกเพศ" />
+              </SelectTrigger>
+              <SelectContent>
+                {STUDENT_GENDER_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <FieldError message={errors.gender} />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="student-birth-date">วันเกิด</Label>
+          {readOnly ? (
+            <p id="student-birth-date" className="text-sm">
+              {form.dateOfBirth ? formatThaiBirthDate(form.dateOfBirth) : "ยังไม่ระบุ"}
+            </p>
+          ) : (
+            <BirthDatePicker
+              id="student-birth-date"
+              value={form.dateOfBirth}
+              onChange={(iso) => updateField("dateOfBirth", iso)}
+              disabled={submitting}
+              aria-invalid={Boolean(errors.dateOfBirth)}
+            />
+          )}
+          <FieldError message={errors.dateOfBirth} />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="student-id-card">เลขบัตรประชาชน</Label>

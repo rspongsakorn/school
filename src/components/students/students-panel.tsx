@@ -164,6 +164,8 @@ export function StudentsPanel({ data, params, isAdmin }: StudentsPanelProps) {
       firstName: selectedStudent.firstName,
       lastName: selectedStudent.lastName,
       idCard: selectedStudent.idCard,
+      gender: selectedStudent.gender,
+      dateOfBirth: selectedStudent.dateOfBirth,
       status: selectedStudent.statusRaw,
       deletable: selectedStudent.deletable,
     };

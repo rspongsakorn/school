@@ -37,6 +37,8 @@ export type Database = {
         first_name: string;
         last_name: string;
         id_card: string | null;
+        gender: "male" | "female" | null;
+        date_of_birth: string | null;
         status: "active" | "graduated" | "transferred" | "withdrawn";
       }>;
       grade_levels: TableDef<{

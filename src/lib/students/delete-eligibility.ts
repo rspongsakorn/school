@@ -1,11 +1,12 @@
 export type StudentReferenceCounts = {
   enrollments: number | null;
   invoices: number | null;
-  payments: number | null;
+  /** Only active (non-voided) payments block delete; voided history is removed on delete. */
+  activePayments: number | null;
 };
 
 export function studentHasBlockingReferences(counts: StudentReferenceCounts): boolean {
-  return (counts.enrollments ?? 0) + (counts.invoices ?? 0) + (counts.payments ?? 0) > 0;
+  return (counts.enrollments ?? 0) + (counts.invoices ?? 0) + (counts.activePayments ?? 0) > 0;
 }
 
 export function canDeleteStudent(hasBlockingReferences: boolean): boolean {
