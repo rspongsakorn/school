@@ -1,7 +1,7 @@
 # Design Spec: จัดการปีการศึกษา ภาคเรียน และนักเรียน (Master)
 
 **Date:** 2026-05-24  
-**Status:** Draft — pending user review  
+**Status:** Approved  
 **Parent:** [2026-05-24-tuition-management-design.md](./2026-05-24-tuition-management-design.md)  
 **Scope:** v1 admin master-data pages — ไม่รวมลงทะเบียน (`student_enrollments`)
 
