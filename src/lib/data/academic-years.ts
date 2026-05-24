@@ -8,6 +8,23 @@ export type SemesterRow = {
   end_date: string;
 };
 
+export type AcademicYearOption = {
+  id: string;
+  name: string;
+  is_active: boolean;
+};
+
+export async function listAcademicYearOptions(): Promise<AcademicYearOption[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("academic_years")
+    .select("id, name, is_active")
+    .order("start_date", { ascending: false });
+
+  if (error || !data) return [];
+  return data;
+}
+
 export type AcademicYearRow = {
   id: string;
   name: string;
