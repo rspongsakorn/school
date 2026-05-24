@@ -18,7 +18,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { deleteClassroom } from "@/lib/actions/classrooms";
+import { deleteEnrollment } from "@/lib/actions/enrollments";
 import { deleteGradeLevel } from "@/lib/actions/grade-levels";
+import { enrollmentDeleteBlockedReason } from "@/lib/enrollment/enrollment-delete-eligibility";
 import {
   Table,
   TableBody,
@@ -89,9 +91,30 @@ export function RegistrationPanel({
   const [editingClassroom, setEditingClassroom] = useState<ClassroomRow | null>(null);
   const [moveTarget, setMoveTarget] = useState<EnrollmentRosterRow | null>(null);
   const [statusTarget, setStatusTarget] = useState<EnrollmentRosterRow | null>(null);
+  const [enrollmentRemoveTarget, setEnrollmentRemoveTarget] = useState<EnrollmentRosterRow | null>(
+    null,
+  );
+  const [removingEnrollment, setRemovingEnrollment] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<
     { type: "grade"; id: string; name: string } | { type: "classroom"; id: string; name: string } | null
   >(null);
+
+  async function handleRemoveEnrollment() {
+    if (!enrollmentRemoveTarget) return;
+
+    setRemovingEnrollment(true);
+    const result = await deleteEnrollment(enrollmentRemoveTarget.enrollmentId);
+    setRemovingEnrollment(false);
+    setEnrollmentRemoveTarget(null);
+
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+
+    toast.success("ลบออกจากห้องแล้ว");
+    router.refresh();
+  }
 
   async function handleDelete() {
     if (!deleteTarget) return;
@@ -396,11 +419,16 @@ export function RegistrationPanel({
                     <TableHead>รหัส</TableHead>
                     <TableHead>ชื่อ-นามสกุล</TableHead>
                     <TableHead>สถานะ</TableHead>
-                    {isAdmin && <TableHead className="w-[140px]">จัดการ</TableHead>}
+                    {isAdmin && <TableHead className="w-[168px]">จัดการ</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {roster.map((row) => (
+                  {roster.map((row) => {
+                    const blockedReason = enrollmentDeleteBlockedReason({
+                      status: row.status,
+                      hasInvoiceInSemester: !row.deletable,
+                    });
+                    return (
                     <TableRow key={row.enrollmentId}>
                       <TableCell className="font-mono text-sm">{row.studentCode}</TableCell>
                       <TableCell>{row.name}</TableCell>
@@ -422,12 +450,24 @@ export function RegistrationPanel({
                             >
                               <ArrowRightLeft className="h-4 w-4" />
                             </Button>
+                            {row.deletable ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive"
+                                title="ลบออกจากห้อง"
+                                onClick={() => setEnrollmentRemoveTarget(row)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            ) : null}
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8 text-destructive"
-                              title="เปลี่ยนสถานะ"
+                              title={blockedReason ?? "เปลี่ยนสถานะ"}
                               onClick={() => setStatusTarget(row)}
                             >
                               <UserX className="h-4 w-4" />
@@ -436,7 +476,8 @@ export function RegistrationPanel({
                         </TableCell>
                       )}
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}
@@ -519,6 +560,30 @@ export function RegistrationPanel({
           studentName={statusTarget.name}
         />
       )}
+
+      <AlertDialog
+        open={Boolean(enrollmentRemoveTarget)}
+        onOpenChange={(open) => !open && !removingEnrollment && setEnrollmentRemoveTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ลบออกจากห้อง</AlertDialogTitle>
+            <AlertDialogDescription>
+              ลบการลงทะเบียนของ {enrollmentRemoveTarget?.name} ออกจากห้องนี้ — นักเรียนยังอยู่ในระบบและสามารถลงทะเบียนใหม่ได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removingEnrollment}>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={handleRemoveEnrollment}
+              disabled={removingEnrollment}
+            >
+              {removingEnrollment ? "กำลังลบ..." : "ยืนยันลบ"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>

@@ -1,5 +1,6 @@
 import { formatClassroom, formatStudentName } from "@/lib/format";
 import type { EnrollmentStatus } from "@/lib/enrollment/constants";
+import { canDeleteEnrollment } from "@/lib/enrollment/enrollment-delete-eligibility";
 import { buildStudentSearchOrFilter } from "@/lib/students/search";
 import { createClient } from "@/lib/supabase/server";
 
@@ -16,6 +17,7 @@ export type EnrollmentRosterRow = {
   lastName: string;
   name: string;
   status: EnrollmentStatus;
+  deletable: boolean;
 };
 
 export type StudentEnrollmentCandidate = {
@@ -85,17 +87,53 @@ export async function listClassroomRoster(classroomId: string): Promise<Enrollme
     } | null;
   };
 
-  return (data as unknown as Row[])
-    .filter((row) => row.students)
-    .map((row) => ({
+  const rosterRows = (data as unknown as Row[]).filter((row) => row.students);
+
+  const { data: classroom } = await supabase
+    .from("classrooms")
+    .select("semester_id")
+    .eq("id", classroomId)
+    .maybeSingle();
+
+  const semesterId = classroom?.semester_id;
+  const studentIds = rosterRows.map((row) => row.students!.id);
+  const studentsWithInvoice = semesterId
+    ? await loadStudentIdsWithInvoiceInSemester(studentIds, semesterId)
+    : new Set<string>();
+
+  return rosterRows.map((row) => {
+    const status = row.status as EnrollmentStatus;
+    const studentId = row.students!.id;
+    return {
       enrollmentId: row.id,
-      studentId: row.students!.id,
+      studentId,
       studentCode: row.students!.student_code,
       firstName: row.students!.first_name,
       lastName: row.students!.last_name,
       name: formatStudentName(row.students!.first_name, row.students!.last_name),
-      status: row.status as EnrollmentStatus,
-    }));
+      status,
+      deletable: canDeleteEnrollment({
+        status,
+        hasInvoiceInSemester: studentsWithInvoice.has(studentId),
+      }),
+    };
+  });
+}
+
+async function loadStudentIdsWithInvoiceInSemester(
+  studentIds: string[],
+  semesterId: string,
+): Promise<Set<string>> {
+  if (studentIds.length === 0) return new Set();
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("student_invoices")
+    .select("student_id")
+    .eq("semester_id", semesterId)
+    .in("student_id", studentIds);
+
+  return new Set((data ?? []).map((row) => row.student_id));
 }
 
 export async function listStudentsAvailableForEnrollment(

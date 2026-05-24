@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { ActionState } from "@/lib/actions/academic-years";
 import { requireAdminAction } from "@/lib/auth/require-admin";
 import type { EnrollmentStatus } from "@/lib/enrollment/constants";
+import { canDeleteEnrollment } from "@/lib/enrollment/enrollment-delete-eligibility";
 import { isValidEnrollmentStatus } from "@/lib/enrollment/validation";
 import { listStudentsAvailableForEnrollment } from "@/lib/data/enrollments";
 import { createClient } from "@/lib/supabase/server";
@@ -139,5 +140,49 @@ export async function updateEnrollmentStatus(
   if (error) return { ok: false, error: "ไม่สามารถเปลี่ยนสถานะได้" };
 
   revalidateRegistrationPaths();
+  return { ok: true };
+}
+
+export async function deleteEnrollment(enrollmentId: string): Promise<ActionState> {
+  const auth = await requireAdminAction();
+  if (!auth.ok) return auth;
+
+  const supabase = await createClient();
+  const { data: enrollment } = await supabase
+    .from("student_enrollments")
+    .select("id, student_id, semester_id, status")
+    .eq("id", enrollmentId)
+    .maybeSingle();
+
+  if (!enrollment) return { ok: false, error: "ไม่พบข้อมูลการลงทะเบียน" };
+  if (enrollment.status !== "enrolled") {
+    return { ok: false, error: "ลบออกจากห้องได้เฉพาะนักเรียนที่กำลังเรียน" };
+  }
+
+  const { count } = await supabase
+    .from("student_invoices")
+    .select("id", { count: "exact", head: true })
+    .eq("student_id", enrollment.student_id)
+    .eq("semester_id", enrollment.semester_id);
+
+  if (
+    !canDeleteEnrollment({
+      status: enrollment.status,
+      hasInvoiceInSemester: (count ?? 0) > 0,
+    })
+  ) {
+    return {
+      ok: false,
+      error: "มีใบแจ้งชำระแล้ว — ใช้เปลี่ยนสถานะแทน",
+    };
+  }
+
+  const { error } = await supabase.from("student_enrollments").delete().eq("id", enrollmentId);
+  if (error) return { ok: false, error: "ไม่สามารถลบการลงทะเบียนได้" };
+
+  revalidateRegistrationPaths();
+  revalidatePath("/invoices");
+  revalidatePath("/reports/outstanding");
+  revalidatePath("/reports/collections");
   return { ok: true };
 }
