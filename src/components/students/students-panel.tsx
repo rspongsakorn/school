@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -26,6 +25,7 @@ import {
   type StudentStatus,
 } from "@/lib/students/constants";
 import { StudentSheet } from "@/components/students/student-sheet";
+import { StudentSearchInput } from "@/components/students/student-search-input";
 
 type StudentsPanelProps = {
   data: PaginatedStudents;
@@ -43,36 +43,32 @@ function statusBadgeClass(status: StudentStatus) {
 export function StudentsPanel({ data, params, isAdmin }: StudentsPanelProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const [searchText, setSearchText] = useState(params.q);
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<StudentListRow | null>(null);
 
-  useEffect(() => {
-    setSearchText(params.q);
-  }, [params.q]);
+  const pushParams = useCallback(
+    (next: { q?: string; status?: string; page?: number }) => {
+      const q = (next.q ?? params.q).trim();
+      const status = next.status ?? params.status;
+      const page = next.page ?? params.page;
+      const query = new URLSearchParams();
 
-  function pushParams(next: { q?: string; status?: string; page?: number }) {
-    const q = (next.q ?? params.q).trim();
-    const status = next.status ?? params.status;
-    const page = next.page ?? params.page;
-    const query = new URLSearchParams();
+      if (q) query.set("q", q);
+      if (status && status !== "all") query.set("status", status);
+      query.set("page", String(Math.max(1, page)));
 
-    if (q) query.set("q", q);
-    if (status && status !== "all") query.set("status", status);
-    query.set("page", String(Math.max(1, page)));
+      const queryString = query.toString();
+      router.push(queryString ? `${pathname}?${queryString}` : pathname);
+    },
+    [params.page, params.q, params.status, pathname, router],
+  );
 
-    const queryString = query.toString();
-    router.push(queryString ? `${pathname}?${queryString}` : pathname);
-  }
-
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (searchText === params.q) return;
-      pushParams({ q: searchText, page: 1 });
-    }, 300);
-
-    return () => clearTimeout(timeout);
-  }, [searchText, params.q]);
+  const handleDebouncedSearch = useCallback(
+    (query: string) => {
+      pushParams({ q: query, page: 1 });
+    },
+    [pushParams],
+  );
 
   const canPrev = data.page > 1;
   const canNext = data.page < data.totalPages;
@@ -100,11 +96,10 @@ export function StudentsPanel({ data, params, isAdmin }: StudentsPanelProps) {
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
-          <Input
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            placeholder="ค้นหารหัส ชื่อ หรือนามสกุล"
-            className="w-full sm:max-w-sm"
+          <StudentSearchInput
+            key={params.q}
+            initialQuery={params.q}
+            onDebouncedChange={handleDebouncedSearch}
           />
           <Select
             value={params.status}

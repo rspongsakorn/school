@@ -22,7 +22,7 @@ export function YearTable({ years, onEdit }: YearTableProps) {
   if (years.length === 0) {
     return (
       <p className="px-6 pb-6 text-sm text-muted-foreground">
-        ยังไม่มีปีการศึกษาในระบบ กดปุ่ม "เพิ่มปีการศึกษา" เพื่อเริ่มต้น
+        ยังไม่มีปีการศึกษาในระบบ กดปุ่ม เพิ่มปีการศึกษา เพื่อเริ่มต้น
       </p>
     );
   }

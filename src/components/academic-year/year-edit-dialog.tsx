@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -31,50 +31,69 @@ type YearEditDialogProps = {
   year: AcademicYearRow | null;
 };
 
-const emptyYearState = {
-  name: "",
-  startDate: "",
-  endDate: "",
-  isActive: false,
-};
 
-const emptySemesterState = {
-  startDate: "",
-  endDate: "",
-  name: "",
-};
+function buildEditState(year: AcademicYearRow) {
+  const defaults = defaultSemesterDates(year.start_date, year.end_date);
+  const sem1 = year.semesters.find((s) => s.number === 1);
+  const sem2 = year.semesters.find((s) => s.number === 2);
 
-export function YearEditDialog({ open, onOpenChange, year }: YearEditDialogProps) {
-  const router = useRouter();
-  const [submitting, setSubmitting] = useState(false);
-  const [yearState, setYearState] = useState(emptyYearState);
-  const [semester1, setSemester1] = useState<SemesterDraft>(emptySemesterState);
-  const [semester2, setSemester2] = useState<SemesterDraft>(emptySemesterState);
-
-  useEffect(() => {
-    if (!year || !open) return;
-
-    const defaults = defaultSemesterDates(year.start_date, year.end_date);
-    const sem1 = year.semesters.find((s) => s.number === 1);
-    const sem2 = year.semesters.find((s) => s.number === 2);
-
-    setYearState({
+  return {
+    yearState: {
       name: year.name,
       startDate: year.start_date,
       endDate: year.end_date,
       isActive: year.is_active,
-    });
-    setSemester1({
+    },
+    semester1: {
       startDate: sem1?.start_date ?? defaults.semester1.start,
       endDate: sem1?.end_date ?? defaults.semester1.end,
       name: sem1?.name ?? "",
-    });
-    setSemester2({
+    },
+    semester2: {
       startDate: sem2?.start_date ?? defaults.semester2.start,
       endDate: sem2?.end_date ?? defaults.semester2.end,
       name: sem2?.name ?? "",
-    });
-  }, [open, year]);
+    },
+  };
+}
+
+export function YearEditDialog({ open, onOpenChange, year }: YearEditDialogProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        {year && open ? (
+          <YearEditForm key={year.id} year={year} onOpenChange={onOpenChange} />
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>แก้ไขปีการศึกษา</DialogTitle>
+              <DialogDescription>ปรับข้อมูลปีการศึกษาและภาคเรียนทั้ง 2 ภาค</DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                ยกเลิก
+              </Button>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function YearEditForm({
+  year,
+  onOpenChange,
+}: {
+  year: AcademicYearRow;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const router = useRouter();
+  const initialState = buildEditState(year);
+  const [submitting, setSubmitting] = useState(false);
+  const [yearState, setYearState] = useState(initialState.yearState);
+  const [semester1, setSemester1] = useState<SemesterDraft>(initialState.semester1);
+  const [semester2, setSemester2] = useState<SemesterDraft>(initialState.semester2);
 
   const sem1OutsideYear = useMemo(() => {
     if (!yearState.startDate || !yearState.endDate) return false;
@@ -100,7 +119,6 @@ export function YearEditDialog({ open, onOpenChange, year }: YearEditDialogProps
   }
 
   async function handleSubmit() {
-    if (!year) return;
     if (!yearState.name.trim()) {
       toast.error("กรุณากรอกชื่อปีการศึกษา");
       return;
@@ -166,15 +184,13 @@ export function YearEditDialog({ open, onOpenChange, year }: YearEditDialogProps
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>แก้ไขปีการศึกษา</DialogTitle>
-          <DialogDescription>ปรับข้อมูลปีการศึกษาและภาคเรียนทั้ง 2 ภาค</DialogDescription>
-        </DialogHeader>
+    <>
+      <DialogHeader>
+        <DialogTitle>แก้ไขปีการศึกษา</DialogTitle>
+        <DialogDescription>ปรับข้อมูลปีการศึกษาและภาคเรียนทั้ง 2 ภาค</DialogDescription>
+      </DialogHeader>
 
-        {!year ? null : (
-          <div className="grid gap-5 py-1">
+      <div className="grid gap-5 py-1">
             <div className="grid gap-3 rounded-xl border border-border p-4">
               <p className="text-sm font-medium">ข้อมูลปีการศึกษา</p>
               <div className="grid gap-2">
@@ -308,18 +324,16 @@ export function YearEditDialog({ open, onOpenChange, year }: YearEditDialogProps
                 </div>
               ) : null}
             </div>
-          </div>
-        )}
+      </div>
 
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={closeDialog}>
-            ยกเลิก
-          </Button>
-          <Button type="button" onClick={handleSubmit} disabled={submitting || !year}>
-            {submitting ? "กำลังบันทึก..." : "บันทึกการแก้ไข"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={closeDialog}>
+          ยกเลิก
+        </Button>
+        <Button type="button" onClick={handleSubmit} disabled={submitting}>
+          {submitting ? "กำลังบันทึก..." : "บันทึกการแก้ไข"}
+        </Button>
+      </DialogFooter>
+    </>
   );
 }

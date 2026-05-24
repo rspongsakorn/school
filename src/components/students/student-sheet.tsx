@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -99,15 +99,40 @@ export function StudentSheet({
   readOnly = false,
   initial,
 }: StudentSheetProps) {
+  const formKey = open ? `${mode}-${initial?.id ?? "new"}` : "closed";
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="sm:max-w-md">
+        {open ? (
+          <StudentSheetBody
+            key={formKey}
+            mode={mode}
+            readOnly={readOnly}
+            initial={initial}
+            onOpenChange={onOpenChange}
+          />
+        ) : null}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function StudentSheetBody({
+  mode,
+  readOnly,
+  initial,
+  onOpenChange,
+}: {
+  mode: "create" | "edit";
+  readOnly: boolean;
+  initial?: StudentSheetProps["initial"];
+  onOpenChange: (open: boolean) => void;
+}) {
   const router = useRouter();
-  const [form, setForm] = useState<StudentFormState>(initialForm);
+  const [form, setForm] = useState<StudentFormState>(() => buildInitialForm(mode, initial));
   const [submitting, setSubmitting] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setForm(buildInitialForm(mode, initial));
-  }, [open, mode, initial]);
 
   const isEditMode = mode === "edit";
   const canDelete = isEditMode && !readOnly && Boolean(initial?.id);
@@ -170,9 +195,8 @@ export function StudentSheet({
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-md">
-        <SheetHeader>
+    <>
+      <SheetHeader>
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>{description}</SheetDescription>
         </SheetHeader>
@@ -259,7 +283,6 @@ export function StudentSheet({
             ) : null}
           </div>
         </SheetFooter>
-      </SheetContent>
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
@@ -278,9 +301,9 @@ export function StudentSheet({
             >
               {submitting ? "กำลังลบ..." : "ยืนยันลบ"}
             </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </Sheet>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
