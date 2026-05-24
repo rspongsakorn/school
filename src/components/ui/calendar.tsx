@@ -6,24 +6,14 @@ import { DayPicker, getDefaultClassNames, type DayPickerProps } from "react-day-
 
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
-import { toBuddhistYear } from "@/lib/students/dates";
+import {
+  formatMonthDropdownThai,
+  formatYearDropdownBE,
+  THAI_MONTHS_LONG,
+  toBuddhistYear,
+} from "@/lib/students/dates";
 
 import "react-day-picker/style.css";
-
-const THAI_MONTHS_LONG = [
-  "มกราคม",
-  "กุมภาพันธ์",
-  "มีนาคม",
-  "เมษายน",
-  "พฤษภาคม",
-  "มิถุนายน",
-  "กรกฎาคม",
-  "สิงหาคม",
-  "กันยายน",
-  "ตุลาคม",
-  "พฤศจิกายน",
-  "ธันวาคม",
-] as const;
 
 function formatCaptionBuddhist(month: Date): string {
   return `${THAI_MONTHS_LONG[month.getMonth()]} ${toBuddhistYear(month.getFullYear())}`;
@@ -33,6 +23,7 @@ function Calendar({
   className,
   classNames,
   showOutsideDays = true,
+  captionLayout = "label",
   formatters,
   ...props
 }: DayPickerProps) {
@@ -41,9 +32,12 @@ function Calendar({
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
+      captionLayout={captionLayout}
       className={cn("p-2", className)}
       formatters={{
         formatCaption: formatCaptionBuddhist,
+        formatYearDropdown: formatYearDropdownBE,
+        formatMonthDropdown: formatMonthDropdownThai,
         ...formatters,
       }}
       classNames={{
@@ -63,6 +57,16 @@ function Calendar({
           "flex h-8 flex-1 items-center justify-center text-sm font-medium",
           defaultClassNames.month_caption,
         ),
+        dropdowns: cn(
+          "flex w-full items-center justify-center gap-2",
+          defaultClassNames.dropdowns,
+        ),
+        dropdown_root: cn("relative", defaultClassNames.dropdown_root),
+        dropdown: cn(
+          "h-8 appearance-none rounded-md border border-input bg-background pl-2 pr-7 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+          defaultClassNames.dropdown,
+        ),
+        caption_label: cn("pointer-events-none sr-only", defaultClassNames.caption_label),
         weekdays: cn("flex", defaultClassNames.weekdays),
         weekday: cn(
           "w-8 text-center text-xs font-normal text-muted-foreground",

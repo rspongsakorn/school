@@ -1,12 +1,26 @@
 "use client";
 
-import { useState } from "react";
-import { CalendarIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
-import { formatThaiBirthDate, isoDateFromLocalDate, parseIsoDateOnly } from "@/lib/students/dates";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  BIRTH_MONTH_OPTIONS,
+  birthYearOptions,
+  buildBirthDateIso,
+  daysInMonth,
+  parseBirthDateParts,
+} from "@/lib/students/dates";
+
+type BirthDatePartsState = {
+  year: string;
+  month: string;
+  day: string;
+};
 
 type BirthDatePickerProps = {
   id?: string;
@@ -16,6 +30,16 @@ type BirthDatePickerProps = {
   "aria-invalid"?: boolean;
 };
 
+function partsFromValue(value: string): BirthDatePartsState {
+  const parsed = parseBirthDateParts(value);
+  if (!parsed) return { year: "", month: "", day: "" };
+  return {
+    year: String(parsed.year),
+    month: String(parsed.month),
+    day: String(parsed.day),
+  };
+}
+
 export function BirthDatePicker({
   id,
   value,
@@ -23,42 +47,98 @@ export function BirthDatePicker({
   disabled,
   "aria-invalid": ariaInvalid,
 }: BirthDatePickerProps) {
-  const [open, setOpen] = useState(false);
-  const selected = value ? parseIsoDateOnly(value) : undefined;
+  const [parts, setParts] = useState<BirthDatePartsState>(() => partsFromValue(value));
+
+  // Sync only when parent has a complete date (avoid clearing partial year/month/day picks)
+  useEffect(() => {
+    const parsed = parseBirthDateParts(value);
+    if (parsed) {
+      setParts({
+        year: String(parsed.year),
+        month: String(parsed.month),
+        day: String(parsed.day),
+      });
+    }
+  }, [value]);
+
+  const yearOptions = useMemo(() => birthYearOptions(), []);
+
+  const dayOptions = useMemo(() => {
+    if (!parts.year || !parts.month) return [];
+    const maxDay = daysInMonth(Number(parts.year), Number(parts.month));
+    return Array.from({ length: maxDay }, (_, index) => {
+      const d = String(index + 1);
+      return { value: d, label: d };
+    });
+  }, [parts.year, parts.month]);
+
+  function updatePart(next: Partial<BirthDatePartsState>) {
+    const merged = { ...parts, ...next };
+    setParts(merged);
+    onChange(buildBirthDateIso(merged));
+  }
+
+  const canPickDay = Boolean(parts.year && parts.month);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        id={id}
+    <div
+      id={id}
+      className="grid grid-cols-3 gap-2"
+      aria-invalid={ariaInvalid}
+    >
+      <Select
+        value={parts.year || undefined}
+        onValueChange={(v) => v && updatePart({ year: v, day: "" })}
         disabled={disabled}
-        aria-invalid={ariaInvalid}
-        render={
-          <Button
-            type="button"
-            variant="outline"
-            className={cn(
-              "w-full justify-start font-normal",
-              !value && "text-muted-foreground",
-            )}
-          />
-        }
+        items={yearOptions}
       >
-        <CalendarIcon className="size-4" />
-        {value ? formatThaiBirthDate(value) : "เลือกวันเกิด"}
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="single"
-          selected={selected}
-          defaultMonth={selected}
-          disabled={{ after: new Date() }}
-          onSelect={(date) => {
-            if (!date) return;
-            onChange(isoDateFromLocalDate(date));
-            setOpen(false);
-          }}
-        />
-      </PopoverContent>
-    </Popover>
+        <SelectTrigger className="w-full" aria-label="ปี พ.ศ.">
+          <SelectValue placeholder="ปี (พ.ศ.)" />
+        </SelectTrigger>
+        <SelectContent className="max-h-60">
+          {yearOptions.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select
+        value={parts.month || undefined}
+        onValueChange={(v) => v && updatePart({ month: v, day: "" })}
+        disabled={disabled}
+        items={BIRTH_MONTH_OPTIONS}
+      >
+        <SelectTrigger className="w-full" aria-label="เดือน">
+          <SelectValue placeholder="เดือน" />
+        </SelectTrigger>
+        <SelectContent>
+          {BIRTH_MONTH_OPTIONS.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select
+        value={parts.day || undefined}
+        onValueChange={(v) => v && updatePart({ day: v })}
+        disabled={disabled || !canPickDay}
+        items={dayOptions}
+      >
+        <SelectTrigger className="w-full" aria-label="วัน">
+          <SelectValue placeholder="วัน" />
+        </SelectTrigger>
+        <SelectContent>
+          {dayOptions.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }
