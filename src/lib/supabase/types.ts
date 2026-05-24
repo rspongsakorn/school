@@ -28,13 +28,16 @@ export type Database = {
         academic_year_id: string;
         number: number;
         name: string | null;
+        start_date: string;
+        end_date: string;
       }>;
       students: TableDef<{
         id: string;
         student_code: string;
         first_name: string;
         last_name: string;
-        status: string;
+        id_card: string | null;
+        status: "active" | "graduated" | "transferred" | "withdrawn";
       }>;
       grade_levels: TableDef<{
         id: string;

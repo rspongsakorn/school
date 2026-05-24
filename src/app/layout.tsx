@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Noto_Sans_Thai } from "next/font/google";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 const inter = Inter({
@@ -32,6 +33,7 @@ export default function RootLayout({
         className={`${inter.variable} ${notoSansThai.variable} min-h-screen font-sans antialiased`}
       >
         {children}
+        <Toaster richColors position="top-center" />
       </body>
     </html>
   );
