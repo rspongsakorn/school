@@ -10,8 +10,148 @@ import {
   validateStudentForm,
   type StudentFormInput,
 } from "@/lib/students/validation";
+import {
+  importRowToCsvInput,
+  validateAndBuildImportRows,
+  type CsvStudentInputRow,
+  type ImportRowError,
+  type ImportStudentRow,
+} from "@/lib/students/csv-import";
+import { CSV_IMPORT_MAX_ROWS } from "@/lib/students/csv-format";
+import { STUDENT_GENDER_LABELS } from "@/lib/students/constants";
+import { formatThaiBirthDate } from "@/lib/students/dates";
 import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
+
+export type ImportStudentPreview = {
+  studentCode: string;
+  idCard: string | null;
+  name: string;
+  genderLabel: string;
+  birthDateLabel: string;
+};
+
+export type PreviewStudentCsvImportResult =
+  | { ok: false; error: string }
+  | {
+      ok: true;
+      stats: { ready: number; errors: number };
+      ready: ImportStudentRow[];
+      preview: ImportStudentPreview[];
+      errors: ImportRowError[];
+    };
+
+export type ConfirmStudentCsvImportResult =
+  | { ok: false; error: string }
+  | { ok: true; imported: number; errors: ImportRowError[] };
+
+const INSERT_CHUNK_SIZE = 100;
+
+async function loadExistingStudentCodes(codes: string[]): Promise<Set<string>> {
+  if (codes.length === 0) return new Set();
+
+  const supabase = await createClient();
+  const uniqueCodes = [...new Set(codes)];
+  const { data, error } = await supabase
+    .from("students")
+    .select("student_code")
+    .in("student_code", uniqueCodes);
+
+  if (error) throw new Error("load_existing_codes_failed");
+
+  return new Set((data ?? []).map((row) => row.student_code));
+}
+
+export async function previewStudentCsvImport(
+  rows: CsvStudentInputRow[],
+): Promise<PreviewStudentCsvImportResult> {
+  const auth = await requireAdminAction();
+  if (!auth.ok) return auth;
+
+  if (rows.length > CSV_IMPORT_MAX_ROWS) {
+    return {
+      ok: false,
+      error: `ไฟล์มีมากกว่า ${CSV_IMPORT_MAX_ROWS} แถว — กรุณาแบ่งไฟล์`,
+    };
+  }
+
+  try {
+    const codes = rows.map((row) => row.student_code?.trim()).filter(Boolean) as string[];
+    const existingSet = await loadExistingStudentCodes(codes);
+    const { ready, errors } = validateAndBuildImportRows(rows, existingSet);
+
+    const preview: ImportStudentPreview[] = ready.map((row) => ({
+      studentCode: row.studentCode,
+      idCard: row.idCard,
+      name: `${row.firstName} ${row.lastName}`,
+      genderLabel: STUDENT_GENDER_LABELS[row.gender],
+      birthDateLabel: formatThaiBirthDate(row.dateOfBirth),
+    }));
+
+    return {
+      ok: true,
+      stats: { ready: ready.length, errors: errors.length },
+      ready,
+      preview,
+      errors,
+    };
+  } catch {
+    return { ok: false, error: "ไม่สามารถตรวจสอบไฟล์ได้" };
+  }
+}
+
+export async function confirmStudentCsvImport(
+  rows: ImportStudentRow[],
+): Promise<ConfirmStudentCsvImportResult> {
+  const auth = await requireAdminAction();
+  if (!auth.ok) return auth;
+
+  if (rows.length === 0) {
+    return { ok: true, imported: 0, errors: [] };
+  }
+
+  if (rows.length > CSV_IMPORT_MAX_ROWS) {
+    return {
+      ok: false,
+      error: `นำเข้าได้สูงสุด ${CSV_IMPORT_MAX_ROWS} แถวต่อครั้ง`,
+    };
+  }
+
+  try {
+    const mappedRows = rows.map((row, index) => importRowToCsvInput(row, index + 2));
+    const codes = mappedRows.map((row) => row.student_code?.trim()).filter(Boolean) as string[];
+    const existingSet = await loadExistingStudentCodes(codes);
+    const { ready, errors } = validateAndBuildImportRows(mappedRows, existingSet);
+
+    if (ready.length === 0) {
+      return { ok: true, imported: 0, errors };
+    }
+
+    const supabase = await createClient();
+    const inserts = ready.map((row) => ({
+      student_code: row.studentCode,
+      first_name: row.firstName,
+      last_name: row.lastName,
+      gender: row.gender,
+      date_of_birth: row.dateOfBirth,
+      id_card: row.idCard,
+      status: "active" as const,
+    }));
+
+    for (let offset = 0; offset < inserts.length; offset += INSERT_CHUNK_SIZE) {
+      const chunk = inserts.slice(offset, offset + INSERT_CHUNK_SIZE);
+      const { error } = await supabase.from("students").insert(chunk);
+      if (error) {
+        return { ok: false, error: "ไม่สามารถนำเข้านักเรียนได้" };
+      }
+    }
+
+    revalidatePath("/students");
+    return { ok: true, imported: ready.length, errors };
+  } catch {
+    return { ok: false, error: "ไม่สามารถนำเข้านักเรียนได้" };
+  }
+}
 
 export async function createStudent(input: StudentFormInput): Promise<ActionState> {
   const auth = await requireAdminAction();

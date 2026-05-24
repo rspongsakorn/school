@@ -155,6 +155,11 @@ export function StudentImportDialog({ open, onOpenChange }: StudentImportDialogP
       return;
     }
 
+    if (result.imported === 0) {
+      toast.error("ไม่สามารถนำเข้าได้ — กรุณาตรวจสอบรายการอีกครั้ง");
+      return;
+    }
+
     if (result.errors.length > 0) {
       toast.success(
         `นำเข้าแล้ว ${result.imported} คน (ข้าม ${result.errors.length} แถวที่มีปัญหา)`,

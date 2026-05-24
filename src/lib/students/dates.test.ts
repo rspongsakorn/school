@@ -4,6 +4,7 @@ import {
   daysInMonth,
   formatMonthDropdownThai,
   formatThaiBirthDate,
+  formatThaiBirthdateShort,
   formatYearDropdownBE,
   isoDateFromLocalDate,
   isFutureIsoDate,
@@ -28,6 +29,12 @@ describe("parseIsoDateOnly / isoDateFromLocalDate", () => {
 describe("formatThaiBirthDate", () => {
   it("formats with Buddhist year", () => {
     expect(formatThaiBirthDate("2007-05-15")).toBe("15 พ.ค. 2550");
+  });
+});
+
+describe("formatThaiBirthdateShort", () => {
+  it("formats ISO as Thai short date for CSV re-validation", () => {
+    expect(formatThaiBirthdateShort("2012-04-21")).toBe("21 เม.ย. 55");
   });
 });
 

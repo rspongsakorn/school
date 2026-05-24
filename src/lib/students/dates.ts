@@ -15,7 +15,7 @@ export const THAI_MONTHS_LONG = [
   "ธันวาคม",
 ] as const;
 
-const THAI_MONTHS_SHORT = [
+export const THAI_MONTHS_SHORT = [
   "ม.ค.",
   "ก.พ.",
   "มี.ค.",
@@ -52,6 +52,15 @@ export function formatThaiBirthDate(isoDate: string): string {
   const month = THAI_MONTHS_SHORT[date.getMonth()];
   const beYear = toBuddhistYear(date.getFullYear());
   return `${day} ${month} ${beYear}`;
+}
+
+/** CSV import birthdate: day, Thai month abbr, BE year 2 digits (e.g. `21 เม.ย. 55`) */
+export function formatThaiBirthdateShort(isoDate: string): string {
+  const date = parseIsoDateOnly(isoDate);
+  const day = date.getDate();
+  const month = THAI_MONTHS_SHORT[date.getMonth()];
+  const yy = String(toBuddhistYear(date.getFullYear()) % 100).padStart(2, "0");
+  return `${day} ${month} ${yy}`;
 }
 
 export function isFutureIsoDate(isoDate: string): boolean {

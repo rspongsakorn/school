@@ -1,0 +1,110 @@
+import { describe, expect, it } from "vitest";
+import {
+  assertRequiredHeaders,
+  importRowToCsvInput,
+  mapGenderLabel,
+  parseCsvText,
+  parseThaiBirthdateShort,
+  validateAndBuildImportRows,
+} from "@/lib/students/csv-import";
+
+describe("parseCsvText", () => {
+  it("parses quoted fields with commas", () => {
+    const rows = parseCsvText('a,b\n1,"hello, world"');
+    expect(rows[1][1]).toBe("hello, world");
+  });
+});
+
+describe("assertRequiredHeaders", () => {
+  it("returns null when all required headers present", () => {
+    expect(
+      assertRequiredHeaders([
+        "id_card",
+        "student_code",
+        "gender",
+        "first_name",
+        "last_name",
+        "birthdate",
+      ]),
+    ).toBeNull();
+  });
+
+  it("lists missing headers", () => {
+    expect(assertRequiredHeaders(["student_code"])).toMatch(/birthdate/);
+  });
+});
+
+describe("mapGenderLabel", () => {
+  it("maps เด็กหญิง to female", () => {
+    expect(mapGenderLabel("เด็กหญิง")).toBe("female");
+  });
+
+  it("maps เด็กชาย to male", () => {
+    expect(mapGenderLabel("เด็กชาย")).toBe("male");
+  });
+
+  it("returns null for unknown", () => {
+    expect(mapGenderLabel("unknown")).toBeNull();
+  });
+});
+
+describe("parseThaiBirthdateShort", () => {
+  it("parses 21 เม.ย. 55 to 2012-04-21", () => {
+    expect(parseThaiBirthdateShort("21 เม.ย. 55")).toBe("2012-04-21");
+  });
+
+  it("returns null for invalid text", () => {
+    expect(parseThaiBirthdateShort("not a date")).toBeNull();
+  });
+});
+
+describe("validateAndBuildImportRows", () => {
+  const baseRow = {
+    rowNumber: 2,
+    student_code: "12390",
+    first_name: "ทดสอบ",
+    last_name: "นามสกุล",
+    gender: "เด็กชาย",
+    birthdate: "25 ก.ค. 54",
+    id_card: "",
+  };
+
+  it("builds ready row when valid", () => {
+    const result = validateAndBuildImportRows([baseRow], new Set());
+    expect(result.ready).toHaveLength(1);
+    expect(result.ready[0].studentCode).toBe("12390");
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it("errors when student_code exists in DB", () => {
+    const result = validateAndBuildImportRows([baseRow], new Set(["12390"]));
+    expect(result.ready).toHaveLength(0);
+    expect(result.errors[0].message).toMatch(/มีในระบบแล้ว/);
+  });
+
+  it("re-validates ImportStudentRow after importRowToCsvInput round-trip", () => {
+    const row = {
+      studentCode: "12390",
+      firstName: "ทดสอบ",
+      lastName: "นามสกุล",
+      gender: "male" as const,
+      dateOfBirth: "2012-04-21",
+      idCard: null,
+    };
+    const csvRow = importRowToCsvInput(row, 2);
+    const result = validateAndBuildImportRows([csvRow], new Set());
+    expect(result.ready).toHaveLength(1);
+    expect(result.ready[0].dateOfBirth).toBe("2012-04-21");
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it("errors duplicate code in file on second row", () => {
+    const result = validateAndBuildImportRows(
+      [baseRow, { ...baseRow, rowNumber: 3 }],
+      new Set(),
+    );
+    expect(result.ready).toHaveLength(1);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0].message).toMatch(/ซ้ำในไฟล์/);
+  });
+});

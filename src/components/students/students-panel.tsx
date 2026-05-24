@@ -37,6 +37,7 @@ import {
   type StudentStatus,
 } from "@/lib/students/constants";
 import { studentDeleteBlockedReason } from "@/lib/students/delete-eligibility";
+import { StudentImportDialog } from "@/components/students/student-import-dialog";
 import { StudentSheet } from "@/components/students/student-sheet";
 import { StudentSearchInput } from "@/components/students/student-search-input";
 
@@ -57,6 +58,7 @@ export function StudentsPanel({ data, params, isAdmin }: StudentsPanelProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [createOpen, setCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<StudentListRow | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [deleteTargetIds, setDeleteTargetIds] = useState<string[] | null>(null);
@@ -216,6 +218,9 @@ export function StudentsPanel({ data, params, isAdmin }: StudentsPanelProps) {
                 ลบที่เลือก ({bulkDeleteCount})
               </Button>
             ) : null}
+            <Button type="button" variant="outline" onClick={() => setImportOpen(true)}>
+              นำเข้า CSV
+            </Button>
             <Button type="button" onClick={() => setCreateOpen(true)}>
               เพิ่มนักเรียน
             </Button>
@@ -349,6 +354,10 @@ export function StudentsPanel({ data, params, isAdmin }: StudentsPanelProps) {
         readOnly={!isAdmin}
         initial={selectedInitial}
       />
+
+      {isAdmin ? (
+        <StudentImportDialog open={importOpen} onOpenChange={setImportOpen} />
+      ) : null}
 
       {isAdmin ? (
         <AlertDialog
