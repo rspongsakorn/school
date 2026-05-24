@@ -16,6 +16,10 @@ import { createClient } from "@/lib/supabase/server";
 
 export type ActionState = { ok: true } | { ok: false; error: string };
 
+export type CreateYearResult =
+  | { ok: true; yearId: string }
+  | { ok: false; error: string };
+
 type YearInput = {
   name: string;
   startDate: string;
@@ -67,7 +71,7 @@ function mapAcademicYearMutationError(error: { code?: string; message?: string }
 export async function createYearWithSemesters(
   year: YearInput,
   semesters: SemesterInput[],
-): Promise<ActionState> {
+): Promise<CreateYearResult> {
   const auth = await requireAdminAction();
   if (!auth.ok) return auth;
 
@@ -80,7 +84,7 @@ export async function createYearWithSemesters(
   const sem1 = semesters.find((s) => s.number === 1) ?? semesters[0];
   const supabase = await createClient();
 
-  const { error } = await supabase.rpc("create_academic_year_with_semesters", {
+  const { data, error } = await supabase.rpc("create_academic_year_with_semesters", {
     p_name: year.name.trim(),
     p_start_date: year.startDate,
     p_end_date: year.endDate,
@@ -94,8 +98,12 @@ export async function createYearWithSemesters(
     return { ok: false, error: mapAcademicYearMutationError(error) };
   }
 
+  if (!data) {
+    return { ok: false, error: "ไม่สามารถสร้างปีการศึกษาได้" };
+  }
+
   revalidatePath("/academic-year");
-  return { ok: true };
+  return { ok: true, yearId: data as string };
 }
 
 export async function updateYearMetadata(

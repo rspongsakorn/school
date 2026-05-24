@@ -29,7 +29,6 @@ import type { AcademicYearRow } from "@/lib/data/academic-years";
 
 type YearTableProps = {
   years: AcademicYearRow[];
-  onEdit: (year: AcademicYearRow) => void;
 };
 
 function formatSemesters(year: AcademicYearRow) {
@@ -38,7 +37,7 @@ function formatSemesters(year: AcademicYearRow) {
   return `${nums.length} ภาค (${nums.join(", ")})`;
 }
 
-export function YearTable({ years, onEdit }: YearTableProps) {
+export function YearTable({ years }: YearTableProps) {
   const router = useRouter();
   const [deleteTarget, setDeleteTarget] = useState<AcademicYearRow | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -81,7 +80,11 @@ export function YearTable({ years, onEdit }: YearTableProps) {
         </TableHeader>
         <TableBody>
           {years.map((year) => (
-            <TableRow key={year.id}>
+            <TableRow
+              key={year.id}
+              className="cursor-pointer hover:bg-muted/50"
+              onClick={() => router.push(`/academic-year/${year.id}`)}
+            >
               <TableCell className="font-medium">{year.name}</TableCell>
               <TableCell>
                 {formatThaiDate(year.start_date)} - {formatThaiDate(year.end_date)}
@@ -100,7 +103,14 @@ export function YearTable({ years, onEdit }: YearTableProps) {
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex justify-end gap-2">
-                  <Button size="sm" variant="outline" onClick={() => onEdit(year)}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/academic-year/${year.id}`);
+                    }}
+                  >
                     แก้ไข
                   </Button>
                   <Button
@@ -109,7 +119,10 @@ export function YearTable({ years, onEdit }: YearTableProps) {
                     className="text-destructive"
                     disabled={year.is_active}
                     title={year.is_active ? "ไม่สามารถลบปีที่กำลังใช้งาน" : "ลบปีการศึกษา"}
-                    onClick={() => setDeleteTarget(year)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteTarget(year);
+                    }}
                   >
                     ลบ
                   </Button>
