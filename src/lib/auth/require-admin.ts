@@ -11,7 +11,7 @@ export async function getCurrentProfileRole() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, display_name, is_active")
+    .select("id, role, display_name, is_active")
     .eq("id", user.id)
     .maybeSingle();
 

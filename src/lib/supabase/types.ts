@@ -69,15 +69,49 @@ export type Database = {
         semester_id: string;
         role: string;
       }>;
+      fee_items: TableDef<{
+        id: string;
+        name: string;
+        description: string | null;
+        is_tuition: boolean;
+        is_active: boolean;
+      }>;
+      receipt_types: TableDef<{
+        id: string;
+        code: string;
+        name: string;
+        description: string | null;
+        is_active: boolean;
+      }>;
+      fee_rates: TableDef<{
+        id: string;
+        academic_year_id: string;
+        semester_id: string;
+        grade_level_id: string;
+        fee_item_id: string;
+        amount: number;
+        receipt_type_id: string | null;
+      }>;
       student_invoices: TableDef<{
         id: string;
         student_id: string;
         academic_year_id: string;
         semester_id: string;
+        invoice_name: string;
+        subtotal: number;
+        discount_type: "percent" | "fixed" | null;
+        discount_value: number | null;
         total_amount: number;
         paid_amount: number;
-        status: string;
+        status: "unpaid" | "partial" | "paid";
         created_at: string;
+      }>;
+      invoice_lines: TableDef<{
+        id: string;
+        invoice_id: string;
+        fee_item_id: string;
+        description: string;
+        amount: number;
       }>;
       payments: TableDef<{
         id: string;
@@ -85,8 +119,33 @@ export type Database = {
         student_id: string;
         academic_year_id: string;
         amount: number;
+        payment_method: "cash" | "transfer";
+        transfer_reference: string | null;
         paid_at: string;
-        status: string;
+        recorded_by: string;
+        note: string | null;
+        status: "active" | "voided";
+      }>;
+      payment_allocations: TableDef<{
+        id: string;
+        payment_id: string;
+        invoice_id: string;
+        amount: number;
+      }>;
+      receipts: TableDef<{
+        id: string;
+        payment_id: string;
+        receipt_number: string;
+        receipt_type_id: string;
+        snapshot_data: Record<string, unknown>;
+        issued_at: string;
+      }>;
+      payment_voids: TableDef<{
+        id: string;
+        payment_id: string;
+        voided_by: string;
+        voided_at: string;
+        reason: string;
       }>;
     };
     Views: Record<string, never>;

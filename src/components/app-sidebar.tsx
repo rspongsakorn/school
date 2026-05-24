@@ -10,6 +10,8 @@ import {
   FileText,
   GraduationCap,
   LayoutDashboard,
+  Receipt,
+  SlidersHorizontal,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -22,9 +24,12 @@ const basicNav = [
 ];
 
 const financeNav = [
-  { href: "/payments", label: "บันทึกการจ่าย", icon: CreditCard },
+  { href: "/fee-rates", label: "ตั้งค่าค่าธรรมเนียม", icon: SlidersHorizontal },
+  { href: "/receipt-types", label: "ประเภทใบเสร็จ", icon: Receipt },
   { href: "/invoices", label: "ใบแจ้งชำระ", icon: FileText },
-  { href: "/reports", label: "รายงาน", icon: ChartColumn },
+  { href: "/payments", label: "บันทึกการจ่าย", icon: CreditCard },
+  { href: "/reports/outstanding", label: "รายงานค้างชำระ", icon: ChartColumn },
+  { href: "/reports/collections", label: "สรุปการเก็บ", icon: ChartColumn },
 ];
 
 function NavSection({
