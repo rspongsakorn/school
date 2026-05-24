@@ -1,7 +1,7 @@
 # Design Spec: ระบบจัดการค่าเทอมโรงเรียน
 
 **Date:** 2026-05-24  
-**Status:** Draft — pending user review  
+**Status:** Approved — includes UI mockups (2026-05-24)  
 **Reference:** [iSchoolSIS demo](https://demopayment.ischoolsis.com/schoolmin/schoolpayment/) (finance/finance)
 
 ---
@@ -437,28 +437,106 @@ Teachers see only students in classrooms where they have a `teacher_assignments`
 
 ---
 
-## 7. UI Notes
+## 7. UI Design — v0 + shadcn (Light School Theme)
 
-### Global header
+**Primary UI source:** [v0 production deploy](https://v0-thai-school-admin-app.vercel.app/) — integrated at repo root.
 
-- School name
-- Year + semester selector (updates `?year=&semester=` and cookie)
-- Current user name + role
-- Logout
+**Prompt pack:** [`v0-ui-prompts.md`](./v0-ui-prompts.md) — copy-paste prompts per screen.
 
-### Language
+**Reference templates:** [School Admin Dashboard (v0)](https://v0.dev/chat/school-admin-dashboard-t5XaTtYgd7u), shadcn blocks `dashboard-01`, `sidebar-03`, `login-04`.
 
-- Thai throughout
+### Design direction
 
-### Receipt print layout
+Clean, trustworthy **Thai primary school finance portal** — light theme, shadcn dashboard aesthetic. Professional for daily finance staff use; approachable school tone (not corporate SaaS, not dark luxury).
 
-- School logo and name
-- Receipt number, date
-- Student name, code, classroom
-- Line items with amounts
-- Payment method
-- Amount in words ( Thai baht text )
-- Received by (staff name)
+### Color palette
+
+| Token | Hex / Tailwind | Usage |
+|-------|----------------|-------|
+| Canvas | `#F8FAFC` | slate-50 page background |
+| Surface | `#FFFFFF` | Cards, sidebar |
+| School blue | `#1B6CA8` | Primary buttons, links, active nav |
+| Finance CTA | `#D97706` | amber-600 — "บันทึกและออกใบเสร็จ" |
+| Charcoal | `#0F172A` | slate-900 primary text |
+| Muted | `#64748B` | slate-500 labels |
+| Border | `#E2E8F0` | slate-200 |
+| Success | `#047857` | emerald-700 paid |
+| Warning | `#B45309` | amber-700 outstanding |
+
+Subtle shadows OK (shadcn default). Prefer borders + whitespace over decoration.
+
+### Typography
+
+| Role | Font |
+|------|------|
+| UI | Inter or Geist (v0/shadcn default) |
+| Thai | Noto Sans Thai (via `next/font`) |
+
+- Page titles: text-2xl font-semibold
+- Tables: text-sm, `tabular-nums` for ฿ amounts
+
+### Layout
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  🏫 โรงเรียนตัวอย่าง     │  ภาพรวม           ปี ▾  ภาค ▾  │
+│  ─── white sidebar 260px │  ภาคเรียนที่ 1 · 2568           │
+│  ข้อมูลพื้นฐาน           │  ─────────────────────────────  │
+│  ภาพรวม ●                │  [ stat cards · shadcn Card ]   │
+│  การเงิน                 │  [ table / chart cards ]        │
+│  บันทึกการจ่าย           │                                 │
+└──────────────────────────┴─────────────────────────────────┘
+```
+
+- Sidebar: white, grouped sections, school blue active state
+- Header: year/semester selectors always visible
+- Content: slate-50 background, p-6 md:p-8
+
+### Key screens (generate in v0)
+
+See `v0-ui-prompts.md` for full prompts.
+
+| Screen | Route | v0 focus |
+|--------|-------|----------|
+| Login | `/login` | login-04 style, Thai copy, school branding |
+| Dashboard | `/` | stat cards + priority list + collections table |
+| บันทึกการจ่าย | `/payments` | search-first 2-column layout |
+| ใบเสร็จ | modal or `/receipts/[id]` | print-ready document |
+| รายงานค้างชำระ | `/reports/outstanding` | filters + striped table |
+
+### Sidebar navigation (Thai)
+
+**ข้อมูลพื้นฐาน:** ภาพรวม, ปีการศึกษา, นักเรียน, ลงทะเบียน  
+**การเงิน:** บันทึกการจ่าย, ใบแจ้งชำระ, รายงาน
+
+### UX best practices (v1 checklist)
+
+| Principle | Implementation | Status |
+|-----------|----------------|--------|
+| Context always visible | Year/semester in header + `?year=&semester=` URL | Required |
+| Single primary CTA | One dominant button per workflow step | Required |
+| Search-first payment flow | Lookup student before amount entry (walk-in desk) | Required |
+| Status not color-only | Pill + Thai text (ค้างชำระ / ชำระแล้ว) | Required |
+| WCAG AA contrast | Charcoal on ivory ≥ 4.5:1 | Required |
+| Touch targets | Buttons/inputs ≥ 40–44px height | Required |
+| Form labels | Label above every input | Required |
+| Destructive confirm | Void receipt → dialog + reason (audit) | v1 spec |
+| Empty states | Next-step guidance when no data | Implement |
+| Keyboard | Enter to search student; logical tab order | Implement |
+| Success feedback | Toast after save + receipt print option | Implement |
+| Focus states | Visible focus ring on all interactive elements | Implement |
+
+### Component library
+
+**shadcn/ui** + Tailwind — generated/refined in **v0**, integrated into Next.js:
+
+```bash
+npx shadcn@latest add dashboard-01 sidebar-03 login-04 button card table badge form
+```
+
+- CSS variables in `globals.css` (see `v0-ui-prompts.md`)
+- `font-sans`: Inter/Geist + Noto Sans Thai
+- Button: primary = school blue; finance CTA = amber accent variant
 
 ---
 
