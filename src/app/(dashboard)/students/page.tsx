@@ -1,22 +1,44 @@
 import { AppHeader } from "@/components/app-header";
+import { StudentsPanel } from "@/components/students/students-panel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getCurrentProfileRole } from "@/lib/auth/require-admin";
+import { getYearSemesterContext } from "@/lib/data/context";
+import { listStudentsPaginated } from "@/lib/data/students";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { getCurrentProfile, getYearSemesterContext } from "@/lib/data/context";
-import { listStudents } from "@/lib/data/students";
+  STUDENT_STATUS_FILTER_OPTIONS,
+  type StudentStatus,
+} from "@/lib/students/constants";
 
-export default async function StudentsPage() {
+type SearchParams = Promise<{ q?: string; status?: string; page?: string }>;
+
+function parseStatus(value?: string): StudentStatus | "all" {
+  if (!value) return "all";
+  const isValid = STUDENT_STATUS_FILTER_OPTIONS.some((option) => option.value === value);
+  return isValid ? (value as StudentStatus | "all") : "all";
+}
+
+export default async function StudentsPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const sp = await searchParams;
   const [profile, context] = await Promise.all([
-    getCurrentProfile(),
+    getCurrentProfileRole(),
     getYearSemesterContext(),
   ]);
-  const students = await listStudents(context?.academicYearId ?? null);
+  const q = sp.q ?? "";
+  const status = parseStatus(sp.status);
+  const rawPage = Number.parseInt(sp.page ?? "1", 10);
+  const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+
+  const students = await listStudentsPaginated({
+    q,
+    status,
+    page,
+    academicYearId: context?.academicYearId ?? null,
+  });
+  const isAdmin = profile?.role === "admin";
 
   return (
     <>
@@ -31,38 +53,15 @@ export default async function StudentsPage() {
           <CardHeader>
             <CardTitle>รายชื่อนักเรียน</CardTitle>
             <CardDescription>
-              ข้อมูลจาก Supabase {students.length > 0 ? `(${students.length} คน)` : ""}
+              {students.total > 0 ? `${students.total} คน` : "ยังไม่มีนักเรียนในระบบ"}
             </CardDescription>
           </CardHeader>
-          <CardContent className="px-0 pb-0">
-            {students.length === 0 ? (
-              <p className="px-6 pb-6 text-sm text-muted-foreground">
-                ยังไม่มีนักเรียนในระบบ — เพิ่มข้อมูลในตาราง students
-              </p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>รหัส</TableHead>
-                    <TableHead>ชื่อ-นามสกุล</TableHead>
-                    <TableHead>ชั้น</TableHead>
-                    <TableHead>สถานะ</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {students.map((student) => (
-                    <TableRow key={student.id}>
-                      <TableCell className="font-medium tabular-nums">
-                        {student.studentCode}
-                      </TableCell>
-                      <TableCell>{student.name}</TableCell>
-                      <TableCell>{student.grade}</TableCell>
-                      <TableCell>{student.status}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+          <CardContent>
+            <StudentsPanel
+              data={students}
+              params={{ q, status, page }}
+              isAdmin={isAdmin}
+            />
           </CardContent>
         </Card>
       </main>
