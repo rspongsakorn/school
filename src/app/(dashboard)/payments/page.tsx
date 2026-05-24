@@ -1,10 +1,13 @@
 import { AppHeader } from "@/components/app-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getPageHeaderProps } from "@/lib/data/page-header";
 
-export default function PaymentsPage() {
+export default async function PaymentsPage() {
+  const header = await getPageHeaderProps();
+
   return (
     <>
-      <AppHeader title="บันทึกการจ่าย" />
+      <AppHeader title="บันทึกการจ่าย" {...header} />
       <main className="p-6">
         <Card className="max-w-lg border-border">
           <CardHeader>
@@ -12,7 +15,7 @@ export default function PaymentsPage() {
             <CardDescription>เคาน์เตอร์รับเงิน walk-in — ค้นหานักเรียน จัดสรร ออกใบเสร็จ</CardDescription>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            Generate หน้านี้ใน v0 แล้ว export มาแทนที่ — หรือให้ agent สร้างต่อจาก spec
+            ข้อมูลชำระเงินเชื่อม Supabase แล้ว — UI ฟอร์มบันทึกจะเพิ่มใน phase ถัดไป
           </CardContent>
         </Card>
       </main>

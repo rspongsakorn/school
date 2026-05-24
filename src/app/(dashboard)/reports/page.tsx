@@ -1,10 +1,13 @@
 import { AppHeader } from "@/components/app-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getPageHeaderProps } from "@/lib/data/page-header";
 
-export default function ReportsPage() {
+export default async function ReportsPage() {
+  const header = await getPageHeaderProps();
+
   return (
     <>
-      <AppHeader title="รายงาน" />
+      <AppHeader title="รายงาน" {...header} />
       <main className="p-6">
         <Card className="max-w-lg border-border">
           <CardHeader>
@@ -12,7 +15,7 @@ export default function ReportsPage() {
             <CardDescription>กรองตามชั้น ห้อง สถานะ</CardDescription>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            Generate หน้านี้ใน v0 แล้ว export มาแทนที่ — หรือให้ agent สร้างต่อจาก spec
+            สรุปค้างชำระแสดงบนแดชบอร์ดแล้ว — รายงานเต็มจะเพิ่มใน phase ถัดไป
           </CardContent>
         </Card>
       </main>

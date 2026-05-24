@@ -1,10 +1,13 @@
 import { AppHeader } from "@/components/app-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getPageHeaderProps } from "@/lib/data/page-header";
 
-export default function InvoicesPage() {
+export default async function InvoicesPage() {
+  const header = await getPageHeaderProps();
+
   return (
     <>
-      <AppHeader title="ใบแจ้งชำระ" />
+      <AppHeader title="ใบแจ้งชำระ" {...header} />
       <main className="p-6">
         <Card className="max-w-lg border-border">
           <CardHeader>
@@ -12,7 +15,7 @@ export default function InvoicesPage() {
             <CardDescription>สร้างและจัดการใบแจ้งชำระค่าเล่าเรียน</CardDescription>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            หน้านี้จะเชื่อมกับ Supabase ใน phase ถัดไป
+            จัดการใน Supabase ตาราง student_invoices และ invoice_lines
           </CardContent>
         </Card>
       </main>

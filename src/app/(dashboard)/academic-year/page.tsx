@@ -1,27 +1,24 @@
 import { AppHeader } from "@/components/app-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getPageHeaderProps } from "@/lib/data/page-header";
 
-function PlaceholderPage({ title, description }: { title: string; description: string }) {
+export default async function AcademicYearPage() {
+  const header = await getPageHeaderProps();
+
   return (
     <>
-      <AppHeader title={title} />
+      <AppHeader title="ปีการศึกษา" {...header} />
       <main className="p-6">
         <Card className="max-w-lg border-border">
           <CardHeader>
-            <CardTitle>{title}</CardTitle>
-            <CardDescription>{description}</CardDescription>
+            <CardTitle>ปีการศึกษา</CardTitle>
+            <CardDescription>ตั้งค่าปีการศึกษาและภาคเรียน</CardDescription>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            หน้านี้จะเชื่อมกับ Supabase ใน phase ถัดไป — UI shell จาก v0 พร้อมแล้ว
+            จัดการใน Supabase ตาราง academic_years และ semesters
           </CardContent>
         </Card>
       </main>
     </>
-  );
-}
-
-export default function AcademicYearPage() {
-  return (
-    <PlaceholderPage title="ปีการศึกษา" description="ตั้งค่าปีการศึกษาและภาคเรียน" />
   );
 }

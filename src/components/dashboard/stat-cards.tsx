@@ -6,49 +6,51 @@ import {
   Users,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatBaht } from "@/lib/mock-data";
+import { formatBaht } from "@/lib/format";
+import type { DashboardStats } from "@/lib/data/dashboard";
 
-const stats = [
-  {
-    title: "นักเรียนทั้งหมด",
-    value: "1,248",
-    delta: "+12",
-    deltaLabel: "เทียบภาคเรียนที่แล้ว",
-    positive: true,
-    icon: Users,
-  },
-  {
-    title: "ยอดเก็บได้",
-    value: formatBaht(2847500),
-    delta: formatBaht(125000),
-    deltaLabel: "เดือนนี้",
-    positive: true,
-    icon: Banknote,
-  },
-  {
-    title: "ชำระแล้ว",
-    value: "1,089",
-    suffix: "(87.3%)",
-    delta: "+5.2%",
-    deltaLabel: "จากเป้าหมาย 95%",
-    positive: true,
-    icon: CircleAlert,
-  },
-  {
-    title: "ค้างชำระ",
-    value: "159",
-    suffix: `(${formatBaht(478500)})`,
-    delta: "-23",
-    deltaLabel: "ลดลงจากเดือนก่อน",
-    positive: false,
-    icon: CircleAlert,
-  },
-];
+export function StatCards({ stats }: { stats: DashboardStats }) {
+  const items = [
+    {
+      title: "นักเรียนที่ลงทะเบียน",
+      value: stats.totalStudents.toLocaleString("th-TH"),
+      delta: "—",
+      deltaLabel: "ปีการศึกษาปัจจุบัน",
+      positive: true,
+      icon: Users,
+    },
+    {
+      title: "ยอดเก็บได้",
+      value: formatBaht(stats.totalCollected),
+      delta: "—",
+      deltaLabel: "รายการชำระที่ใช้งาน",
+      positive: true,
+      icon: Banknote,
+    },
+    {
+      title: "ชำระแล้ว",
+      value: stats.paidCount.toLocaleString("th-TH"),
+      suffix: stats.paidCount > 0 ? `(${stats.paidRate}%)` : undefined,
+      delta: "—",
+      deltaLabel: "จากใบแจ้งชำระทั้งหมด",
+      positive: true,
+      icon: CircleAlert,
+    },
+    {
+      title: "ค้างชำระ",
+      value: stats.overdueCount.toLocaleString("th-TH"),
+      suffix:
+        stats.overdueCount > 0 ? `(${formatBaht(stats.overdueAmount)})` : undefined,
+      delta: "—",
+      deltaLabel: "ใบแจ้งที่ยังไม่ครบ",
+      positive: false,
+      icon: CircleAlert,
+    },
+  ];
 
-export function StatCards() {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      {stats.map((stat) => {
+      {items.map((stat) => {
         const Icon = stat.icon;
         const DeltaIcon = stat.positive ? ArrowUpRight : ArrowDownRight;
         const deltaColor = stat.positive ? "text-emerald-700" : "text-amber-700";
