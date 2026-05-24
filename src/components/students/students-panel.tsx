@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +40,7 @@ import { studentDeleteBlockedReason } from "@/lib/students/delete-eligibility";
 import { StudentImportDialog } from "@/components/students/student-import-dialog";
 import { StudentSheet } from "@/components/students/student-sheet";
 import { StudentSearchInput } from "@/components/students/student-search-input";
+import { cn } from "@/lib/utils";
 
 type StudentsPanelProps = {
   data: PaginatedStudents;
@@ -63,6 +64,7 @@ export function StudentsPanel({ data, params, isAdmin }: StudentsPanelProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [deleteTargetIds, setDeleteTargetIds] = useState<string[] | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [isNavigating, startTransition] = useTransition();
 
   const deletableRows = useMemo(
     () => data.rows.filter((row) => row.deletable),
@@ -92,9 +94,11 @@ export function StudentsPanel({ data, params, isAdmin }: StudentsPanelProps) {
       if (yearSemester.get("semester")) query.set("semester", yearSemester.get("semester")!);
 
       const queryString = query.toString();
-      router.push(queryString ? `${pathname}?${queryString}` : pathname);
+      startTransition(() => {
+        router.push(queryString ? `${pathname}?${queryString}` : pathname);
+      });
     },
-    [params.page, params.q, params.status, pathname, router],
+    [params.page, params.q, params.status, pathname, router, startTransition],
   );
 
   const handleDebouncedSearch = useCallback(
@@ -180,7 +184,7 @@ export function StudentsPanel({ data, params, isAdmin }: StudentsPanelProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className={cn("space-y-4 transition-opacity", isNavigating && "pointer-events-none opacity-60")}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
           <StudentSearchInput

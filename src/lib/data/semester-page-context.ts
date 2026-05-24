@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { listAcademicYearOptions } from "@/lib/data/academic-years";
 import { listSemestersForYears } from "@/lib/data/semesters";
@@ -33,7 +34,7 @@ async function readSemesterCookieParams(): Promise<{
   };
 }
 
-export async function loadSemesterPageContext(
+async function loadSemesterPageContextImpl(
   yearParam?: string,
   semesterParam?: string,
 ): Promise<SemesterPageContext> {
@@ -50,6 +51,9 @@ export async function loadSemesterPageContext(
 
   return { years, semesters, ctx };
 }
+
+/** Dedupes year/semester lists when header + page load in parallel. */
+export const loadSemesterPageContext = cache(loadSemesterPageContextImpl);
 
 export function buildHeaderContextProps(
   page: SemesterPageContext,

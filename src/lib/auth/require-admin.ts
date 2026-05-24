@@ -1,22 +1,15 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getSessionProfile } from "@/lib/auth/session-profile";
 
 export async function getCurrentProfileRole() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, role, display_name, is_active")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (!profile?.is_active) return null;
-  return profile;
+  const profile = await getSessionProfile();
+  if (!profile) return null;
+  return {
+    id: profile.id,
+    role: profile.role,
+    display_name: profile.display_name,
+    is_active: profile.is_active,
+  };
 }
 
 export async function requireAdminPage() {

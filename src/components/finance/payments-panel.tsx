@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +46,7 @@ import type { OutstandingInvoiceRow } from "@/lib/data/invoices";
 import type { PaymentListRow } from "@/lib/data/payments";
 import type { GradeLevelRow } from "@/lib/data/grade-levels";
 import type { ClassroomWithGradeRow } from "@/lib/data/classrooms";
+import { cn } from "@/lib/utils";
 
 type PaymentsPanelProps = {
   context: {
@@ -101,6 +102,7 @@ export function PaymentsPanel({
   const [voidTarget, setVoidTarget] = useState<PaymentListRow | null>(null);
   const [voidReason, setVoidReason] = useState("");
   const [voiding, setVoiding] = useState(false);
+  const [isNavigating, startTransition] = useTransition();
 
   const gradeItems = [
     { value: "all", label: "ทุกชั้น" },
@@ -134,9 +136,11 @@ export function PaymentsPanel({
       if (yearSemester.get("year")) query.set("year", yearSemester.get("year")!);
       if (yearSemester.get("semester")) query.set("semester", yearSemester.get("semester")!);
 
-      router.push(`${pathname}?${query.toString()}`);
+      startTransition(() => {
+        router.push(`${pathname}?${query.toString()}`);
+      });
     },
-    [params, pathname, router],
+    [params, pathname, router, startTransition],
   );
 
   useEffect(() => {
@@ -240,7 +244,12 @@ export function PaymentsPanel({
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
+    <div
+      className={cn(
+        "grid gap-6 transition-opacity lg:grid-cols-[320px_1fr]",
+        isNavigating && "pointer-events-none opacity-60",
+      )}
+    >
       <Card className="border-border shadow-sm">
         <CardHeader>
           <CardTitle className="text-base">ค้นหานักเรียน</CardTitle>

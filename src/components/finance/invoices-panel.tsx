@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +45,7 @@ import type { InvoiceCandidateRow } from "@/lib/data/invoices";
 import type { FeeItemRow } from "@/lib/data/fee-items";
 import type { GradeLevelRow } from "@/lib/data/grade-levels";
 import type { ClassroomWithGradeRow } from "@/lib/data/classrooms";
+import { cn } from "@/lib/utils";
 
 const STATUS_FILTER_ITEMS = [
   { value: "all", label: "ทั้งหมด" },
@@ -96,6 +97,7 @@ export function InvoicesPanel({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [deleteTargetIds, setDeleteTargetIds] = useState<string[] | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [isNavigating, startTransition] = useTransition();
 
   function deleteContextFor(row: InvoiceListRow) {
     return {
@@ -148,9 +150,11 @@ export function InvoicesPanel({
       if (yearSemester.get("year")) query.set("year", yearSemester.get("year")!);
       if (yearSemester.get("semester")) query.set("semester", yearSemester.get("semester")!);
 
-      router.push(`${pathname}?${query.toString()}`);
+      startTransition(() => {
+        router.push(`${pathname}?${query.toString()}`);
+      });
     },
-    [params, pathname, router],
+    [params, pathname, router, startTransition],
   );
 
   function toggleRow(id: string, checked: boolean) {
@@ -200,7 +204,7 @@ export function InvoicesPanel({
   const bulkDeleteCount = selectedIds.size;
 
   return (
-    <div className="space-y-4">
+    <div className={cn("space-y-4 transition-opacity", isNavigating && "pointer-events-none opacity-60")}>
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-1 flex-wrap gap-2">
           <StudentSearchInput

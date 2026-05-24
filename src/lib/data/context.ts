@@ -1,3 +1,4 @@
+import { getSessionProfile } from "@/lib/auth/session-profile";
 import { createClient } from "@/lib/supabase/server";
 
 export type YearSemesterContext = {
@@ -63,20 +64,12 @@ export async function getYearSemesterContext(): Promise<YearSemesterContext | nu
 }
 
 export async function getCurrentProfile() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("display_name, role, is_active")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  return profile
-    ? { ...profile, email: user.email ?? "" }
-    : { display_name: user.email ?? "ผู้ใช้", role: "teacher" as const, is_active: false, email: user.email ?? "" };
+  const profile = await getSessionProfile();
+  if (!profile) return null;
+  return {
+    display_name: profile.display_name,
+    role: profile.role,
+    is_active: profile.is_active,
+    email: profile.email,
+  };
 }
