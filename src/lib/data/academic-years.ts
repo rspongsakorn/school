@@ -56,6 +56,30 @@ export async function listAcademicYears(): Promise<AcademicYearRow[]> {
 }
 
 export async function getAcademicYearById(id: string): Promise<AcademicYearRow | null> {
-  const years = await listAcademicYears();
-  return years.find((y) => y.id === id) ?? null;
+  const supabase = await createClient();
+
+  const { data: year, error } = await supabase
+    .from("academic_years")
+    .select("id, name, start_date, end_date, is_active")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error || !year) return null;
+
+  const { data: semesters } = await supabase
+    .from("semesters")
+    .select("id, academic_year_id, number, name, start_date, end_date")
+    .eq("academic_year_id", id)
+    .order("number", { ascending: true });
+
+  return {
+    ...year,
+    semesters: (semesters ?? []).map((sem) => ({
+      id: sem.id,
+      number: sem.number,
+      name: sem.name,
+      start_date: sem.start_date,
+      end_date: sem.end_date,
+    })),
+  };
 }

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { FieldError } from "@/components/ui/field-error";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -40,6 +41,11 @@ import {
   deleteStudent,
   updateStudent,
 } from "@/lib/actions/students";
+import {
+  validateStudentForm,
+  type StudentFormErrors,
+  type StudentFormInput,
+} from "@/lib/students/validation";
 
 type StudentSheetProps = {
   open: boolean;
@@ -56,13 +62,7 @@ type StudentSheetProps = {
   };
 };
 
-type StudentFormState = {
-  studentCode: string;
-  firstName: string;
-  lastName: string;
-  idCard: string;
-  status: StudentStatus;
-};
+type StudentFormState = StudentFormInput;
 
 const STATUS_OPTIONS = STUDENT_STATUS_FILTER_OPTIONS.filter(
   (option) => option.value !== "all",
@@ -131,6 +131,7 @@ function StudentSheetBody({
 }) {
   const router = useRouter();
   const [form, setForm] = useState<StudentFormState>(() => buildInitialForm(mode, initial));
+  const [errors, setErrors] = useState<StudentFormErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -150,11 +151,25 @@ function StudentSheetBody({
     value: StudentFormState[Key],
   ) {
     setForm((prev) => ({ ...prev, [key]: value }));
+    if (key in errors) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[key as keyof StudentFormErrors];
+        return next;
+      });
+    }
   }
 
   async function handleSave() {
     if (readOnly || submitting) return;
 
+    const validation = validateStudentForm(form);
+    if (!validation.ok) {
+      setErrors(validation.errors);
+      return;
+    }
+
+    setErrors({});
     setSubmitting(true);
     try {
       const result = isEditMode
@@ -197,92 +212,98 @@ function StudentSheetBody({
   return (
     <>
       <SheetHeader>
-          <SheetTitle>{title}</SheetTitle>
-          <SheetDescription>{description}</SheetDescription>
-        </SheetHeader>
+        <SheetTitle>{title}</SheetTitle>
+        <SheetDescription>{description}</SheetDescription>
+      </SheetHeader>
 
-        <div className="grid gap-4 px-4">
-          <div className="grid gap-2">
-            <Label htmlFor="student-code">รหัสนักเรียน</Label>
-            <Input
-              id="student-code"
-              value={form.studentCode}
-              onChange={(e) => updateField("studentCode", e.target.value)}
-              placeholder="เช่น 67001"
-              disabled={readOnly || submitting}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="student-first-name">ชื่อ</Label>
-            <Input
-              id="student-first-name"
-              value={form.firstName}
-              onChange={(e) => updateField("firstName", e.target.value)}
-              disabled={readOnly || submitting}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="student-last-name">นามสกุล</Label>
-            <Input
-              id="student-last-name"
-              value={form.lastName}
-              onChange={(e) => updateField("lastName", e.target.value)}
-              disabled={readOnly || submitting}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="student-id-card">เลขบัตรประชาชน</Label>
-            <Input
-              id="student-id-card"
-              value={form.idCard}
-              onChange={(e) => updateField("idCard", e.target.value)}
-              placeholder="ไม่บังคับ"
-              disabled={readOnly || submitting}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="student-status">สถานะ</Label>
-            <Select
-              value={form.status}
-              onValueChange={(value) => updateField("status", value as StudentStatus)}
-              disabled={readOnly || submitting}
-            >
-              <SelectTrigger id="student-status" className="w-full">
-                <SelectValue placeholder="เลือกสถานะ" />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUS_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+      <div className="grid gap-4 px-4">
+        <div className="grid gap-2">
+          <Label htmlFor="student-code">รหัสนักเรียน</Label>
+          <Input
+            id="student-code"
+            value={form.studentCode}
+            onChange={(e) => updateField("studentCode", e.target.value)}
+            placeholder="เช่น 67001"
+            disabled={readOnly || submitting}
+            aria-invalid={Boolean(errors.studentCode)}
+          />
+          <FieldError message={errors.studentCode} />
         </div>
+        <div className="grid gap-2">
+          <Label htmlFor="student-first-name">ชื่อ</Label>
+          <Input
+            id="student-first-name"
+            value={form.firstName}
+            onChange={(e) => updateField("firstName", e.target.value)}
+            disabled={readOnly || submitting}
+            aria-invalid={Boolean(errors.firstName)}
+          />
+          <FieldError message={errors.firstName} />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="student-last-name">นามสกุล</Label>
+          <Input
+            id="student-last-name"
+            value={form.lastName}
+            onChange={(e) => updateField("lastName", e.target.value)}
+            disabled={readOnly || submitting}
+            aria-invalid={Boolean(errors.lastName)}
+          />
+          <FieldError message={errors.lastName} />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="student-id-card">เลขบัตรประชาชน</Label>
+          <Input
+            id="student-id-card"
+            value={form.idCard}
+            onChange={(e) => updateField("idCard", e.target.value)}
+            placeholder="ไม่บังคับ"
+            disabled={readOnly || submitting}
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="student-status">สถานะ</Label>
+          <Select
+            value={form.status}
+            onValueChange={(value) => updateField("status", value as StudentStatus)}
+            disabled={readOnly || submitting}
+          >
+            <SelectTrigger id="student-status" className="w-full">
+              <SelectValue placeholder="เลือกสถานะ" />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
-        <SheetFooter className="gap-2 border-t">
-          {canDelete ? (
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={() => setDeleteOpen(true)}
-              disabled={submitting}
-            >
-              ลบนักเรียน
+      <SheetFooter className="gap-2 border-t">
+        {canDelete ? (
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={() => setDeleteOpen(true)}
+            disabled={submitting}
+          >
+            ลบนักเรียน
+          </Button>
+        ) : null}
+        <div className="flex flex-1 justify-end gap-2">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            ปิด
+          </Button>
+          {!readOnly ? (
+            <Button type="button" onClick={handleSave} disabled={submitting}>
+              {saveLabel}
             </Button>
           ) : null}
-          <div className="flex flex-1 justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              ปิด
-            </Button>
-            {!readOnly ? (
-              <Button type="button" onClick={handleSave} disabled={submitting}>
-                {saveLabel}
-              </Button>
-            ) : null}
-          </div>
-        </SheetFooter>
+        </div>
+      </SheetFooter>
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
@@ -301,9 +322,9 @@ function StudentSheetBody({
             >
               {submitting ? "กำลังลบ..." : "ยืนยันลบ"}
             </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

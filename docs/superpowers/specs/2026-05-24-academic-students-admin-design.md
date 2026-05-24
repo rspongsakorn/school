@@ -100,7 +100,7 @@ src/components/academic-year/
   year-wizard-dialog.tsx
   year-edit-dialog.tsx
 src/components/students/
-  student-table.tsx                   # client: search, filter, pagination
+  students-panel.tsx                 # client: search, filter, pagination, table
   student-sheet.tsx
 src/app/(dashboard)/academic-year/page.tsx
 src/app/(dashboard)/students/page.tsx

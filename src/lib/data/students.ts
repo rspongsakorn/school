@@ -1,5 +1,6 @@
 import { formatStudentName } from "@/lib/format";
 import { getStudentGradeMap } from "@/lib/data/enrollments";
+import { buildStudentSearchOrFilter } from "@/lib/students/search";
 import {
   STUDENT_STATUS_LABELS,
   STUDENTS_PAGE_SIZE,
@@ -85,31 +86,38 @@ export async function listStudentsPaginated(
   const to = from + pageSize - 1;
 
   const supabase = await createClient();
-  let query = supabase
-    .from("students")
-    .select("id, student_code, first_name, last_name, id_card, status", { count: "exact" })
-    .order("student_code", { ascending: true });
-
   const q = params.q?.trim();
-  if (q) {
-    query = query.or(
-      `student_code.ilike.%${q}%,first_name.ilike.%${q}%,last_name.ilike.%${q}%`,
-    );
-  }
+  const searchFilter = q ? buildStudentSearchOrFilter(q) : "";
 
-  if (params.status && params.status !== "all") {
-    query = query.eq("status", params.status);
-  }
+  const gradePromise = params.academicYearId
+    ? getStudentGradeMap(params.academicYearId)
+    : Promise.resolve(new Map<string, string>());
 
-  const { data: students, count, error } = await query.range(from, to);
+  const studentsPromise = (async () => {
+    let query = supabase
+      .from("students")
+      .select("id, student_code, first_name, last_name, id_card, status", { count: "exact" })
+      .order("student_code", { ascending: true });
+
+    if (searchFilter) {
+      query = query.or(searchFilter);
+    }
+
+    if (params.status && params.status !== "all") {
+      query = query.eq("status", params.status);
+    }
+
+    return query.range(from, to);
+  })();
+
+  const [{ data: students, count, error }, gradeByStudent] = await Promise.all([
+    studentsPromise,
+    gradePromise,
+  ]);
 
   if (error || !students) {
     return { rows: [], total: 0, page, pageSize, totalPages: 0 };
   }
-
-  const gradeByStudent = params.academicYearId
-    ? await getStudentGradeMap(params.academicYearId)
-    : new Map<string, string>();
 
   const rows = students.map((s) => mapStudentRow(s, gradeByStudent));
   const total = count ?? 0;

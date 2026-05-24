@@ -1,8 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import {
+  firstSemesterFormError,
+  firstYearFormError,
+  validateSemesterForm,
+  validateYearForm,
+} from "@/lib/academic-year/form-validation";
 import { requireAdminAction } from "@/lib/auth/require-admin";
-import { isValidDateRange } from "@/lib/academic-year/validation";
 import { createClient } from "@/lib/supabase/server";
 
 export type ActionState = { ok: true } | { ok: false; error: string };
@@ -21,34 +26,36 @@ type SemesterInput = {
   endDate: string;
 };
 
-function validateYear(input: YearInput): string | null {
-  if (!input.name.trim()) return "กรุณากรอกชื่อปีการศึกษา";
-  if (!input.startDate || !input.endDate) return "กรุณากรอกวันที่เริ่มและสิ้นสุด";
-  if (!isValidDateRange(input.startDate, input.endDate)) {
-    return "วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม";
-  }
+function validateYear(year: YearInput): string | null {
+  const result = validateYearForm(year);
+  if (!result.ok) return firstYearFormError(result.errors);
   return null;
 }
 
 function validateSemesters(semesters: SemesterInput[]): string | null {
   for (const sem of semesters) {
-    if (!sem.startDate || !sem.endDate) return `กรุณากรอกวันที่ภาคเรียนที่ ${sem.number}`;
-    if (!isValidDateRange(sem.startDate, sem.endDate)) {
-      return `วันที่ภาคเรียนที่ ${sem.number} ไม่ถูกต้อง`;
-    }
+    const result = validateSemesterForm(sem, sem.number);
+    if (!result.ok) return firstSemesterFormError(result.errors);
   }
   return null;
 }
 
-async function unsetOtherActiveYears(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  exceptId?: string,
-) {
-  let query = supabase.from("academic_years").update({ is_active: false }).eq("is_active", true);
-  if (exceptId) {
-    query = query.neq("id", exceptId);
+function mapAcademicYearMutationError(error: { code?: string; message?: string }): string {
+  if (error.code === "23505") {
+    return "มีปีการศึกษาที่ใช้งานอยู่แล้ว กรุณารีเฟรชแล้วลองใหม่";
   }
-  await query;
+  if (error.code === "42501") {
+    return "ไม่มีสิทธิ์ดำเนินการ";
+  }
+  return "ไม่สามารถบันทึกปีการศึกษาได้";
+}
+
+function semesterByNumber(semesters: SemesterInput[], number: 1 | 2): SemesterInput {
+  const semester = semesters.find((s) => s.number === number);
+  if (!semester) {
+    throw new Error(`Missing semester ${number}`);
+  }
+  return semester;
 }
 
 export async function createYearWithSemesters(
@@ -64,40 +71,25 @@ export async function createYearWithSemesters(
   const semError = validateSemesters(semesters);
   if (semError) return { ok: false, error: semError };
 
+  const sem1 = semesterByNumber(semesters, 1);
+  const sem2 = semesterByNumber(semesters, 2);
   const supabase = await createClient();
 
-  if (year.isActive) {
-    await unsetOtherActiveYears(supabase);
-  }
+  const { error } = await supabase.rpc("create_academic_year_with_semesters", {
+    p_name: year.name.trim(),
+    p_start_date: year.startDate,
+    p_end_date: year.endDate,
+    p_is_active: year.isActive,
+    p_sem1_start: sem1.startDate,
+    p_sem1_end: sem1.endDate,
+    p_sem1_name: sem1.name,
+    p_sem2_start: sem2.startDate,
+    p_sem2_end: sem2.endDate,
+    p_sem2_name: sem2.name,
+  });
 
-  const { data: createdYear, error: yearInsertError } = await supabase
-    .from("academic_years")
-    .insert({
-      name: year.name.trim(),
-      start_date: year.startDate,
-      end_date: year.endDate,
-      is_active: year.isActive,
-    })
-    .select("id")
-    .single();
-
-  if (yearInsertError || !createdYear) {
-    return { ok: false, error: "ไม่สามารถสร้างปีการศึกษาได้" };
-  }
-
-  const semesterRows = semesters.map((s) => ({
-    academic_year_id: createdYear.id,
-    number: s.number,
-    name: s.name.trim() || null,
-    start_date: s.startDate,
-    end_date: s.endDate,
-  }));
-
-  const { error: semInsertError } = await supabase.from("semesters").insert(semesterRows);
-
-  if (semInsertError) {
-    await supabase.from("academic_years").delete().eq("id", createdYear.id);
-    return { ok: false, error: "ไม่สามารถสร้างภาคเรียนได้" };
+  if (error) {
+    return { ok: false, error: mapAcademicYearMutationError(error) };
   }
 
   revalidatePath("/academic-year");
@@ -118,40 +110,26 @@ export async function updateYearWithSemesters(
   const semError = validateSemesters(semesters);
   if (semError) return { ok: false, error: semError };
 
+  const sem1 = semesterByNumber(semesters, 1);
+  const sem2 = semesterByNumber(semesters, 2);
   const supabase = await createClient();
 
-  if (year.isActive) {
-    await unsetOtherActiveYears(supabase, yearId);
-  }
+  const { error } = await supabase.rpc("update_academic_year_with_semesters", {
+    p_year_id: yearId,
+    p_name: year.name.trim(),
+    p_start_date: year.startDate,
+    p_end_date: year.endDate,
+    p_is_active: year.isActive,
+    p_sem1_start: sem1.startDate,
+    p_sem1_end: sem1.endDate,
+    p_sem1_name: sem1.name,
+    p_sem2_start: sem2.startDate,
+    p_sem2_end: sem2.endDate,
+    p_sem2_name: sem2.name,
+  });
 
-  const { error: yearUpdateError } = await supabase
-    .from("academic_years")
-    .update({
-      name: year.name.trim(),
-      start_date: year.startDate,
-      end_date: year.endDate,
-      is_active: year.isActive,
-    })
-    .eq("id", yearId);
-
-  if (yearUpdateError) {
-    return { ok: false, error: "ไม่สามารถแก้ไขปีการศึกษาได้" };
-  }
-
-  for (const sem of semesters) {
-    const { error } = await supabase
-      .from("semesters")
-      .update({
-        name: sem.name.trim() || null,
-        start_date: sem.startDate,
-        end_date: sem.endDate,
-      })
-      .eq("academic_year_id", yearId)
-      .eq("number", sem.number);
-
-    if (error) {
-      return { ok: false, error: `ไม่สามารถแก้ไขภาคเรียนที่ ${sem.number} ได้` };
-    }
+  if (error) {
+    return { ok: false, error: mapAcademicYearMutationError(error) };
   }
 
   revalidatePath("/academic-year");

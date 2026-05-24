@@ -25,7 +25,7 @@ export async function getStudentGradeMap(academicYearId: string) {
 
   const map = new Map<string, string>();
 
-  for (const row of (data ?? []) as EnrollmentRow[]) {
+  for (const row of (data ?? []) as unknown as EnrollmentRow[]) {
     const classroom = row.classrooms;
     const gradeName = classroom?.grade_levels?.name ?? null;
     map.set(row.student_id, formatClassroom(gradeName, classroom?.name ?? null));

@@ -79,7 +79,39 @@ export type Database = {
       }>;
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      create_academic_year_with_semesters: {
+        Args: {
+          p_name: string;
+          p_start_date: string;
+          p_end_date: string;
+          p_is_active: boolean;
+          p_sem1_start: string;
+          p_sem1_end: string;
+          p_sem1_name: string;
+          p_sem2_start: string;
+          p_sem2_end: string;
+          p_sem2_name: string;
+        };
+        Returns: string;
+      };
+      update_academic_year_with_semesters: {
+        Args: {
+          p_year_id: string;
+          p_name: string;
+          p_start_date: string;
+          p_end_date: string;
+          p_is_active: boolean;
+          p_sem1_start: string;
+          p_sem1_end: string;
+          p_sem1_name: string;
+          p_sem2_start: string;
+          p_sem2_end: string;
+          p_sem2_name: string;
+        };
+        Returns: undefined;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

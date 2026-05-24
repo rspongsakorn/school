@@ -1,5 +1,8 @@
 /**
- * Apply supabase/migrations + seed to a remote Supabase Postgres database.
+ * Apply pending supabase/migrations + seed to a remote Supabase Postgres database.
+ *
+ * Tracks applied migrations in public.schema_migrations so re-runs are safe on
+ * databases that already have the initial schema.
  *
  * Requires in .env.local (one of):
  *   DATABASE_URL=postgresql://postgres:PASSWORD@db.PROJECT_REF.supabase.co:5432/postgres
@@ -7,7 +10,7 @@
  *     (uses NEXT_PUBLIC_SUPABASE_URL to derive project ref)
  */
 
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
@@ -65,6 +68,58 @@ Database password: Supabase Dashboard → Project Settings → Database → Data
   return `postgresql://postgres:${encodeURIComponent(password)}@db.${ref}.supabase.co:5432/postgres`;
 }
 
+async function ensureMigrationTable(client) {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS public.schema_migrations (
+      filename text PRIMARY KEY,
+      applied_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+}
+
+async function getAppliedMigrations(client) {
+  const { rows } = await client.query(
+    "SELECT filename FROM public.schema_migrations ORDER BY filename",
+  );
+  return new Set(rows.map((row) => row.filename));
+}
+
+async function bootstrapExistingDatabase(client, migrationFiles) {
+  const applied = await getAppliedMigrations(client);
+  if (applied.size > 0) return;
+
+  const { rows } = await client.query(
+    "SELECT 1 FROM pg_type WHERE typname = 'student_status' LIMIT 1",
+  );
+  if (rows.length === 0) return;
+
+  const initialMigration = migrationFiles.find((file) => file.includes("initial_schema"));
+  if (!initialMigration) return;
+
+  await client.query(
+    "INSERT INTO public.schema_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING",
+    [initialMigration],
+  );
+  console.log(`  ↷ Skipping ${initialMigration} (database already initialized)\n`);
+}
+
+async function runMigration(client, filename, sql) {
+  console.log(`→ ${filename}…`);
+  await client.query("BEGIN");
+  try {
+    await client.query(sql);
+    await client.query(
+      "INSERT INTO public.schema_migrations (filename) VALUES ($1)",
+      [filename],
+    );
+    await client.query("COMMIT");
+    console.log(`  ✓ ${filename}`);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  }
+}
+
 async function runSql(client, label, sql) {
   console.log(`→ ${label}…`);
   await client.query(sql);
@@ -75,13 +130,11 @@ async function main() {
   const env = loadEnvLocal();
   const connectionString = getConnectionString(env);
 
-  const migrationPath = resolve(
-    root,
-    "supabase/migrations/20260524120000_initial_schema.sql"
-  );
+  const migrationsDir = resolve(root, "supabase/migrations");
+  const migrationFiles = readdirSync(migrationsDir)
+    .filter((name) => name.endsWith(".sql"))
+    .sort();
   const seedPath = resolve(root, "supabase/seed.sql");
-
-  const migrationSql = readFileSync(migrationPath, "utf8");
   const seedSql = readFileSync(seedPath, "utf8");
 
   const client = new pg.Client({
@@ -93,13 +146,27 @@ async function main() {
     await client.connect();
     console.log("Connected to Supabase Postgres.\n");
 
-    await runSql(client, "initial_schema migration", migrationSql);
+    await ensureMigrationTable(client);
+    await bootstrapExistingDatabase(client, migrationFiles);
+
+    const applied = await getAppliedMigrations(client);
+    const pending = migrationFiles.filter((file) => !applied.has(file));
+
+    if (pending.length === 0) {
+      console.log("No pending migrations.");
+    } else {
+      for (const file of pending) {
+        const migrationSql = readFileSync(resolve(migrationsDir, file), "utf8");
+        await runMigration(client, file, migrationSql);
+      }
+    }
+
     await runSql(client, "seed data", seedSql);
 
     const { rows } = await client.query(
       `SELECT table_name FROM information_schema.tables
        WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
-       ORDER BY table_name`
+       ORDER BY table_name`,
     );
     console.log("\nPublic tables:");
     for (const row of rows) {
@@ -107,7 +174,7 @@ async function main() {
     }
 
     const { rows: seeds } = await client.query(
-      `SELECT code, name FROM public.receipt_types ORDER BY code`
+      "SELECT code, name FROM public.receipt_types ORDER BY code",
     );
     console.log("\nreceipt_types seed:");
     for (const row of seeds) {
@@ -116,11 +183,6 @@ async function main() {
 
     console.log("\nDatabase setup complete.");
   } catch (err) {
-    if (err.code === "42P07") {
-      console.error(
-        "\nSome objects already exist. If this is a re-run on a partial setup, reset the DB in Dashboard → Database → Reset, or drop public schema objects first."
-      );
-    }
     console.error("\nSetup failed:", err.message);
     process.exit(1);
   } finally {

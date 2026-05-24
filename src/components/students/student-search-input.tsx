@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 
 type StudentSearchInputProps = {
@@ -10,21 +10,28 @@ type StudentSearchInputProps = {
 
 export function StudentSearchInput({ initialQuery, onDebouncedChange }: StudentSearchInputProps) {
   const [draft, setDraft] = useState(initialQuery);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onDebouncedChangeRef = useRef(onDebouncedChange);
+  onDebouncedChangeRef.current = onDebouncedChange;
 
   useEffect(() => {
-    if (draft === initialQuery) return;
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
-    const timeout = setTimeout(() => {
-      onDebouncedChange(draft);
+  function handleChange(value: string) {
+    setDraft(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      onDebouncedChangeRef.current(value);
     }, 300);
-
-    return () => clearTimeout(timeout);
-  }, [draft, initialQuery, onDebouncedChange]);
+  }
 
   return (
     <Input
       value={draft}
-      onChange={(e) => setDraft(e.target.value)}
+      onChange={(e) => handleChange(e.target.value)}
       placeholder="ค้นหารหัส ชื่อ หรือนามสกุล"
       className="w-full sm:max-w-sm"
     />
