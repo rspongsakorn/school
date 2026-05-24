@@ -1,7 +1,7 @@
 # Design Spec: หน้าการเงินทั้งหมด (v1)
 
 **Date:** 2026-05-24  
-**Status:** Draft — pending user review  
+**Status:** Approved  
 **Parent:** [2026-05-24-tuition-management-design.md](./2026-05-24-tuition-management-design.md)  
 **Depends on:** [2026-05-24-academic-students-admin-design.md](./2026-05-24-academic-students-admin-design.md), [2026-05-24-registration-design.md](./2026-05-24-registration-design.md) (implemented)  
 **Scope:** v1 finance module — ตั้งค่า, ใบแจ้งชำระ, บันทึกการจ่าย, รายงาน
