@@ -42,7 +42,7 @@ export function validateYearForm(
 
 export function validateSemesterForm(
   input: SemesterFormInput,
-  semesterNumber: 1 | 2,
+  semesterNumber: number,
 ): { ok: true } | { ok: false; errors: SemesterFormErrors } {
   const errors: SemesterFormErrors = {};
 

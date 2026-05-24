@@ -1,7 +1,7 @@
 export type SemesterOption = {
   id: string;
   academic_year_id: string;
-  number: 1 | 2;
+  number: number;
   name: string | null;
 };
 
@@ -9,11 +9,20 @@ export type SemesterContext = {
   academicYearId: string;
   academicYearName: string;
   semesterId: string;
-  semesterNumber: 1 | 2;
+  semesterNumber: number;
 };
 
-export function parseSemesterNumber(value: string | undefined): 1 | 2 {
-  if (value === "2") return 2;
+export function parseSemesterNumber(
+  value: string | undefined,
+  availableInYear: number[],
+): number {
+  const parsed = value ? Number.parseInt(value, 10) : NaN;
+  if (Number.isFinite(parsed) && parsed >= 1 && availableInYear.includes(parsed)) {
+    return parsed;
+  }
+  if (availableInYear.length > 0) {
+    return Math.min(...availableInYear);
+  }
   return 1;
 }
 
@@ -33,10 +42,17 @@ export function resolveSemesterContext(
   const year = years.find((y) => y.id === academicYearId);
   if (!year) return null;
 
-  const semesterNumber = parseSemesterNumber(semesterParam);
-  const semester =
-    semesters.find((s) => s.academic_year_id === academicYearId && s.number === semesterNumber) ??
-    semesters.find((s) => s.academic_year_id === academicYearId && s.number === 1);
+  const availableNumbers = semesters
+    .filter((s) => s.academic_year_id === academicYearId)
+    .map((s) => s.number)
+    .sort((a, b) => a - b);
+
+  if (availableNumbers.length === 0) return null;
+
+  const semesterNumber = parseSemesterNumber(semesterParam, availableNumbers);
+  const semester = semesters.find(
+    (s) => s.academic_year_id === academicYearId && s.number === semesterNumber,
+  );
 
   if (!semester) return null;
 

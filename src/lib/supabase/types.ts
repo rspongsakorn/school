@@ -100,9 +100,6 @@ export type Database = {
           p_sem1_start: string;
           p_sem1_end: string;
           p_sem1_name: string;
-          p_sem2_start: string;
-          p_sem2_end: string;
-          p_sem2_name: string;
         };
         Returns: string;
       };

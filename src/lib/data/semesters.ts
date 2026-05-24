@@ -16,7 +16,7 @@ export async function listSemestersForYears(yearIds: string[]): Promise<Semester
   return data.map((s) => ({
     id: s.id,
     academic_year_id: s.academic_year_id,
-    number: s.number as 1 | 2,
+    number: s.number,
     name: s.name,
   }));
 }
@@ -34,14 +34,14 @@ export async function getSemesterById(id: string): Promise<SemesterOption | null
   return {
     id: data.id,
     academic_year_id: data.academic_year_id,
-    number: data.number as 1 | 2,
+    number: data.number,
     name: data.name,
   };
 }
 
 export async function getSemesterByYearAndNumber(
   academicYearId: string,
-  number: 1 | 2,
+  number: number,
 ): Promise<SemesterOption | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -56,7 +56,39 @@ export async function getSemesterByYearAndNumber(
   return {
     id: data.id,
     academic_year_id: data.academic_year_id,
-    number: data.number as 1 | 2,
+    number: data.number,
     name: data.name,
   };
+}
+
+export async function listSemestersWithGradeLevels(
+  academicYearId: string,
+): Promise<SemesterOption[]> {
+  const supabase = await createClient();
+  const { data: semesters, error } = await supabase
+    .from("semesters")
+    .select("id, academic_year_id, number, name")
+    .eq("academic_year_id", academicYearId)
+    .order("number", { ascending: true });
+
+  if (error || !semesters) return [];
+
+  const withGrades: SemesterOption[] = [];
+  for (const semester of semesters) {
+    const { count } = await supabase
+      .from("grade_levels")
+      .select("id", { count: "exact", head: true })
+      .eq("semester_id", semester.id);
+
+    if ((count ?? 0) > 0) {
+      withGrades.push({
+        id: semester.id,
+        academic_year_id: semester.academic_year_id,
+        number: semester.number,
+        name: semester.name,
+      });
+    }
+  }
+
+  return withGrades;
 }

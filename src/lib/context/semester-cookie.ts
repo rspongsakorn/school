@@ -3,7 +3,7 @@ export const SEMESTER_NUMBER_COOKIE = "school_semester";
 
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 
-export function setSemesterCookie(yearId: string, semesterNumber: 1 | 2) {
+export function setSemesterCookie(yearId: string, semesterNumber: number) {
   const secure = typeof window !== "undefined" && window.location.protocol === "https:";
   const base = `path=/; max-age=${MAX_AGE_SECONDS}; SameSite=Lax`;
   const suffix = secure ? "; Secure" : "";
@@ -13,7 +13,7 @@ export function setSemesterCookie(yearId: string, semesterNumber: 1 | 2) {
 
 export function readSemesterCookieFromDocument(): {
   yearId: string | null;
-  semesterNumber: 1 | 2 | null;
+  semesterNumber: number | null;
 } {
   if (typeof document === "undefined") {
     return { yearId: null, semesterNumber: null };
@@ -30,7 +30,8 @@ export function readSemesterCookieFromDocument(): {
     ? decodeURIComponent(cookies[SEMESTER_YEAR_COOKIE])
     : null;
   const rawSemester = cookies[SEMESTER_NUMBER_COOKIE];
-  const semesterNumber = rawSemester === "2" ? 2 : rawSemester === "1" ? 1 : null;
+  const parsed = rawSemester ? Number.parseInt(rawSemester, 10) : NaN;
+  const semesterNumber = Number.isFinite(parsed) && parsed >= 1 ? parsed : null;
 
   return { yearId, semesterNumber };
 }

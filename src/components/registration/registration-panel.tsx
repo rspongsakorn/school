@@ -32,7 +32,15 @@ import type { ClassroomRow, ClassroomWithGradeRow } from "@/lib/data/classrooms"
 import type { EnrollmentRosterRow, StudentEnrollmentCandidate } from "@/lib/data/enrollments";
 import type { GradeLevelRow } from "@/lib/data/grade-levels";
 import { copySemesterStructure } from "@/lib/actions/semester-structure";
+import type { SemesterOption } from "@/lib/context/semester-params";
 import { ENROLLMENT_STATUS_LABELS } from "@/lib/enrollment/constants";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { GradeLevelDialog } from "@/components/registration/grade-level-dialog";
 import { ClassroomDialog } from "@/components/registration/classroom-dialog";
 import { EnrollStudentDialog } from "@/components/registration/enroll-student-dialog";
@@ -41,8 +49,9 @@ import { EnrollmentStatusDialog } from "@/components/registration/enrollment-sta
 
 type RegistrationPanelProps = {
   semesterId: string;
-  semesterNumber: 1 | 2;
+  semesterNumber: number;
   academicYearId: string;
+  sourceSemesters: SemesterOption[];
   grades: GradeLevelRow[];
   selectedGradeId: string | null;
   classrooms: ClassroomRow[];
@@ -57,6 +66,7 @@ export function RegistrationPanel({
   semesterId,
   semesterNumber,
   academicYearId,
+  sourceSemesters,
   grades,
   selectedGradeId,
   classrooms,
@@ -69,6 +79,9 @@ export function RegistrationPanel({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [copyPending, startCopyTransition] = useTransition();
+  const [copySourceId, setCopySourceId] = useState(
+    () => sourceSemesters.find((s) => s.id !== semesterId)?.id ?? "",
+  );
   const [enrollOpen, setEnrollOpen] = useState(false);
   const [gradeCreateOpen, setGradeCreateOpen] = useState(false);
   const [editingGrade, setEditingGrade] = useState<GradeLevelRow | null>(null);
@@ -132,34 +145,62 @@ export function RegistrationPanel({
 
   const selectedClassroom = classrooms.find((c) => c.id === selectedClassroomId);
 
+  const copySourceOptions = sourceSemesters
+    .filter((s) => s.id !== semesterId)
+    .sort((a, b) => a.number - b.number)
+    .map((s) => ({
+      value: s.id,
+      label: s.name ? `ภาค ${s.number} (${s.name})` : `ภาค ${s.number}`,
+    }));
+
   function handleCopyStructure() {
+    if (!copySourceId) {
+      toast.error("กรุณาเลือกภาคเรียนต้นทาง");
+      return;
+    }
     startCopyTransition(async () => {
-      const result = await copySemesterStructure(semesterId);
+      const result = await copySemesterStructure(copySourceId, semesterId);
       if (!result.ok) {
         toast.error(result.error);
         return;
       }
-      toast.success("คัดลอกโครงสร้างจากภาค 1 แล้ว");
+      toast.success("คัดลอกโครงสร้างแล้ว");
       router.refresh();
     });
   }
 
   return (
     <div className="space-y-6">
-      {isAdmin && semesterNumber === 2 && grades.length === 0 && (
+      {isAdmin && grades.length === 0 && copySourceOptions.length > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3">
           <p className="text-sm text-muted-foreground">
-            ภาคเรียนที่ 2 ยังไม่มีชั้นเรียน — คัดลอกโครงสร้างจากภาค 1 (ไม่รวมนักเรียน)
+            ภาค {semesterNumber} ยังไม่มีชั้นเรียน — คัดลอกโครงสร้างจากภาคอื่น (ไม่รวมนักเรียน)
           </p>
+          <Select
+            value={copySourceId || null}
+            onValueChange={(id) => setCopySourceId(id ?? "")}
+            items={copySourceOptions}
+          >
+            <SelectTrigger className="h-9 w-[200px] bg-background">
+              <SelectValue placeholder="เลือกภาคต้นทาง" />
+            </SelectTrigger>
+            <SelectContent>
+              {copySourceOptions.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button
             type="button"
             variant="secondary"
             size="sm"
-            disabled={copyPending}
+            disabled={copyPending || !copySourceId}
             onClick={handleCopyStructure}
           >
             <Copy className="mr-1 h-4 w-4" />
-            {copyPending ? "กำลังคัดลอก..." : "คัดลอกโครงสร้างจากภาค 1"}
+            {copyPending ? "กำลังคัดลอก..." : "คัดลอกโครงสร้าง"}
           </Button>
         </div>
       )}

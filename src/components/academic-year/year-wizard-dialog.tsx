@@ -51,72 +51,34 @@ const initialSemester = {
 
 export function YearWizardDialog({ open, onOpenChange }: YearWizardDialogProps) {
   const router = useRouter();
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2>(1);
   const [submitting, setSubmitting] = useState(false);
   const [year, setYear] = useState(initialYear);
   const [semester1, setSemester1] = useState<SemesterDraft>(initialSemester);
-  const [semester2, setSemester2] = useState<SemesterDraft>(initialSemester);
   const [yearErrors, setYearErrors] = useState<YearFormErrors>({});
   const [sem1Errors, setSem1Errors] = useState<SemesterFormErrors>({});
-  const [sem2Errors, setSem2Errors] = useState<SemesterFormErrors>({});
 
   const currentSemesterWarning = useMemo(() => {
-    const semester = step === 2 ? semester1 : semester2;
     if (step === 1 || !year.startDate || !year.endDate) return false;
-    if (!semester.startDate || !semester.endDate) return false;
+    if (!semester1.startDate || !semester1.endDate) return false;
     return isSemesterOutsideYear(
       { start: year.startDate, end: year.endDate },
-      { start: semester.startDate, end: semester.endDate },
+      { start: semester1.startDate, end: semester1.endDate },
     );
-  }, [step, year.startDate, year.endDate, semester1, semester2]);
+  }, [step, year.startDate, year.endDate, semester1]);
 
   function resetState() {
     setStep(1);
     setSubmitting(false);
     setYear(initialYear);
     setSemester1(initialSemester);
-    setSemester2(initialSemester);
     setYearErrors({});
     setSem1Errors({});
-    setSem2Errors({});
   }
 
   function handleOpenChange(nextOpen: boolean) {
     onOpenChange(nextOpen);
     if (!nextOpen) resetState();
-  }
-
-  function updateYearField<Key extends keyof typeof year>(key: Key, value: (typeof year)[Key]) {
-    setYear((prev) => ({ ...prev, [key]: value }));
-    if (key in yearErrors) {
-      setYearErrors((prev) => {
-        const next = { ...prev };
-        delete next[key as keyof YearFormErrors];
-        return next;
-      });
-    }
-  }
-
-  function updateSem1Field<Key extends keyof SemesterDraft>(key: Key, value: SemesterDraft[Key]) {
-    setSemester1((prev) => ({ ...prev, [key]: value }));
-    if (key === "startDate" || key === "endDate") {
-      setSem1Errors((prev) => {
-        const next = { ...prev };
-        delete next[key as keyof SemesterFormErrors];
-        return next;
-      });
-    }
-  }
-
-  function updateSem2Field<Key extends keyof SemesterDraft>(key: Key, value: SemesterDraft[Key]) {
-    setSemester2((prev) => ({ ...prev, [key]: value }));
-    if (key === "startDate" || key === "endDate") {
-      setSem2Errors((prev) => {
-        const next = { ...prev };
-        delete next[key as keyof SemesterFormErrors];
-        return next;
-      });
-    }
   }
 
   function goStep2() {
@@ -133,15 +95,10 @@ export function YearWizardDialog({ open, onOpenChange }: YearWizardDialogProps) 
       startDate: defaults.semester1.start,
       endDate: defaults.semester1.end,
     }));
-    setSemester2((prev) => ({
-      ...prev,
-      startDate: defaults.semester2.start,
-      endDate: defaults.semester2.end,
-    }));
     setStep(2);
   }
 
-  function goStep3() {
+  async function handleSubmit() {
     const validation = validateSemesterForm(semester1, 1);
     if (!validation.ok) {
       setSem1Errors(validation.errors);
@@ -149,17 +106,6 @@ export function YearWizardDialog({ open, onOpenChange }: YearWizardDialogProps) 
     }
 
     setSem1Errors({});
-    setStep(3);
-  }
-
-  async function handleSubmit() {
-    const validation = validateSemesterForm(semester2, 2);
-    if (!validation.ok) {
-      setSem2Errors(validation.errors);
-      return;
-    }
-
-    setSem2Errors({});
     setSubmitting(true);
     try {
       const result = await createYearWithSemesters(
@@ -175,12 +121,6 @@ export function YearWizardDialog({ open, onOpenChange }: YearWizardDialogProps) 
             startDate: semester1.startDate,
             endDate: semester1.endDate,
             name: semester1.name,
-          },
-          {
-            number: 2,
-            startDate: semester2.startDate,
-            endDate: semester2.endDate,
-            name: semester2.name,
           },
         ],
       );
@@ -204,7 +144,8 @@ export function YearWizardDialog({ open, onOpenChange }: YearWizardDialogProps) 
         <DialogHeader>
           <DialogTitle>เพิ่มปีการศึกษา</DialogTitle>
           <DialogDescription>
-            ขั้นตอนที่ {step} จาก 3 {step === 1 ? "ข้อมูลปีการศึกษา" : `ข้อมูลภาคเรียนที่ ${step - 1}`}
+            ขั้นตอนที่ {step} จาก 2{" "}
+            {step === 1 ? "ข้อมูลปีการศึกษา" : "ภาคเรียนแรก (เพิ่มภาคอื่นได้ภายหลัง)"}
           </DialogDescription>
         </DialogHeader>
 
@@ -217,7 +158,7 @@ export function YearWizardDialog({ open, onOpenChange }: YearWizardDialogProps) 
                   id="create-year-name"
                   placeholder="เช่น 2569"
                   value={year.name}
-                  onChange={(e) => updateYearField("name", e.target.value)}
+                  onChange={(e) => setYear((prev) => ({ ...prev, name: e.target.value }))}
                   aria-invalid={Boolean(yearErrors.name)}
                 />
                 <FieldError message={yearErrors.name} />
@@ -229,7 +170,7 @@ export function YearWizardDialog({ open, onOpenChange }: YearWizardDialogProps) 
                     id="create-year-start"
                     type="date"
                     value={year.startDate}
-                    onChange={(e) => updateYearField("startDate", e.target.value)}
+                    onChange={(e) => setYear((prev) => ({ ...prev, startDate: e.target.value }))}
                     aria-invalid={Boolean(yearErrors.startDate)}
                   />
                   <FieldError message={yearErrors.startDate} />
@@ -240,7 +181,7 @@ export function YearWizardDialog({ open, onOpenChange }: YearWizardDialogProps) 
                     id="create-year-end"
                     type="date"
                     value={year.endDate}
-                    onChange={(e) => updateYearField("endDate", e.target.value)}
+                    onChange={(e) => setYear((prev) => ({ ...prev, endDate: e.target.value }))}
                     aria-invalid={Boolean(yearErrors.endDate)}
                   />
                   <FieldError message={yearErrors.endDate} />
@@ -252,15 +193,12 @@ export function YearWizardDialog({ open, onOpenChange }: YearWizardDialogProps) 
                   type="checkbox"
                   className="size-4 rounded border-border accent-primary"
                   checked={year.isActive}
-                  onChange={(e) => {
-                    const isActive = e.target.checked;
-                    setYear((prev) => ({ ...prev, isActive }));
-                  }}
+                  onChange={(e) => setYear((prev) => ({ ...prev, isActive: e.target.checked }))}
                 />
                 ตั้งค่าเป็นปีการศึกษาปัจจุบัน
               </Label>
             </>
-          ) : step === 2 ? (
+          ) : (
             <>
               <div className="grid gap-2">
                 <Label htmlFor="create-sem1-name">ชื่อภาคเรียนที่ 1 (ไม่บังคับ)</Label>
@@ -268,7 +206,7 @@ export function YearWizardDialog({ open, onOpenChange }: YearWizardDialogProps) 
                   id="create-sem1-name"
                   placeholder="เช่น ภาคต้น"
                   value={semester1.name}
-                  onChange={(e) => updateSem1Field("name", e.target.value)}
+                  onChange={(e) => setSemester1((prev) => ({ ...prev, name: e.target.value }))}
                 />
               </div>
               <div className="grid gap-2 md:grid-cols-2">
@@ -278,7 +216,9 @@ export function YearWizardDialog({ open, onOpenChange }: YearWizardDialogProps) 
                     id="create-sem1-start"
                     type="date"
                     value={semester1.startDate}
-                    onChange={(e) => updateSem1Field("startDate", e.target.value)}
+                    onChange={(e) =>
+                      setSemester1((prev) => ({ ...prev, startDate: e.target.value }))
+                    }
                     aria-invalid={Boolean(sem1Errors.startDate)}
                   />
                   <FieldError message={sem1Errors.startDate} />
@@ -289,46 +229,12 @@ export function YearWizardDialog({ open, onOpenChange }: YearWizardDialogProps) 
                     id="create-sem1-end"
                     type="date"
                     value={semester1.endDate}
-                    onChange={(e) => updateSem1Field("endDate", e.target.value)}
+                    onChange={(e) =>
+                      setSemester1((prev) => ({ ...prev, endDate: e.target.value }))
+                    }
                     aria-invalid={Boolean(sem1Errors.endDate)}
                   />
                   <FieldError message={sem1Errors.endDate} />
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="grid gap-2">
-                <Label htmlFor="create-sem2-name">ชื่อภาคเรียนที่ 2 (ไม่บังคับ)</Label>
-                <Input
-                  id="create-sem2-name"
-                  placeholder="เช่น ภาคปลาย"
-                  value={semester2.name}
-                  onChange={(e) => updateSem2Field("name", e.target.value)}
-                />
-              </div>
-              <div className="grid gap-2 md:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label htmlFor="create-sem2-start">วันที่เริ่มภาคเรียนที่ 2</Label>
-                  <Input
-                    id="create-sem2-start"
-                    type="date"
-                    value={semester2.startDate}
-                    onChange={(e) => updateSem2Field("startDate", e.target.value)}
-                    aria-invalid={Boolean(sem2Errors.startDate)}
-                  />
-                  <FieldError message={sem2Errors.startDate} />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="create-sem2-end">วันที่สิ้นสุดภาคเรียนที่ 2</Label>
-                  <Input
-                    id="create-sem2-end"
-                    type="date"
-                    value={semester2.endDate}
-                    onChange={(e) => updateSem2Field("endDate", e.target.value)}
-                    aria-invalid={Boolean(sem2Errors.endDate)}
-                  />
-                  <FieldError message={sem2Errors.endDate} />
                 </div>
               </div>
             </>
@@ -346,7 +252,7 @@ export function YearWizardDialog({ open, onOpenChange }: YearWizardDialogProps) 
             <Button
               type="button"
               variant="outline"
-              onClick={() => setStep((prev) => (prev === 3 ? 2 : 1))}
+              onClick={() => setStep(1)}
               disabled={submitting}
             >
               ย้อนกลับ
@@ -355,8 +261,8 @@ export function YearWizardDialog({ open, onOpenChange }: YearWizardDialogProps) 
           <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
             ยกเลิก
           </Button>
-          {step < 3 ? (
-            <Button type="button" onClick={step === 1 ? goStep2 : goStep3} disabled={submitting}>
+          {step < 2 ? (
+            <Button type="button" onClick={goStep2} disabled={submitting}>
               ถัดไป
             </Button>
           ) : (

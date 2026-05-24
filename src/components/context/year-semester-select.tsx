@@ -17,13 +17,17 @@ type YearSemesterSelectProps = {
   years: AcademicYearOption[];
   semesters: SemesterOption[];
   selectedYearId: string;
-  selectedSemesterNumber: 1 | 2;
+  selectedSemesterNumber: number;
   basePath: string;
   clearGradeClassroomOnChange?: boolean;
 };
 
 function formatYearLabel(year: AcademicYearOption) {
   return `${year.name}${year.is_active ? " (ปัจจุบัน)" : ""}`;
+}
+
+function formatSemesterLabel(semester: SemesterOption) {
+  return semester.name ? `ภาค ${semester.number} (${semester.name})` : `ภาค ${semester.number}`;
 }
 
 export function YearSemesterSelect({
@@ -46,17 +50,29 @@ export function YearSemesterSelect({
     [years],
   );
 
+  const semestersInYear = useMemo(
+    () =>
+      semesters
+        .filter((s) => s.academic_year_id === selectedYearId)
+        .sort((a, b) => a.number - b.number),
+    [semesters, selectedYearId],
+  );
+
   const semesterItems = useMemo(
-    () => [
-      { value: "1", label: "ภาค 1" },
-      { value: "2", label: "ภาค 2" },
-    ],
-    [],
+    () =>
+      semestersInYear.map((s) => ({
+        value: String(s.number),
+        label: formatSemesterLabel(s),
+      })),
+    [semestersInYear],
   );
 
   const selectedYearValue = years.some((y) => y.id === selectedYearId) ? selectedYearId : null;
+  const selectedSemesterValue = semestersInYear.some((s) => s.number === selectedSemesterNumber)
+    ? String(selectedSemesterNumber)
+    : semesterItems[0]?.value ?? null;
 
-  function navigate(yearId: string, semesterNumber: 1 | 2) {
+  function navigate(yearId: string, semesterNumber: number) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("year", yearId);
     params.set("semester", String(semesterNumber));
@@ -72,12 +88,16 @@ export function YearSemesterSelect({
 
   function handleYearChange(yearId: string | null) {
     if (!yearId) return;
-    navigate(yearId, 1);
+    const firstSemester = semesters
+      .filter((s) => s.academic_year_id === yearId)
+      .sort((a, b) => a.number - b.number)[0];
+    navigate(yearId, firstSemester?.number ?? 1);
   }
 
   function handleSemesterChange(value: string | null) {
     if (!value) return;
-    const semesterNumber = value === "2" ? 2 : 1;
+    const semesterNumber = Number.parseInt(value, 10);
+    if (!Number.isFinite(semesterNumber)) return;
     navigate(selectedYearId, semesterNumber);
   }
 
@@ -99,22 +119,24 @@ export function YearSemesterSelect({
           ))}
         </SelectContent>
       </Select>
-      <Select
-        value={String(selectedSemesterNumber)}
-        onValueChange={handleSemesterChange}
-        items={semesterItems}
-      >
-        <SelectTrigger className="h-9 w-[90px] border-border bg-background">
-          <SelectValue placeholder="ภาค" />
-        </SelectTrigger>
-        <SelectContent>
-          {semesterItems.map((item) => (
-            <SelectItem key={item.value} value={item.value}>
-              {item.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {semesterItems.length > 0 ? (
+        <Select
+          value={selectedSemesterValue}
+          onValueChange={handleSemesterChange}
+          items={semesterItems}
+        >
+          <SelectTrigger className="h-9 min-w-[90px] border-border bg-background">
+            <SelectValue placeholder="ภาค" />
+          </SelectTrigger>
+          <SelectContent>
+            {semesterItems.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : null}
     </div>
   );
 }

@@ -2,6 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  assertAcademicYearDeletable,
+  yearDeleteBlockedMessage,
+} from "@/lib/academic-year/delete-eligibility";
+import {
   firstSemesterFormError,
   firstYearFormError,
   validateSemesterForm,
@@ -20,11 +24,18 @@ type YearInput = {
 };
 
 type SemesterInput = {
-  number: 1 | 2;
+  number: number;
   name: string;
   startDate: string;
   endDate: string;
 };
+
+function revalidateAll() {
+  revalidatePath("/academic-year");
+  revalidatePath("/registration");
+  revalidatePath("/students");
+  revalidatePath("/");
+}
 
 function validateYear(year: YearInput): string | null {
   const result = validateYearForm(year);
@@ -33,6 +44,9 @@ function validateYear(year: YearInput): string | null {
 }
 
 function validateSemesters(semesters: SemesterInput[]): string | null {
+  if (semesters.length === 0) {
+    return "ต้องมีอย่างน้อย 1 ภาคเรียน";
+  }
   for (const sem of semesters) {
     const result = validateSemesterForm(sem, sem.number);
     if (!result.ok) return firstSemesterFormError(result.errors);
@@ -50,14 +64,6 @@ function mapAcademicYearMutationError(error: { code?: string; message?: string }
   return "ไม่สามารถบันทึกปีการศึกษาได้";
 }
 
-function semesterByNumber(semesters: SemesterInput[], number: 1 | 2): SemesterInput {
-  const semester = semesters.find((s) => s.number === number);
-  if (!semester) {
-    throw new Error(`Missing semester ${number}`);
-  }
-  return semester;
-}
-
 export async function createYearWithSemesters(
   year: YearInput,
   semesters: SemesterInput[],
@@ -71,8 +77,7 @@ export async function createYearWithSemesters(
   const semError = validateSemesters(semesters);
   if (semError) return { ok: false, error: semError };
 
-  const sem1 = semesterByNumber(semesters, 1);
-  const sem2 = semesterByNumber(semesters, 2);
+  const sem1 = semesters.find((s) => s.number === 1) ?? semesters[0];
   const supabase = await createClient();
 
   const { error } = await supabase.rpc("create_academic_year_with_semesters", {
@@ -83,9 +88,6 @@ export async function createYearWithSemesters(
     p_sem1_start: sem1.startDate,
     p_sem1_end: sem1.endDate,
     p_sem1_name: sem1.name,
-    p_sem2_start: sem2.startDate,
-    p_sem2_end: sem2.endDate,
-    p_sem2_name: sem2.name,
   });
 
   if (error) {
@@ -96,10 +98,9 @@ export async function createYearWithSemesters(
   return { ok: true };
 }
 
-export async function updateYearWithSemesters(
+export async function updateYearMetadata(
   yearId: string,
   year: YearInput,
-  semesters: SemesterInput[],
 ): Promise<ActionState> {
   const auth = await requireAdminAction();
   if (!auth.ok) return auth;
@@ -107,31 +108,88 @@ export async function updateYearWithSemesters(
   const yearError = validateYear(year);
   if (yearError) return { ok: false, error: yearError };
 
-  const semError = validateSemesters(semesters);
-  if (semError) return { ok: false, error: semError };
-
-  const sem1 = semesterByNumber(semesters, 1);
-  const sem2 = semesterByNumber(semesters, 2);
   const supabase = await createClient();
 
-  const { error } = await supabase.rpc("update_academic_year_with_semesters", {
-    p_year_id: yearId,
-    p_name: year.name.trim(),
-    p_start_date: year.startDate,
-    p_end_date: year.endDate,
-    p_is_active: year.isActive,
-    p_sem1_start: sem1.startDate,
-    p_sem1_end: sem1.endDate,
-    p_sem1_name: sem1.name,
-    p_sem2_start: sem2.startDate,
-    p_sem2_end: sem2.endDate,
-    p_sem2_name: sem2.name,
-  });
+  if (year.isActive) {
+    await supabase
+      .from("academic_years")
+      .update({ is_active: false })
+      .eq("is_active", true)
+      .neq("id", yearId);
+  }
+
+  const { error } = await supabase
+    .from("academic_years")
+    .update({
+      name: year.name.trim(),
+      start_date: year.startDate,
+      end_date: year.endDate,
+      is_active: year.isActive,
+    })
+    .eq("id", yearId);
 
   if (error) {
     return { ok: false, error: mapAcademicYearMutationError(error) };
   }
 
-  revalidatePath("/academic-year");
+  revalidateAll();
+  return { ok: true };
+}
+
+/** @deprecated Use updateYearMetadata + semester actions */
+export async function updateYearWithSemesters(
+  yearId: string,
+  year: YearInput,
+  semesters: SemesterInput[],
+): Promise<ActionState> {
+  const metadata = await updateYearMetadata(yearId, year);
+  if (!metadata.ok) return metadata;
+
+  const { updateSemester } = await import("@/lib/actions/semesters");
+  for (const sem of semesters) {
+    const supabase = await createClient();
+    const { data: row } = await supabase
+      .from("semesters")
+      .select("id")
+      .eq("academic_year_id", yearId)
+      .eq("number", sem.number)
+      .maybeSingle();
+
+    if (row) {
+      const result = await updateSemester(row.id, {
+        name: sem.name,
+        startDate: sem.startDate,
+        endDate: sem.endDate,
+      });
+      if (!result.ok) return result;
+    }
+  }
+
+  return { ok: true };
+}
+
+export async function deleteAcademicYear(yearId: string): Promise<ActionState> {
+  const auth = await requireAdminAction();
+  if (!auth.ok) return auth;
+
+  const check = await assertAcademicYearDeletable(yearId);
+  if (!check.ok) {
+    return { ok: false, error: yearDeleteBlockedMessage(check.reason) };
+  }
+
+  const supabase = await createClient();
+  const { error: semError } = await supabase
+    .from("semesters")
+    .delete()
+    .eq("academic_year_id", yearId);
+
+  if (semError) {
+    return { ok: false, error: "ไม่สามารถลบปีการศึกษาได้" };
+  }
+
+  const { error } = await supabase.from("academic_years").delete().eq("id", yearId);
+  if (error) return { ok: false, error: "ไม่สามารถลบปีการศึกษาได้" };
+
+  revalidateAll();
   return { ok: true };
 }

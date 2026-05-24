@@ -11,6 +11,7 @@ import {
   buildHeaderContextProps,
   loadSemesterPageContext,
 } from "@/lib/data/semester-page-context";
+import { listSemestersWithGradeLevels } from "@/lib/data/semesters";
 
 type SearchParams = Promise<{
   year?: string;
@@ -41,10 +42,11 @@ export default async function RegistrationPage({
       ? sp.classroom
       : classrooms[0]?.id ?? null;
 
-  const [roster, allClassrooms, enrollCandidates] = await Promise.all([
+  const [roster, allClassrooms, enrollCandidates, sourceSemesters] = await Promise.all([
     selectedClassroomId ? listClassroomRoster(selectedClassroomId) : Promise.resolve([]),
     ctx ? listClassroomsBySemester(ctx.semesterId) : Promise.resolve([]),
     ctx ? listStudentsAvailableForEnrollment(ctx.semesterId) : Promise.resolve([]),
+    ctx ? listSemestersWithGradeLevels(ctx.academicYearId) : Promise.resolve([]),
   ]);
 
   const isAdmin = profile?.role === "admin";
@@ -73,6 +75,7 @@ export default async function RegistrationPage({
             roster={roster}
             allClassrooms={allClassrooms}
             enrollCandidates={enrollCandidates}
+            sourceSemesters={sourceSemesters}
             isAdmin={isAdmin}
           />
         ) : (

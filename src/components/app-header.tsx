@@ -15,7 +15,7 @@ type AppHeaderProps = {
     years: AcademicYearOption[];
     semesters: SemesterOption[];
     selectedYearId: string;
-    selectedSemesterNumber: 1 | 2;
+    selectedSemesterNumber: number;
     basePath: string;
     clearGradeClassroomOnChange?: boolean;
   };

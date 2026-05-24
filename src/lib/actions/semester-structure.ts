@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache";
 import type { ActionState } from "@/lib/actions/academic-years";
 import { requireAdminAction } from "@/lib/auth/require-admin";
-import { listGradeLevels } from "@/lib/data/grade-levels";
 import { listClassroomsByGrade } from "@/lib/data/classrooms";
-import { getSemesterById, getSemesterByYearAndNumber } from "@/lib/data/semesters";
+import { listGradeLevels } from "@/lib/data/grade-levels";
+import { getSemesterById } from "@/lib/data/semesters";
 import { createClient } from "@/lib/supabase/server";
 
 function revalidateRegistrationPaths() {
@@ -13,14 +13,27 @@ function revalidateRegistrationPaths() {
   revalidatePath("/students");
 }
 
-export async function copySemesterStructure(targetSemesterId: string): Promise<ActionState> {
+export async function copySemesterStructure(
+  sourceSemesterId: string,
+  targetSemesterId: string,
+): Promise<ActionState> {
   const auth = await requireAdminAction();
   if (!auth.ok) return auth;
 
-  const target = await getSemesterById(targetSemesterId);
-  if (!target) return { ok: false, error: "ไม่พบภาคเรียน" };
-  if (target.number !== 2) {
-    return { ok: false, error: "คัดลอกได้เฉพาะไปยังภาคเรียนที่ 2" };
+  const [source, target] = await Promise.all([
+    getSemesterById(sourceSemesterId),
+    getSemesterById(targetSemesterId),
+  ]);
+
+  if (!source) return { ok: false, error: "ไม่พบภาคเรียนต้นทาง" };
+  if (!target) return { ok: false, error: "ไม่พบภาคเรียนปลายทาง" };
+
+  if (source.academic_year_id !== target.academic_year_id) {
+    return { ok: false, error: "คัดลอกได้เฉพาะภายในปีการศึกษาเดียวกัน" };
+  }
+
+  if (source.id === target.id) {
+    return { ok: false, error: "ไม่สามารถคัดลอกไปยังภาคเรียนเดียวกันได้" };
   }
 
   const existingGrades = await listGradeLevels(targetSemesterId);
@@ -28,12 +41,9 @@ export async function copySemesterStructure(targetSemesterId: string): Promise<A
     return { ok: false, error: "ภาคเรียนนี้มีชั้นเรียนอยู่แล้ว" };
   }
 
-  const source = await getSemesterByYearAndNumber(target.academic_year_id, 1);
-  if (!source) return { ok: false, error: "ไม่พบภาคเรียนที่ 1 ของปีนี้" };
-
-  const sourceGrades = await listGradeLevels(source.id);
+  const sourceGrades = await listGradeLevels(sourceSemesterId);
   if (sourceGrades.length === 0) {
-    return { ok: false, error: "ภาคเรียนที่ 1 ยังไม่มีชั้นเรียน" };
+    return { ok: false, error: "ภาคเรียนต้นทางยังไม่มีชั้นเรียน" };
   }
 
   const supabase = await createClient();

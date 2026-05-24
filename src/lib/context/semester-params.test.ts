@@ -7,31 +7,31 @@ const years = [
 ];
 
 const semesters = [
-  { id: "s1-active", academic_year_id: "y-active", number: 1 as const, name: null },
-  { id: "s2-active", academic_year_id: "y-active", number: 2 as const, name: null },
-  { id: "s1-old", academic_year_id: "y-old", number: 1 as const, name: null },
+  { id: "s1-active", academic_year_id: "y-active", number: 1, name: null },
+  { id: "s3-active", academic_year_id: "y-active", number: 3, name: null },
+  { id: "s1-old", academic_year_id: "y-old", number: 1, name: null },
 ];
 
 describe("parseSemesterNumber", () => {
-  it("accepts 1 and 2", () => {
-    expect(parseSemesterNumber("1")).toBe(1);
-    expect(parseSemesterNumber("2")).toBe(2);
+  it("accepts available numbers", () => {
+    expect(parseSemesterNumber("3", [1, 3])).toBe(3);
+    expect(parseSemesterNumber("1", [1, 3])).toBe(1);
   });
 
-  it("defaults invalid to 1", () => {
-    expect(parseSemesterNumber(undefined)).toBe(1);
-    expect(parseSemesterNumber("3")).toBe(1);
+  it("defaults to lowest available when invalid", () => {
+    expect(parseSemesterNumber(undefined, [1, 3])).toBe(1);
+    expect(parseSemesterNumber("2", [1, 3])).toBe(1);
   });
 });
 
 describe("resolveSemesterContext", () => {
   it("uses year and semester params when valid", () => {
-    const ctx = resolveSemesterContext("y-active", "2", years, semesters);
-    expect(ctx?.semesterId).toBe("s2-active");
-    expect(ctx?.semesterNumber).toBe(2);
+    const ctx = resolveSemesterContext("y-active", "3", years, semesters);
+    expect(ctx?.semesterId).toBe("s3-active");
+    expect(ctx?.semesterNumber).toBe(3);
   });
 
-  it("defaults to active year and semester 1", () => {
+  it("defaults to active year and lowest semester", () => {
     const ctx = resolveSemesterContext(undefined, undefined, years, semesters);
     expect(ctx?.academicYearId).toBe("y-active");
     expect(ctx?.semesterId).toBe("s1-active");

@@ -28,7 +28,8 @@ async function readSemesterCookieParams(): Promise<{
   const semester = cookieStore.get(SEMESTER_NUMBER_COOKIE)?.value;
   return {
     year: year ? decodeURIComponent(year) : undefined,
-    semester: semester === "1" || semester === "2" ? semester : undefined,
+    semester:
+      semester && Number.parseInt(semester, 10) >= 1 ? semester : undefined,
   };
 }
 
@@ -69,7 +70,7 @@ export function buildHeaderContextProps(
   };
 }
 
-export function semesterParamFromNumber(number: 1 | 2): string {
+export function semesterParamFromNumber(number: number): string {
   return String(number);
 }
 
