@@ -1,23 +1,21 @@
 import { AppHeader } from "@/components/app-header";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getPageHeaderProps } from "@/lib/data/page-header";
+import { AcademicYearPanel } from "@/components/academic-year/academic-year-panel";
+import { requireAdminPage } from "@/lib/auth/require-admin";
+import { listAcademicYears } from "@/lib/data/academic-years";
 
 export default async function AcademicYearPage() {
-  const header = await getPageHeaderProps();
+  const profile = await requireAdminPage();
+  const years = await listAcademicYears();
 
   return (
     <>
-      <AppHeader title="ปีการศึกษา" {...header} />
+      <AppHeader
+        title="ปีการศึกษา"
+        displayName={profile.display_name ?? "ผู้ใช้"}
+        showContextSelectors={false}
+      />
       <main className="p-6">
-        <Card className="max-w-lg border-border">
-          <CardHeader>
-            <CardTitle>ปีการศึกษา</CardTitle>
-            <CardDescription>ตั้งค่าปีการศึกษาและภาคเรียน</CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            จัดการใน Supabase ตาราง academic_years และ semesters
-          </CardContent>
-        </Card>
+        <AcademicYearPanel years={years} />
       </main>
     </>
   );

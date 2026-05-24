@@ -14,6 +14,7 @@ type AppHeaderProps = {
   displayName: string;
   yearName?: string;
   semesterNumber?: number;
+  showContextSelectors?: boolean;
 };
 
 export function AppHeader({
@@ -21,6 +22,7 @@ export function AppHeader({
   displayName,
   yearName,
   semesterNumber,
+  showContextSelectors = true,
 }: AppHeaderProps) {
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card px-6">
@@ -33,26 +35,28 @@ export function AppHeader({
         ) : null}
       </div>
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <Select value={yearName ?? "none"} disabled>
-            <SelectTrigger className="h-9 w-[100px] border-border bg-background">
-              <SelectValue placeholder="ปี" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={yearName ?? "none"}>{yearName ?? "—"}</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={String(semesterNumber ?? 1)} disabled>
-            <SelectTrigger className="h-9 w-[90px] border-border bg-background">
-              <SelectValue placeholder="ภาค" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={String(semesterNumber ?? 1)}>
-                ภาค {semesterNumber ?? 1}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {showContextSelectors ? (
+          <div className="flex items-center gap-2">
+            <Select value={yearName ?? "none"} disabled>
+              <SelectTrigger className="h-9 w-[100px] border-border bg-background">
+                <SelectValue placeholder="ปี" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={yearName ?? "none"}>{yearName ?? "—"}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={String(semesterNumber ?? 1)} disabled>
+              <SelectTrigger className="h-9 w-[90px] border-border bg-background">
+                <SelectValue placeholder="ภาค" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={String(semesterNumber ?? 1)}>
+                  ภาค {semesterNumber ?? 1}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
         <UserMenu displayName={displayName} />
       </div>
     </header>
