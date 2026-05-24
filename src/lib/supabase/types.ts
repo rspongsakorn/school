@@ -56,7 +56,7 @@ export type Database = {
         student_id: string;
         classroom_id: string;
         academic_year_id: string;
-        status: string;
+        status: "enrolled" | "transferred" | "withdrawn";
       }>;
       student_invoices: TableDef<{
         id: string;
