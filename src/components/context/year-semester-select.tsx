@@ -108,7 +108,7 @@ export function YearSemesterSelect({
   return (
     <div className="flex items-center gap-2">
       <Select value={selectedYearValue} onValueChange={handleYearChange} items={yearItems}>
-        <SelectTrigger className="h-9 w-[120px] border-border bg-background">
+        <SelectTrigger className="h-9 w-auto min-w-[5.5rem] border-border bg-background *:data-[slot=select-value]:line-clamp-none">
           <SelectValue placeholder="ปี" />
         </SelectTrigger>
         <SelectContent>

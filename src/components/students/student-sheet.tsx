@@ -267,6 +267,7 @@ function StudentSheetBody({
             value={form.status}
             onValueChange={(value) => updateField("status", value as StudentStatus)}
             disabled={readOnly || submitting}
+            items={STATUS_OPTIONS}
           >
             <SelectTrigger id="student-status" className="w-full">
               <SelectValue placeholder="เลือกสถานะ" />

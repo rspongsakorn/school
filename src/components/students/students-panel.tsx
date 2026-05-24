@@ -104,6 +104,7 @@ export function StudentsPanel({ data, params, isAdmin }: StudentsPanelProps) {
           <Select
             value={params.status}
             onValueChange={(value) => pushParams({ status: value ?? "all", page: 1 })}
+            items={STUDENT_STATUS_FILTER_OPTIONS}
           >
             <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="สถานะ" />
