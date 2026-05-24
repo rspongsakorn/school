@@ -1,4 +1,6 @@
-.cursor/
+.cursor/*
+!.cursor/skills/
+!.cursor/skills/**
 
 # dependencies
 /node_modules
@@ -41,3 +43,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .env.*
+.cursor/
+vendor/

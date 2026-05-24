@@ -15,13 +15,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -102,8 +102,8 @@ export function StudentSheet({
   const formKey = open ? `${mode}-${initial?.id ?? "new"}` : "closed";
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-md">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
         {open ? (
           <StudentSheetBody
             key={formKey}
@@ -113,8 +113,8 @@ export function StudentSheet({
             onOpenChange={onOpenChange}
           />
         ) : null}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -211,12 +211,12 @@ function StudentSheetBody({
 
   return (
     <>
-      <SheetHeader>
-        <SheetTitle>{title}</SheetTitle>
-        <SheetDescription>{description}</SheetDescription>
-      </SheetHeader>
+      <DialogHeader>
+        <DialogTitle>{title}</DialogTitle>
+        <DialogDescription>{description}</DialogDescription>
+      </DialogHeader>
 
-      <div className="grid gap-4 px-4">
+      <div className="grid gap-4">
         <div className="grid gap-2">
           <Label htmlFor="student-code">รหัสนักเรียน</Label>
           <Input
@@ -282,7 +282,7 @@ function StudentSheetBody({
         </div>
       </div>
 
-      <SheetFooter className="gap-2 border-t">
+      <DialogFooter className="sm:justify-between">
         {canDelete ? (
           <Button
             type="button"
@@ -303,7 +303,7 @@ function StudentSheetBody({
             </Button>
           ) : null}
         </div>
-      </SheetFooter>
+      </DialogFooter>
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
