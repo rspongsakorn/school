@@ -1,5 +1,6 @@
 import { formatClassroom, formatStudentName } from "@/lib/format";
 import { getStudentGradeMap } from "@/lib/data/enrollments";
+import type { InvoiceDeleteContext } from "@/lib/finance/invoice-delete-eligibility";
 import { buildStudentSearchOrFilter } from "@/lib/students/search";
 import { createClient } from "@/lib/supabase/server";
 
@@ -20,6 +21,7 @@ export type InvoiceListRow = {
   discountType: "percent" | "fixed" | null;
   discountValue: number | null;
   createdAt: string;
+  hasActivePaymentAllocation: boolean;
 };
 
 export type PaginatedInvoices = {
@@ -138,6 +140,9 @@ export async function listInvoicesPaginated(params: {
     students: { student_code: string; first_name: string; last_name: string };
   };
 
+  const invoiceIds = (data as unknown as Row[]).map((row) => row.id);
+  const activeAllocationInvoiceIds = await loadActiveAllocationInvoiceIds(invoiceIds);
+
   const rows: InvoiceListRow[] = (data as unknown as Row[]).map((row) => {
     const totalAmount = Number(row.total_amount);
     const paidAmount = Number(row.paid_amount);
@@ -156,6 +161,7 @@ export async function listInvoicesPaginated(params: {
       discountType: row.discount_type,
       discountValue: row.discount_value != null ? Number(row.discount_value) : null,
       createdAt: row.created_at,
+      hasActivePaymentAllocation: activeAllocationInvoiceIds.has(row.id),
     };
   });
 
@@ -235,6 +241,45 @@ export async function listInvoiceCandidates(semesterId: string): Promise<Invoice
     gradeClassroom: gradeByStudent.get(row.student_id) ?? "—",
     hasInvoice: existingSet.has(row.student_id),
   }));
+}
+
+export async function getInvoiceDeleteContext(
+  invoiceIds: string[],
+): Promise<Map<string, InvoiceDeleteContext>> {
+  if (invoiceIds.length === 0) return new Map();
+
+  const supabase = await createClient();
+  const [invoicesResult, activeAllocationIds] = await Promise.all([
+    supabase
+      .from("student_invoices")
+      .select("id, paid_amount, total_amount")
+      .in("id", invoiceIds),
+    loadActiveAllocationInvoiceIds(invoiceIds),
+  ]);
+
+  const map = new Map<string, InvoiceDeleteContext>();
+  for (const row of invoicesResult.data ?? []) {
+    map.set(row.id, {
+      paidAmount: Number(row.paid_amount),
+      totalAmount: Number(row.total_amount),
+      hasActivePaymentAllocation: activeAllocationIds.has(row.id),
+    });
+  }
+  return map;
+}
+
+async function loadActiveAllocationInvoiceIds(invoiceIds: string[]): Promise<Set<string>> {
+  if (invoiceIds.length === 0) return new Set();
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("payment_allocations")
+    .select("invoice_id, payments!inner ( status )")
+    .in("invoice_id", invoiceIds)
+    .eq("payments.status", "active");
+
+  type Row = { invoice_id: string; payments: { status: string } };
+  return new Set(((data ?? []) as unknown as Row[]).map((row) => row.invoice_id));
 }
 
 export async function listStudentIdsWithInvoice(semesterId: string): Promise<Set<string>> {

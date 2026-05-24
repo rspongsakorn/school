@@ -1,9 +1,20 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -22,8 +33,13 @@ import {
 import { InvoiceDiscountDialog } from "@/components/finance/invoice-discount-dialog";
 import { InvoiceGenerateDialog } from "@/components/finance/invoice-generate-dialog";
 import { StudentSearchInput } from "@/components/students/student-search-input";
+import { deleteInvoices } from "@/lib/actions/invoices";
 import { formatBaht } from "@/lib/format";
 import { INVOICE_STATUS_LABELS } from "@/lib/finance/constants";
+import {
+  canDeleteInvoice,
+  invoiceDeleteBlockedReason,
+} from "@/lib/finance/invoice-delete-eligibility";
 import type { PaginatedInvoices, InvoiceListRow } from "@/lib/data/invoices";
 import type { InvoiceCandidateRow } from "@/lib/data/invoices";
 import type { FeeItemRow } from "@/lib/data/fee-items";
@@ -77,6 +93,29 @@ export function InvoicesPanel({
   const pathname = usePathname();
   const [generateOpen, setGenerateOpen] = useState(false);
   const [discountTarget, setDiscountTarget] = useState<InvoiceListRow | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [deleteTargetIds, setDeleteTargetIds] = useState<string[] | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  function deleteContextFor(row: InvoiceListRow) {
+    return {
+      paidAmount: row.paidAmount,
+      totalAmount: row.totalAmount,
+      hasActivePaymentAllocation: row.hasActivePaymentAllocation,
+    };
+  }
+
+  const deletableRows = useMemo(
+    () => data.rows.filter((row) => canDeleteInvoice(deleteContextFor(row))),
+    [data.rows],
+  );
+
+  const allDeletableSelected =
+    deletableRows.length > 0 && deletableRows.every((row) => selectedIds.has(row.id));
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [data.page, params.q, params.status, params.grade, params.classroom]);
 
   const gradeItems = [
     { value: "all", label: "ทุกชั้น" },
@@ -113,6 +152,52 @@ export function InvoicesPanel({
     },
     [params, pathname, router],
   );
+
+  function toggleRow(id: string, checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll(checked: boolean) {
+    if (!checked) {
+      setSelectedIds(new Set());
+      return;
+    }
+    setSelectedIds(new Set(deletableRows.map((row) => row.id)));
+  }
+
+  async function confirmDelete() {
+    if (!deleteTargetIds || deleteTargetIds.length === 0) return;
+
+    setDeleting(true);
+    const result = await deleteInvoices(deleteTargetIds);
+    setDeleting(false);
+    setDeleteTargetIds(null);
+
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of deleteTargetIds) next.delete(id);
+      return next;
+    });
+
+    if (result.skipped > 0) {
+      toast.success(`ลบแล้ว ${result.deleted} ใบ (ข้าม ${result.skipped} ใบที่ลบไม่ได้)`);
+    } else {
+      toast.success(`ลบใบแจ้งชำระแล้ว ${result.deleted} ใบ`);
+    }
+    router.refresh();
+  }
+
+  const bulkDeleteCount = selectedIds.size;
 
   return (
     <div className="space-y-4">
@@ -172,14 +257,36 @@ export function InvoicesPanel({
             </SelectContent>
           </Select>
         </div>
-        <Button type="button" onClick={() => setGenerateOpen(true)}>
-          สร้างใบแจ้งชำระ
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {bulkDeleteCount > 0 ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="text-destructive"
+              onClick={() => setDeleteTargetIds([...selectedIds])}
+            >
+              ลบที่เลือก ({bulkDeleteCount})
+            </Button>
+          ) : null}
+          <Button type="button" onClick={() => setGenerateOpen(true)}>
+            สร้างใบแจ้งชำระ
+          </Button>
+        </div>
       </div>
 
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-10">
+              <input
+                type="checkbox"
+                className="size-4 rounded border-border"
+                checked={allDeletableSelected}
+                disabled={deletableRows.length === 0}
+                aria-label="เลือกทั้งหมดที่ลบได้"
+                onChange={(e) => toggleSelectAll(e.target.checked)}
+              />
+            </TableHead>
             <TableHead>รหัส</TableHead>
             <TableHead>ชื่อ-นามสกุล</TableHead>
             <TableHead>ชั้น/ห้อง</TableHead>
@@ -187,19 +294,34 @@ export function InvoicesPanel({
             <TableHead className="text-right">ต้องชำระ</TableHead>
             <TableHead className="text-right">ค้าง</TableHead>
             <TableHead>สถานะ</TableHead>
-            <TableHead className="w-[100px]" />
+            <TableHead className="w-[140px]" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {data.rows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="py-6 text-center text-muted-foreground">
+              <TableCell colSpan={9} className="py-6 text-center text-muted-foreground">
                 ไม่พบใบแจ้งชำระ
               </TableCell>
             </TableRow>
           ) : (
-            data.rows.map((row) => (
+            data.rows.map((row) => {
+              const ctx = deleteContextFor(row);
+              const deletable = canDeleteInvoice(ctx);
+              const blockedReason = invoiceDeleteBlockedReason(ctx);
+              return (
               <TableRow key={row.id}>
+                <TableCell>
+                  <input
+                    type="checkbox"
+                    className="size-4 rounded border-border"
+                    checked={selectedIds.has(row.id)}
+                    disabled={!deletable}
+                    title={blockedReason ?? undefined}
+                    aria-label={`เลือก ${row.studentCode}`}
+                    onChange={(e) => toggleRow(row.id, e.target.checked)}
+                  />
+                </TableCell>
                 <TableCell className="tabular-nums">{row.studentCode}</TableCell>
                 <TableCell>{row.studentName}</TableCell>
                 <TableCell>{row.gradeClassroom}</TableCell>
@@ -216,19 +338,40 @@ export function InvoicesPanel({
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  {row.paidAmount === 0 ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setDiscountTarget(row)}
-                    >
-                      ส่วนลด
-                    </Button>
-                  ) : null}
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {row.paidAmount === 0 ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setDiscountTarget(row)}
+                      >
+                        ส่วนลด
+                      </Button>
+                    ) : null}
+                    {deletable ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="text-destructive"
+                        onClick={() => setDeleteTargetIds([row.id])}
+                      >
+                        ลบ
+                      </Button>
+                    ) : blockedReason ? (
+                      <span
+                        className="text-xs text-muted-foreground"
+                        title={blockedReason}
+                      >
+                        ลบไม่ได้
+                      </span>
+                    ) : null}
+                  </div>
                 </TableCell>
               </TableRow>
-            ))
+            );
+            })
           )}
         </TableBody>
       </Table>
@@ -275,6 +418,37 @@ export function InvoicesPanel({
         onOpenChange={(open) => !open && setDiscountTarget(null)}
         invoice={discountTarget}
       />
+
+      <AlertDialog
+        open={Boolean(deleteTargetIds)}
+        onOpenChange={(open) => !open && !deleting && setDeleteTargetIds(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ลบใบแจ้งชำระ</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <span>
+                {deleteTargetIds && deleteTargetIds.length > 1
+                  ? `ยืนยันลบ ${deleteTargetIds.length} ใบ — เฉพาะใบที่ยกเลิกใบเสร็จครบแล้วจะถูกลบ`
+                  : "ยืนยันลบใบแจ้งชำระนี้ — การลบไม่สามารถย้อนกลับได้"}
+              </span>
+              <span className="block text-muted-foreground">
+                ประวัติใบเสร็จที่ยกเลิกแล้วจะยังอยู่ในระบบ
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={confirmDelete}
+              disabled={deleting}
+            >
+              {deleting ? "กำลังลบ..." : "ยืนยันลบ"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

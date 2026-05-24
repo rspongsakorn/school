@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import type { ActionState } from "@/lib/actions/academic-years";
 import { requireAdminAction } from "@/lib/auth/require-admin";
 import { computeInvoiceTotal } from "@/lib/finance/amounts";
-import { listStudentIdsWithInvoice } from "@/lib/data/invoices";
+import { canDeleteInvoice } from "@/lib/finance/invoice-delete-eligibility";
+import { getInvoiceDeleteContext, listStudentIdsWithInvoice } from "@/lib/data/invoices";
 import { createClient } from "@/lib/supabase/server";
 
 export type GenerateInvoicesResult =
@@ -214,6 +215,79 @@ export async function updateInvoiceDiscount(
 
   revalidateFinancePaths();
   return { ok: true };
+}
+
+export type DeleteInvoicesResult =
+  | { ok: true; deleted: number; skipped: number }
+  | { ok: false; error: string };
+
+export async function deleteInvoices(invoiceIds: string[]): Promise<DeleteInvoicesResult> {
+  const auth = await requireAdminAction();
+  if (!auth.ok) return auth;
+
+  const uniqueIds = [...new Set(invoiceIds.map((id) => id.trim()).filter(Boolean))];
+  if (uniqueIds.length === 0) {
+    return { ok: false, error: "กรุณาเลือกใบแจ้งชำระที่ต้องการลบ" };
+  }
+
+  const supabase = await createClient();
+  const deleteContext = await getInvoiceDeleteContext(uniqueIds);
+
+  if (deleteContext.size === 0) {
+    return { ok: false, error: "ไม่พบใบแจ้งชำระที่เลือก" };
+  }
+
+  const deletableIds = uniqueIds.filter((id) => {
+    const ctx = deleteContext.get(id);
+    return ctx ? canDeleteInvoice(ctx) : false;
+  });
+
+  const skipped = uniqueIds.length - deletableIds.length;
+
+  if (deletableIds.length === 0) {
+    return {
+      ok: false,
+      error: "ไม่สามารถลบได้ — ต้องยกเลิกใบเสร็จที่เกี่ยวข้องทั้งหมดก่อน",
+    };
+  }
+
+  for (const invoiceId of deletableIds) {
+    const { data: voidedAllocations, error: allocFetchError } = await supabase
+      .from("payment_allocations")
+      .select("id, payments!inner ( status )")
+      .eq("invoice_id", invoiceId)
+      .eq("payments.status", "voided");
+
+    if (allocFetchError) {
+      return { ok: false, error: "ไม่สามารถเตรียมลบใบแจ้งชำระได้" };
+    }
+
+    type AllocRow = { id: string; payments: { status: string } };
+    const allocationIds = ((voidedAllocations ?? []) as unknown as AllocRow[]).map((row) => row.id);
+
+    if (allocationIds.length > 0) {
+      const { error: allocDeleteError } = await supabase
+        .from("payment_allocations")
+        .delete()
+        .in("id", allocationIds);
+
+      if (allocDeleteError) {
+        return { ok: false, error: "ไม่สามารถลบใบแจ้งชำระได้" };
+      }
+    }
+
+    const { error: invoiceDeleteError } = await supabase
+      .from("student_invoices")
+      .delete()
+      .eq("id", invoiceId);
+
+    if (invoiceDeleteError) {
+      return { ok: false, error: "ไม่สามารถลบใบแจ้งชำระได้" };
+    }
+  }
+
+  revalidateFinancePaths();
+  return { ok: true, deleted: deletableIds.length, skipped };
 }
 
 function revalidateFinancePaths() {
