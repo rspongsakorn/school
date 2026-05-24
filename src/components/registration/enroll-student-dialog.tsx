@@ -19,7 +19,7 @@ import type { StudentEnrollmentCandidate } from "@/lib/data/enrollments";
 type EnrollStudentDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  academicYearId: string;
+  semesterId: string;
   classroomId: string;
   initialCandidates: StudentEnrollmentCandidate[];
 };
@@ -27,7 +27,7 @@ type EnrollStudentDialogProps = {
 export function EnrollStudentDialog({
   open,
   onOpenChange,
-  academicYearId,
+  semesterId,
   classroomId,
   initialCandidates,
 }: EnrollStudentDialogProps) {
@@ -55,7 +55,7 @@ export function EnrollStudentDialog({
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
-      const results = await searchStudentsForEnrollment(academicYearId, value);
+      const results = await searchStudentsForEnrollment(semesterId, value);
       setCandidates(results);
       setLoading(false);
     }, 300);
@@ -81,7 +81,7 @@ export function EnrollStudentDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>เพิ่มนักเรียนในห้อง</DialogTitle>
-          <DialogDescription>ค้นหารหัสหรือชื่อนักเรียนที่ยังไม่ได้ลงทะเบียนในปีนี้</DialogDescription>
+          <DialogDescription>ค้นหารหัสหรือชื่อนักเรียนที่ยังไม่ได้ลงทะเบียนในภาคนี้</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <Input

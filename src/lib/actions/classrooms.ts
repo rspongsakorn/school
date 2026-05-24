@@ -3,16 +3,17 @@
 import { revalidatePath } from "next/cache";
 import type { ActionState } from "@/lib/actions/academic-years";
 import { requireAdminAction } from "@/lib/auth/require-admin";
+import { getSemesterById } from "@/lib/data/semesters";
 import { validateClassroomName } from "@/lib/enrollment/validation";
 import { createClient } from "@/lib/supabase/server";
 
 function revalidateRegistrationPaths() {
-  revalidatePath("/registration/setup");
   revalidatePath("/registration");
+  revalidatePath("/students");
 }
 
 export async function createClassroom(
-  academicYearId: string,
+  semesterId: string,
   gradeLevelId: string,
   input: { name: string },
 ): Promise<ActionState> {
@@ -22,9 +23,13 @@ export async function createClassroom(
   const validation = validateClassroomName(input.name);
   if (!validation.ok) return { ok: false, error: validation.error };
 
+  const semester = await getSemesterById(semesterId);
+  if (!semester) return { ok: false, error: "ไม่พบภาคเรียน" };
+
   const supabase = await createClient();
   const { error } = await supabase.from("classrooms").insert({
-    academic_year_id: academicYearId,
+    semester_id: semesterId,
+    academic_year_id: semester.academic_year_id,
     grade_level_id: gradeLevelId,
     name: input.name.trim(),
   });

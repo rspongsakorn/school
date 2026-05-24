@@ -85,7 +85,7 @@ export async function getDashboardData(
 
   const supabase = await createClient();
   const { academicYearId, semesterId } = context;
-  const gradeByStudent = await getStudentGradeMap(academicYearId);
+  const gradeByStudent = await getStudentGradeMap(semesterId);
 
   const [
     enrollmentsRes,
@@ -98,7 +98,7 @@ export async function getDashboardData(
     supabase
       .from("student_enrollments")
       .select("student_id", { count: "exact", head: true })
-      .eq("academic_year_id", academicYearId)
+      .eq("semester_id", semesterId)
       .eq("status", "enrolled"),
     supabase
       .from("student_invoices")
@@ -128,7 +128,7 @@ export async function getDashboardData(
     supabase
       .from("grade_levels")
       .select("id, name, sort_order")
-      .eq("academic_year_id", academicYearId)
+      .eq("semester_id", semesterId)
       .order("sort_order", { ascending: true }),
   ]);
 
@@ -196,7 +196,7 @@ export async function getDashboardData(
         .from("classrooms")
         .select("id")
         .eq("grade_level_id", gl.id)
-        .eq("academic_year_id", academicYearId);
+        .eq("semester_id", semesterId);
 
       const classroomIds = (classrooms ?? []).map((c) => c.id);
       if (classroomIds.length === 0) {
@@ -206,7 +206,7 @@ export async function getDashboardData(
       const { data: enrollments } = await supabase
         .from("student_enrollments")
         .select("student_id")
-        .eq("academic_year_id", academicYearId)
+        .eq("semester_id", semesterId)
         .eq("status", "enrolled")
         .in("classroom_id", classroomIds);
 

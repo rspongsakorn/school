@@ -2,14 +2,23 @@ import { AppHeader } from "@/components/app-header";
 import { StudentsPanel } from "@/components/students/students-panel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentProfileRole } from "@/lib/auth/require-admin";
-import { getYearSemesterContext } from "@/lib/data/context";
+import {
+  buildHeaderContextProps,
+  loadSemesterPageContext,
+} from "@/lib/data/semester-page-context";
 import { listStudentsPaginated } from "@/lib/data/students";
 import {
   STUDENT_STATUS_FILTER_OPTIONS,
   type StudentStatus,
 } from "@/lib/students/constants";
 
-type SearchParams = Promise<{ q?: string; status?: string; page?: string }>;
+type SearchParams = Promise<{
+  q?: string;
+  status?: string;
+  page?: string;
+  year?: string;
+  semester?: string;
+}>;
 
 function parseStatus(value?: string): StudentStatus | "all" {
   if (!value) return "all";
@@ -23,30 +32,31 @@ export default async function StudentsPage({
   searchParams: SearchParams;
 }) {
   const sp = await searchParams;
-  const [profile, context] = await Promise.all([
+  const [profile, page] = await Promise.all([
     getCurrentProfileRole(),
-    getYearSemesterContext(),
+    loadSemesterPageContext(sp.year, sp.semester),
   ]);
   const q = sp.q ?? "";
   const status = parseStatus(sp.status);
   const rawPage = Number.parseInt(sp.page ?? "1", 10);
-  const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+  const pageNum = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
 
   const students = await listStudentsPaginated({
     q,
     status,
-    page,
-    academicYearId: context?.academicYearId ?? null,
+    page: pageNum,
+    semesterId: page.ctx?.semesterId ?? null,
   });
   const isAdmin = profile?.role === "admin";
+  const headerContext = buildHeaderContextProps(page, "/students");
 
   return (
     <>
       <AppHeader
         title="นักเรียน"
         displayName={profile?.display_name ?? "ผู้ใช้"}
-        yearName={context?.academicYearName}
-        semesterNumber={context?.semesterNumber}
+        showContextSelectors={Boolean(headerContext)}
+        context={headerContext}
       />
       <main className="p-6">
         <Card className="border-border shadow-sm">
@@ -59,7 +69,7 @@ export default async function StudentsPage({
           <CardContent>
             <StudentsPanel
               data={students}
-              params={{ q, status, page }}
+              params={{ q, status, page: pageNum }}
               isAdmin={isAdmin}
             />
           </CardContent>

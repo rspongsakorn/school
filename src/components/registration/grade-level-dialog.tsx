@@ -22,7 +22,7 @@ type GradeLevelDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: "create" | "edit";
-  academicYearId: string;
+  semesterId: string;
   initial?: { id: string; name: string; sortOrder: number };
 };
 
@@ -30,7 +30,7 @@ export function GradeLevelDialog({
   open,
   onOpenChange,
   mode,
-  academicYearId,
+  semesterId,
   initial,
 }: GradeLevelDialogProps) {
   const router = useRouter();
@@ -59,7 +59,7 @@ export function GradeLevelDialog({
     const sort = Number.parseInt(sortOrder, 10) || 0;
     const result =
       mode === "create"
-        ? await createGradeLevel(academicYearId, { name, sortOrder: sort })
+        ? await createGradeLevel(semesterId, { name, sortOrder: sort })
         : await updateGradeLevel(initial!.id, { name, sortOrder: sort });
 
     setSubmitting(false);

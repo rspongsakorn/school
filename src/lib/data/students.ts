@@ -24,7 +24,7 @@ export type StudentListParams = {
   q?: string;
   status?: StudentStatus | "all";
   page?: number;
-  academicYearId?: string | null;
+  semesterId?: string | null;
 };
 
 export type PaginatedStudents = {
@@ -60,7 +60,7 @@ function mapStudentRow(
   };
 }
 
-export async function listStudents(academicYearId: string | null): Promise<StudentListRow[]> {
+export async function listStudents(semesterId: string | null): Promise<StudentListRow[]> {
   const supabase = await createClient();
 
   const { data: students, error } = await supabase
@@ -70,8 +70,8 @@ export async function listStudents(academicYearId: string | null): Promise<Stude
 
   if (error || !students) return [];
 
-  const gradeByStudent = academicYearId
-    ? await getStudentGradeMap(academicYearId)
+  const gradeByStudent = semesterId
+    ? await getStudentGradeMap(semesterId)
     : new Map<string, string>();
 
   return students.map((s) => mapStudentRow(s, gradeByStudent));
@@ -89,8 +89,8 @@ export async function listStudentsPaginated(
   const q = params.q?.trim();
   const searchFilter = q ? buildStudentSearchOrFilter(q) : "";
 
-  const gradePromise = params.academicYearId
-    ? getStudentGradeMap(params.academicYearId)
+  const gradePromise = params.semesterId
+    ? getStudentGradeMap(params.semesterId)
     : Promise.resolve(new Map<string, string>());
 
   const studentsPromise = (async () => {

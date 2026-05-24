@@ -43,6 +43,7 @@ export type Database = {
         id: string;
         name: string;
         academic_year_id: string;
+        semester_id: string;
         sort_order: number;
       }>;
       classrooms: TableDef<{
@@ -50,13 +51,23 @@ export type Database = {
         name: string;
         grade_level_id: string;
         academic_year_id: string;
+        semester_id: string;
       }>;
       student_enrollments: TableDef<{
         id: string;
         student_id: string;
         classroom_id: string;
         academic_year_id: string;
+        semester_id: string;
         status: "enrolled" | "transferred" | "withdrawn";
+      }>;
+      teacher_assignments: TableDef<{
+        id: string;
+        profile_id: string;
+        classroom_id: string;
+        academic_year_id: string;
+        semester_id: string;
+        role: string;
       }>;
       student_invoices: TableDef<{
         id: string;

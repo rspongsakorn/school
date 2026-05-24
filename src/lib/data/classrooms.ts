@@ -5,6 +5,7 @@ export type ClassroomRow = {
   name: string;
   grade_level_id: string;
   academic_year_id: string;
+  semester_id: string;
   enrolled_count: number;
 };
 
@@ -17,7 +18,7 @@ export async function listClassroomsByGrade(gradeLevelId: string): Promise<Class
   const supabase = await createClient();
   const { data: classrooms, error } = await supabase
     .from("classrooms")
-    .select("id, name, grade_level_id, academic_year_id")
+    .select("id, name, grade_level_id, academic_year_id, semester_id")
     .eq("grade_level_id", gradeLevelId)
     .order("name", { ascending: true });
 
@@ -43,8 +44,8 @@ export async function listClassroomsByGrade(gradeLevelId: string): Promise<Class
   }));
 }
 
-export async function listClassroomsByYear(
-  academicYearId: string,
+export async function listClassroomsBySemester(
+  semesterId: string,
 ): Promise<ClassroomWithGradeRow[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -55,10 +56,11 @@ export async function listClassroomsByYear(
       name,
       grade_level_id,
       academic_year_id,
+      semester_id,
       grade_levels ( name, sort_order )
     `,
     )
-    .eq("academic_year_id", academicYearId)
+    .eq("semester_id", semesterId)
     .order("name", { ascending: true });
 
   if (error || !data) return [];
@@ -68,6 +70,7 @@ export async function listClassroomsByYear(
     name: string;
     grade_level_id: string;
     academic_year_id: string;
+    semester_id: string;
     grade_levels: { name: string; sort_order: number } | null;
   };
 
@@ -79,6 +82,7 @@ export async function listClassroomsByYear(
       name: c.name,
       grade_level_id: c.grade_level_id,
       academic_year_id: c.academic_year_id,
+      semester_id: c.semester_id,
       enrolled_count: 0,
       grade_name: c.grade_levels?.name ?? "—",
       grade_sort_order: c.grade_levels?.sort_order ?? 0,

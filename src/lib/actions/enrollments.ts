@@ -14,13 +14,13 @@ function revalidateRegistrationPaths() {
 }
 
 export async function searchStudentsForEnrollment(
-  academicYearId: string,
+  semesterId: string,
   query: string,
 ): Promise<{ studentId: string; studentCode: string; name: string }[]> {
   const auth = await requireAdminAction();
   if (!auth.ok) return [];
 
-  return listStudentsAvailableForEnrollment(academicYearId, query);
+  return listStudentsAvailableForEnrollment(semesterId, query);
 }
 
 export async function enrollStudent(
@@ -33,7 +33,7 @@ export async function enrollStudent(
   const supabase = await createClient();
   const { data: classroom, error: classroomError } = await supabase
     .from("classrooms")
-    .select("id, academic_year_id")
+    .select("id, academic_year_id, semester_id")
     .eq("id", classroomId)
     .maybeSingle();
 
@@ -45,7 +45,7 @@ export async function enrollStudent(
     .from("student_enrollments")
     .select("id")
     .eq("student_id", studentId)
-    .eq("academic_year_id", classroom.academic_year_id)
+    .eq("semester_id", classroom.semester_id)
     .maybeSingle();
 
   if (existing) {
@@ -63,11 +63,12 @@ export async function enrollStudent(
       student_id: studentId,
       classroom_id: classroomId,
       academic_year_id: classroom.academic_year_id,
+      semester_id: classroom.semester_id,
       status: "enrolled",
     });
 
     if (error?.code === "23505") {
-      return { ok: false, error: "นักเรียนลงทะเบียนในปีนี้แล้ว" };
+      return { ok: false, error: "นักเรียนลงทะเบียนในภาคนี้แล้ว" };
     }
     if (error) return { ok: false, error: "ไม่สามารถลงทะเบียนได้" };
   }
@@ -87,7 +88,7 @@ export async function moveStudentClassroom(
 
   const { data: enrollment } = await supabase
     .from("student_enrollments")
-    .select("id, academic_year_id, status")
+    .select("id, academic_year_id, semester_id, status")
     .eq("id", enrollmentId)
     .maybeSingle();
 
@@ -98,13 +99,13 @@ export async function moveStudentClassroom(
 
   const { data: classroom } = await supabase
     .from("classrooms")
-    .select("id, academic_year_id")
+    .select("id, academic_year_id, semester_id")
     .eq("id", newClassroomId)
     .maybeSingle();
 
   if (!classroom) return { ok: false, error: "ไม่พบห้องเรียน" };
-  if (classroom.academic_year_id !== enrollment.academic_year_id) {
-    return { ok: false, error: "ห้องเรียนต้องอยู่ในปีการศึกษาเดียวกัน" };
+  if (classroom.semester_id !== enrollment.semester_id) {
+    return { ok: false, error: "ห้องเรียนต้องอยู่ในภาคเรียนเดียวกัน" };
   }
 
   const { error } = await supabase

@@ -10,7 +10,6 @@ import {
   FileText,
   GraduationCap,
   LayoutDashboard,
-  Settings2,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,11 +18,7 @@ const basicNav = [
   { href: "/", label: "ภาพรวม", icon: LayoutDashboard },
   { href: "/academic-year", label: "ปีการศึกษา", icon: Calendar },
   { href: "/students", label: "นักเรียน", icon: Users },
-];
-
-const registrationNav = [
-  { href: "/registration/setup", label: "ตั้งค่าชั้น/ห้อง", icon: Settings2 },
-  { href: "/registration", label: "ลงทะเบียนนักเรียน", icon: ClipboardList },
+  { href: "/registration", label: "ลงทะเบียน", icon: ClipboardList },
 ];
 
 const financeNav = [
@@ -49,8 +44,7 @@ function NavSection({
       <ul className="space-y-1">
         {items.map((item) => {
           const active =
-            pathname === item.href ||
-            (item.href !== "/registration" && pathname.startsWith(`${item.href}/`));
+            pathname === item.href || pathname.startsWith(`${item.href}/`);
           const Icon = item.icon;
           return (
             <li key={item.href}>
@@ -88,7 +82,6 @@ export function AppSidebar() {
       </div>
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         <NavSection title="ข้อมูลพื้นฐาน" items={basicNav} />
-        <NavSection title="ลงทะเบียน" items={registrationNav} />
         <NavSection title="การเงิน" items={financeNav} />
       </nav>
     </aside>

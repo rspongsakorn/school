@@ -24,7 +24,7 @@ export type StudentEnrollmentCandidate = {
   name: string;
 };
 
-export async function getStudentGradeMap(academicYearId: string) {
+export async function getStudentGradeMap(semesterId: string) {
   const supabase = await createClient();
 
   const { data } = await supabase
@@ -38,7 +38,7 @@ export async function getStudentGradeMap(academicYearId: string) {
       )
     `,
     )
-    .eq("academic_year_id", academicYearId)
+    .eq("semester_id", semesterId)
     .eq("status", "enrolled");
 
   const map = new Map<string, string>();
@@ -99,7 +99,7 @@ export async function listClassroomRoster(classroomId: string): Promise<Enrollme
 }
 
 export async function listStudentsAvailableForEnrollment(
-  academicYearId: string,
+  semesterId: string,
   query?: string,
 ): Promise<StudentEnrollmentCandidate[]> {
   const supabase = await createClient();
@@ -123,7 +123,7 @@ export async function listStudentsAvailableForEnrollment(
   const { data: enrollments } = await supabase
     .from("student_enrollments")
     .select("student_id, status")
-    .eq("academic_year_id", academicYearId);
+    .eq("semester_id", semesterId);
 
   const enrolledStudentIds = new Set(
     (enrollments ?? []).filter((e) => e.status === "enrolled").map((e) => e.student_id),

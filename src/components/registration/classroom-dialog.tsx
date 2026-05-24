@@ -22,7 +22,7 @@ type ClassroomDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: "create" | "edit";
-  academicYearId: string;
+  semesterId: string;
   gradeLevelId: string;
   initial?: { id: string; name: string };
 };
@@ -31,7 +31,7 @@ export function ClassroomDialog({
   open,
   onOpenChange,
   mode,
-  academicYearId,
+  semesterId,
   gradeLevelId,
   initial,
 }: ClassroomDialogProps) {
@@ -58,7 +58,7 @@ export function ClassroomDialog({
 
     const result =
       mode === "create"
-        ? await createClassroom(academicYearId, gradeLevelId, { name })
+        ? await createClassroom(semesterId, gradeLevelId, { name })
         : await updateClassroom(initial!.id, { name });
 
     setSubmitting(false);

@@ -2,8 +2,15 @@ import { AppHeader } from "@/components/app-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getPageHeaderProps } from "@/lib/data/page-header";
 
-export default async function ReportsPage() {
-  const header = await getPageHeaderProps();
+type SearchParams = Promise<{ year?: string; semester?: string }>;
+
+export default async function ReportsPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const sp = await searchParams;
+  const header = await getPageHeaderProps("/reports", sp);
 
   return (
     <>

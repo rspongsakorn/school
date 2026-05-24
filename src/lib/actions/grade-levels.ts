@@ -3,16 +3,17 @@
 import { revalidatePath } from "next/cache";
 import type { ActionState } from "@/lib/actions/academic-years";
 import { requireAdminAction } from "@/lib/auth/require-admin";
+import { getSemesterById } from "@/lib/data/semesters";
 import { validateGradeLevelName } from "@/lib/enrollment/validation";
 import { createClient } from "@/lib/supabase/server";
 
 function revalidateRegistrationPaths() {
-  revalidatePath("/registration/setup");
   revalidatePath("/registration");
+  revalidatePath("/students");
 }
 
 export async function createGradeLevel(
-  academicYearId: string,
+  semesterId: string,
   input: { name: string; sortOrder?: number },
 ): Promise<ActionState> {
   const auth = await requireAdminAction();
@@ -21,15 +22,19 @@ export async function createGradeLevel(
   const validation = validateGradeLevelName(input.name);
   if (!validation.ok) return { ok: false, error: validation.error };
 
+  const semester = await getSemesterById(semesterId);
+  if (!semester) return { ok: false, error: "ไม่พบภาคเรียน" };
+
   const supabase = await createClient();
   const { error } = await supabase.from("grade_levels").insert({
-    academic_year_id: academicYearId,
+    semester_id: semesterId,
+    academic_year_id: semester.academic_year_id,
     name: input.name.trim(),
     sort_order: input.sortOrder ?? 0,
   });
 
   if (error?.code === "23505") {
-    return { ok: false, error: "ชื่อชั้นเรียนนี้มีอยู่แล้วในปีการศึกษานี้" };
+    return { ok: false, error: "ชื่อชั้นเรียนนี้มีอยู่แล้วในภาคเรียนนี้" };
   }
   if (error) return { ok: false, error: "ไม่สามารถเพิ่มชั้นเรียนได้" };
 
@@ -57,7 +62,7 @@ export async function updateGradeLevel(
     .eq("id", id);
 
   if (error?.code === "23505") {
-    return { ok: false, error: "ชื่อชั้นเรียนนี้มีอยู่แล้วในปีการศึกษานี้" };
+    return { ok: false, error: "ชื่อชั้นเรียนนี้มีอยู่แล้วในภาคเรียนนี้" };
   }
   if (error) return { ok: false, error: "ไม่สามารถแก้ไขชั้นเรียนได้" };
 
@@ -77,7 +82,16 @@ export async function deleteGradeLevel(id: string): Promise<ActionState> {
     .eq("grade_level_id", id);
 
   if (classrooms && classrooms.length > 0) {
-    return { ok: false, error: "ไม่สามารถลบได้ — มีห้องเรียนในชั้นนี้" };
+    const classroomIds = classrooms.map((c) => c.id);
+    const { count } = await supabase
+      .from("student_enrollments")
+      .select("id", { count: "exact", head: true })
+      .in("classroom_id", classroomIds);
+
+    if ((count ?? 0) > 0) {
+      return { ok: false, error: "ไม่สามารถลบได้ — มีนักเรียนลงทะเบียนอยู่" };
+    }
+    return { ok: false, error: "ไม่สามารถลบได้ — มีห้องเรียนในชั้นนี้ กรุณาลบห้องก่อน" };
   }
 
   const { error } = await supabase.from("grade_levels").delete().eq("id", id);

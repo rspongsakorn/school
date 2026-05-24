@@ -3,24 +3,46 @@ import { GradeStats } from "@/components/dashboard/grade-stats";
 import { OverdueList } from "@/components/dashboard/overdue-list";
 import { RecentPaymentsTable } from "@/components/dashboard/recent-payments-table";
 import { StatCards } from "@/components/dashboard/stat-cards";
-import { getCurrentProfile, getYearSemesterContext } from "@/lib/data/context";
+import { getCurrentProfile } from "@/lib/data/context";
 import { getDashboardData } from "@/lib/data/dashboard";
+import {
+  buildHeaderContextProps,
+  loadSemesterPageContext,
+} from "@/lib/data/semester-page-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-export default async function DashboardPage() {
-  const [profile, context] = await Promise.all([
+type SearchParams = Promise<{ year?: string; semester?: string }>;
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const sp = await searchParams;
+  const [profile, page] = await Promise.all([
     getCurrentProfile(),
-    getYearSemesterContext(),
+    loadSemesterPageContext(sp.year, sp.semester),
   ]);
+
+  const context = page.ctx
+    ? {
+        academicYearId: page.ctx.academicYearId,
+        academicYearName: page.ctx.academicYearName,
+        semesterId: page.ctx.semesterId,
+        semesterNumber: page.ctx.semesterNumber,
+      }
+    : null;
+
   const dashboard = await getDashboardData(context);
+  const headerContext = buildHeaderContextProps(page, "/");
 
   return (
     <>
       <AppHeader
         title="ภาพรวม"
         displayName={profile?.display_name ?? "ผู้ใช้"}
-        yearName={context?.academicYearName}
-        semesterNumber={context?.semesterNumber}
+        showContextSelectors={Boolean(headerContext)}
+        context={headerContext}
       />
       <main className="p-6">
         {!context ? (

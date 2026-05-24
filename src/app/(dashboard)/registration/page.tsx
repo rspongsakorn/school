@@ -1,17 +1,23 @@
 import { AppHeader } from "@/components/app-header";
 import { RegistrationPanel } from "@/components/registration/registration-panel";
 import { getCurrentProfileRole } from "@/lib/auth/require-admin";
-import { listAcademicYearOptions } from "@/lib/data/academic-years";
-import { listClassroomsByGrade, listClassroomsByYear } from "@/lib/data/classrooms";
+import { listClassroomsByGrade, listClassroomsBySemester } from "@/lib/data/classrooms";
 import {
   listClassroomRoster,
   listStudentsAvailableForEnrollment,
 } from "@/lib/data/enrollments";
 import { listGradeLevels } from "@/lib/data/grade-levels";
-import { getYearSemesterContext } from "@/lib/data/context";
-import { resolveSelectedYearId } from "@/lib/enrollment/year-params";
+import {
+  buildHeaderContextProps,
+  loadSemesterPageContext,
+} from "@/lib/data/semester-page-context";
 
-type SearchParams = Promise<{ year?: string; grade?: string; classroom?: string }>;
+type SearchParams = Promise<{
+  year?: string;
+  semester?: string;
+  grade?: string;
+  classroom?: string;
+}>;
 
 export default async function RegistrationPage({
   searchParams,
@@ -19,16 +25,16 @@ export default async function RegistrationPage({
   searchParams: SearchParams;
 }) {
   const sp = await searchParams;
-  const [profile, years, context] = await Promise.all([
+  const [profile, page] = await Promise.all([
     getCurrentProfileRole(),
-    listAcademicYearOptions(),
-    getYearSemesterContext(),
+    loadSemesterPageContext(sp.year, sp.semester),
   ]);
 
-  const selectedYearId = resolveSelectedYearId(sp.year, years);
-  const grades = selectedYearId ? await listGradeLevels(selectedYearId) : [];
+  const ctx = page.ctx;
+  const grades = ctx ? await listGradeLevels(ctx.semesterId) : [];
   const selectedGradeId =
     sp.grade && grades.some((g) => g.id === sp.grade) ? sp.grade : grades[0]?.id ?? null;
+
   const classrooms = selectedGradeId ? await listClassroomsByGrade(selectedGradeId) : [];
   const selectedClassroomId =
     sp.classroom && classrooms.some((c) => c.id === sp.classroom)
@@ -37,25 +43,29 @@ export default async function RegistrationPage({
 
   const [roster, allClassrooms, enrollCandidates] = await Promise.all([
     selectedClassroomId ? listClassroomRoster(selectedClassroomId) : Promise.resolve([]),
-    selectedYearId ? listClassroomsByYear(selectedYearId) : Promise.resolve([]),
-    selectedYearId ? listStudentsAvailableForEnrollment(selectedYearId) : Promise.resolve([]),
+    ctx ? listClassroomsBySemester(ctx.semesterId) : Promise.resolve([]),
+    ctx ? listStudentsAvailableForEnrollment(ctx.semesterId) : Promise.resolve([]),
   ]);
 
   const isAdmin = profile?.role === "admin";
+  const headerContext = buildHeaderContextProps(page, "/registration", {
+    clearGradeClassroomOnChange: true,
+  });
 
   return (
     <>
       <AppHeader
-        title="ลงทะเบียนนักเรียน"
+        title="ลงทะเบียน"
         displayName={profile?.display_name ?? "ผู้ใช้"}
-        yearName={context?.academicYearName}
-        semesterNumber={context?.semesterNumber}
+        showContextSelectors={Boolean(headerContext)}
+        context={headerContext}
       />
       <main className="p-6">
-        {selectedYearId ? (
+        {ctx ? (
           <RegistrationPanel
-            years={years}
-            selectedYearId={selectedYearId}
+            semesterId={ctx.semesterId}
+            semesterNumber={ctx.semesterNumber}
+            academicYearId={ctx.academicYearId}
             grades={grades}
             selectedGradeId={selectedGradeId}
             classrooms={classrooms}

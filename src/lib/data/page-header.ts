@@ -1,14 +1,30 @@
-import { getCurrentProfile, getYearSemesterContext } from "@/lib/data/context";
+import { getCurrentProfile } from "@/lib/data/context";
+import {
+  buildHeaderContextProps,
+  loadSemesterPageContext,
+} from "@/lib/data/semester-page-context";
 
-export async function getPageHeaderProps() {
-  const [profile, context] = await Promise.all([
+type PageHeaderSearchParams = {
+  year?: string;
+  semester?: string;
+};
+
+export async function getPageHeaderProps(
+  basePath: string,
+  searchParams?: PageHeaderSearchParams,
+) {
+  const [profile, page] = await Promise.all([
     getCurrentProfile(),
-    getYearSemesterContext(),
+    loadSemesterPageContext(searchParams?.year, searchParams?.semester),
   ]);
+
+  const headerContext = buildHeaderContextProps(page, basePath);
 
   return {
     displayName: profile?.display_name ?? "ผู้ใช้",
-    yearName: context?.academicYearName,
-    semesterNumber: context?.semesterNumber,
+    yearName: page.ctx?.academicYearName,
+    semesterNumber: page.ctx?.semesterNumber,
+    showContextSelectors: Boolean(headerContext),
+    context: headerContext,
   };
 }
