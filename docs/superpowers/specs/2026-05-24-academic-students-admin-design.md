@@ -268,8 +268,8 @@ Header แสดง year/semester context ตามเดิม (จากปี
 
 ## 10. Future (out of scope)
 
-- ลงทะเบียน `/registration`
-- ชั้น/ห้อง `/grade-levels`, `/classrooms`
+- ลงทะเบียน — see [2026-05-24-registration-design.md](./2026-05-24-registration-design.md)
+- ชั้น/ห้อง — รวมใน registration spec (`/registration/setup`)
 - Bulk import CSV
 - Header year/semester selector ที่เปลี่ยน URL param ได้
 - Copy ปีการศึกษา (duplicate year structure)
