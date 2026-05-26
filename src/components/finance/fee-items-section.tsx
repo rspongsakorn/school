@@ -144,6 +144,7 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
 
     if (!result.ok) {
       toast.error("เกิดข้อผิดพลาด ไม่สามารถลบรายการได้");
+      setDeleteDialogOpen(false);
       return;
     }
 
@@ -198,6 +199,7 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
                   type="checkbox"
                   className="size-4 rounded border-border accent-primary"
                   checked={allSelected}
+                  aria-label="เลือกทั้งหมด"
                   ref={(el) => {
                     if (el) el.indeterminate = someSelected;
                   }}
@@ -228,6 +230,7 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
                       type="checkbox"
                       className="size-4 rounded border-border accent-primary"
                       checked={selectedIds.has(item.id)}
+                      aria-label={`เลือก ${item.name}`}
                       onChange={() => toggleSelect(item.id)}
                     />
                   </TableCell>
