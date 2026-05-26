@@ -2,11 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -24,7 +30,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { createFeeItem, updateFeeItem } from "@/lib/actions/fee-items";
+import {
+  createFeeItem,
+  updateFeeItem,
+  deleteFeeItems,
+} from "@/lib/actions/fee-items";
 import type { FeeItemRow } from "@/lib/data/fee-items";
 
 type FeeItemsSectionProps = {
@@ -33,6 +43,8 @@ type FeeItemsSectionProps = {
 
 export function FeeItemsSection({ items }: FeeItemsSectionProps) {
   const router = useRouter();
+
+  // Edit/Create state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [editTarget, setEditTarget] = useState<FeeItemRow | null>(null);
@@ -41,6 +53,14 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
   const [isTuition, setIsTuition] = useState(false);
   const [isActive, setIsActive] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  // Delete state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteTarget, setDeleteTarget] = useState<FeeItemRow[] | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // --- Edit/Create handlers ---
 
   function openCreate() {
     setMode("create");
@@ -86,6 +106,63 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
     router.refresh();
   }
 
+  // --- Delete handlers ---
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === items.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(items.map((i) => i.id)));
+    }
+  }
+
+  function openDeleteSingle(item: FeeItemRow) {
+    setDeleteTarget([item]);
+    setDeleteDialogOpen(true);
+  }
+
+  function openDeleteBulk() {
+    setDeleteTarget(items.filter((i) => selectedIds.has(i.id)));
+    setDeleteDialogOpen(true);
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    const ids = deleteTarget.map((i) => i.id);
+    const result = await deleteFeeItems(ids);
+    setDeleting(false);
+
+    if (!result.ok) {
+      toast.error("เกิดข้อผิดพลาด ไม่สามารถลบรายการได้");
+      return;
+    }
+
+    if (result.deletedCount > 0) {
+      toast.success(`ลบ ${result.deletedCount} รายการแล้ว`);
+    }
+
+    for (const b of result.blocked) {
+      toast.error(`${b.name} — ${b.reason}`);
+    }
+
+    setDeleteDialogOpen(false);
+    setSelectedIds(new Set());
+    router.refresh();
+  }
+
+  const allSelected = items.length > 0 && selectedIds.size === items.length;
+  const someSelected = selectedIds.size > 0 && selectedIds.size < items.length;
+
   return (
     <Card className="border-border shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between gap-2">
@@ -93,31 +170,67 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
           <CardTitle className="text-base">รายการค่าใช้จ่าย</CardTitle>
           <CardDescription>ประเภทค่าธรรมเนียมที่ใช้ในใบแจ้งชำระ</CardDescription>
         </div>
-        <Button type="button" size="sm" onClick={openCreate}>
-          <Plus className="mr-1 h-4 w-4" />
-          เพิ่มรายการ
-        </Button>
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              onClick={openDeleteBulk}
+            >
+              <Trash2 className="mr-1 h-4 w-4" />
+              ลบที่เลือก ({selectedIds.size})
+            </Button>
+          )}
+          <Button type="button" size="sm" onClick={openCreate}>
+            <Plus className="mr-1 h-4 w-4" />
+            เพิ่มรายการ
+          </Button>
+        </div>
       </CardHeader>
+
       <CardContent className="px-0 pb-0">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[48px] pl-4">
+                <input
+                  type="checkbox"
+                  className="size-4 rounded border-border accent-primary"
+                  checked={allSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someSelected;
+                  }}
+                  onChange={toggleSelectAll}
+                />
+              </TableHead>
               <TableHead>ชื่อ</TableHead>
               <TableHead>ประเภท</TableHead>
               <TableHead>สถานะ</TableHead>
-              <TableHead className="w-[100px] text-right">จัดการ</TableHead>
+              <TableHead className="w-[180px] text-right">จัดการ</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="py-6 text-center text-muted-foreground">
+                <TableCell
+                  colSpan={5}
+                  className="py-6 text-center text-muted-foreground"
+                >
                   ยังไม่มีรายการ — กดเพิ่มรายการ
                 </TableCell>
               </TableRow>
             ) : (
               items.map((item) => (
                 <TableRow key={item.id}>
+                  <TableCell className="pl-4">
+                    <input
+                      type="checkbox"
+                      className="size-4 rounded border-border accent-primary"
+                      checked={selectedIds.has(item.id)}
+                      onChange={() => toggleSelect(item.id)}
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">{item.name}</TableCell>
                   <TableCell>
                     {item.isTuition ? (
@@ -136,10 +249,26 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button type="button" size="sm" variant="outline" onClick={() => openEdit(item)}>
-                      <Pencil className="mr-1 h-4 w-4" />
-                      แก้ไข
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openEdit(item)}
+                      >
+                        <Pencil className="mr-1 h-4 w-4" />
+                        แก้ไข
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openDeleteSingle(item)}
+                      >
+                        <Trash2 className="mr-1 h-4 w-4" />
+                        ลบ
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -148,12 +277,15 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
         </Table>
       </CardContent>
 
+      {/* Edit / Create Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <form onSubmit={handleSubmit}>
             <DialogHeader>
               <DialogTitle>
-                {mode === "create" ? "เพิ่มรายการค่าใช้จ่าย" : "แก้ไขรายการค่าใช้จ่าย"}
+                {mode === "create"
+                  ? "เพิ่มรายการค่าใช้จ่าย"
+                  : "แก้ไขรายการค่าใช้จ่าย"}
               </DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -196,7 +328,11 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
               ) : null}
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDialogOpen(false)}
+              >
                 ยกเลิก
               </Button>
               <Button type="submit" disabled={submitting}>
@@ -204,6 +340,37 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>ยืนยันการลบ</DialogTitle>
+          </DialogHeader>
+          <p className="py-2 text-sm text-muted-foreground">
+            {deleteTarget?.length === 1
+              ? `แน่ใจว่าต้องการลบ "${deleteTarget[0].name}"?`
+              : `แน่ใจว่าต้องการลบ ${deleteTarget?.length ?? 0} รายการที่เลือก?`}
+          </p>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleting}
+              onClick={handleDelete}
+            >
+              {deleting ? "กำลังลบ..." : "ลบ"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </Card>
