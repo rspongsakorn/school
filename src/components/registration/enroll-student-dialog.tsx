@@ -48,7 +48,8 @@ export function EnrollStudentDialog({
     setQuery("");
     setCandidates(initialCandidates);
     setSelectedStudents(new Map());
-  }, [open, initialCandidates]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   useEffect(() => {
     return () => {
@@ -163,9 +164,9 @@ export function EnrollStudentDialog({
                         type="checkbox"
                         className="size-4 rounded border-border accent-primary"
                         checked={selectedStudents.has(student.studentId)}
-                        onChange={() => toggleStudent(student)}
-                        onClick={(e) => e.stopPropagation()}
-                        aria-label={`เลือก ${student.name}`}
+                        readOnly
+                        tabIndex={-1}
+                        aria-hidden="true"
                       />
                       <span className="flex-1 font-medium">{student.name}</span>
                       <span className="text-muted-foreground">
