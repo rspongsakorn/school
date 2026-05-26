@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { X } from "lucide-react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,7 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { enrollStudent, searchStudentsForEnrollment } from "@/lib/actions/enrollments";
+import { enrollStudents, searchStudentsForEnrollment } from "@/lib/actions/enrollments";
 import type { StudentEnrollmentCandidate } from "@/lib/data/enrollments";
 
 type EnrollStudentDialogProps = {
@@ -36,12 +38,16 @@ export function EnrollStudentDialog({
   const [candidates, setCandidates] = useState(initialCandidates);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedStudents, setSelectedStudents] = useState<
+    Map<string, StudentEnrollmentCandidate>
+  >(new Map());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setQuery("");
     setCandidates(initialCandidates);
+    setSelectedStudents(new Map());
   }, [open, initialCandidates]);
 
   useEffect(() => {
@@ -61,9 +67,30 @@ export function EnrollStudentDialog({
     }, 300);
   }
 
-  async function handleSelect(studentId: string) {
+  function toggleStudent(student: StudentEnrollmentCandidate) {
+    setSelectedStudents((prev) => {
+      const next = new Map(prev);
+      if (next.has(student.studentId)) {
+        next.delete(student.studentId);
+      } else {
+        next.set(student.studentId, student);
+      }
+      return next;
+    });
+  }
+
+  function removeStudent(studentId: string) {
+    setSelectedStudents((prev) => {
+      const next = new Map(prev);
+      next.delete(studentId);
+      return next;
+    });
+  }
+
+  async function handleEnroll() {
     setSubmitting(true);
-    const result = await enrollStudent(studentId, classroomId);
+    const ids = Array.from(selectedStudents.keys());
+    const result = await enrollStudents(ids, classroomId);
     setSubmitting(false);
 
     if (!result.ok) {
@@ -71,19 +98,45 @@ export function EnrollStudentDialog({
       return;
     }
 
-    toast.success("ลงทะเบียนนักเรียนแล้ว");
+    toast.success(`เพิ่ม ${ids.length} คนแล้ว`);
     onOpenChange(false);
     router.refresh();
   }
+
+  const selectedList = Array.from(selectedStudents.values());
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>เพิ่มนักเรียนในห้อง</DialogTitle>
-          <DialogDescription>ค้นหารหัสหรือชื่อนักเรียนที่ยังไม่ได้ลงทะเบียนในภาคนี้</DialogDescription>
+          <DialogDescription>
+            ค้นหารหัสหรือชื่อนักเรียนที่ยังไม่ได้ลงทะเบียนในภาคนี้
+          </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 py-2">
+        <div className="space-y-3 py-2">
+          {selectedList.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {selectedList.map((student) => (
+                <Badge
+                  key={student.studentId}
+                  variant="secondary"
+                  className="gap-1 pr-1"
+                >
+                  {student.name}
+                  <button
+                    type="button"
+                    onClick={() => removeStudent(student.studentId)}
+                    className="ml-0.5 rounded-full hover:bg-muted"
+                    disabled={submitting}
+                    aria-label={`ยกเลิก ${student.name}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          )}
           <Input
             value={query}
             onChange={(e) => handleQueryChange(e.target.value)}
@@ -93,7 +146,9 @@ export function EnrollStudentDialog({
             {loading ? (
               <p className="p-4 text-sm text-muted-foreground">กำลังค้นหา...</p>
             ) : candidates.length === 0 ? (
-              <p className="p-4 text-sm text-muted-foreground">ไม่พบนักเรียนที่เลือกได้</p>
+              <p className="p-4 text-sm text-muted-foreground">
+                ไม่พบนักเรียนที่เลือกได้
+              </p>
             ) : (
               <ul>
                 {candidates.map((student) => (
@@ -101,11 +156,21 @@ export function EnrollStudentDialog({
                     <button
                       type="button"
                       disabled={submitting}
-                      className="flex w-full items-center justify-between px-4 py-3 text-left text-sm hover:bg-muted/50 disabled:opacity-50"
-                      onClick={() => handleSelect(student.studentId)}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-muted/50 disabled:opacity-50"
+                      onClick={() => toggleStudent(student)}
                     >
-                      <span className="font-medium">{student.name}</span>
-                      <span className="text-muted-foreground">{student.studentCode}</span>
+                      <input
+                        type="checkbox"
+                        className="size-4 rounded border-border accent-primary"
+                        checked={selectedStudents.has(student.studentId)}
+                        onChange={() => toggleStudent(student)}
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={`เลือก ${student.name}`}
+                      />
+                      <span className="flex-1 font-medium">{student.name}</span>
+                      <span className="text-muted-foreground">
+                        {student.studentCode}
+                      </span>
                     </button>
                   </li>
                 ))}
@@ -114,8 +179,23 @@ export function EnrollStudentDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
             ปิด
+          </Button>
+          <Button
+            type="button"
+            disabled={selectedStudents.size === 0 || submitting}
+            onClick={handleEnroll}
+          >
+            {submitting
+              ? "กำลังเพิ่ม..."
+              : selectedStudents.size === 0
+                ? "เพิ่มนักเรียน"
+                : `เพิ่ม ${selectedStudents.size} คน`}
           </Button>
         </DialogFooter>
       </DialogContent>
