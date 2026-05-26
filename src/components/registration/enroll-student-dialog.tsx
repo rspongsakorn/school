@@ -183,6 +183,7 @@ export function EnrollStudentDialog({
           <Button
             type="button"
             variant="outline"
+            disabled={submitting}
             onClick={() => onOpenChange(false)}
           >
             ปิด
