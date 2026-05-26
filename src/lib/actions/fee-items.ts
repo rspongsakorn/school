@@ -72,6 +72,7 @@ export type DeleteFeeItemsResult = {
   ok: boolean;
   deletedCount: number;
   blocked: { id: string; name: string; reason: string }[];
+  error?: string;
 };
 
 export async function deleteFeeItems(ids: string[]): Promise<DeleteFeeItemsResult> {
@@ -82,7 +83,7 @@ export async function deleteFeeItems(ids: string[]): Promise<DeleteFeeItemsResul
 
   const supabase = await createClient();
 
-  // Pre-check: ดูว่า id ไหนถูก้างอิงใน fee_rates หรือ invoice_lines
+  // Pre-check: ดูว่า id ไหนถูกอ้างอิงใน fee_rates หรือ invoice_lines
   const [{ data: rateRefs }, { data: invoiceRefs }] = await Promise.all([
     supabase.from("fee_rates").select("fee_item_id").in("fee_item_id", ids),
     supabase.from("invoice_lines").select("fee_item_id").in("fee_item_id", ids),
@@ -107,13 +108,13 @@ export async function deleteFeeItems(ids: string[]): Promise<DeleteFeeItemsResul
       reason: feeItemDeleteBlockedReason({
         feeRates: inRates.has(item.id) ? 1 : 0,
         invoiceLines: inInvoices.has(item.id) ? 1 : 0,
-      })!,
+      })!, // safe: item is in blockedIds, so at least one count is > 0
     }));
   }
 
   if (canDelete.length > 0) {
     const { error } = await supabase.from("fee_items").delete().in("id", canDelete);
-    if (error) return { ok: false, deletedCount: 0, blocked };
+    if (error) return { ok: false, deletedCount: 0, blocked, error: "ไม่สามารถลบรายการค่าใช้จ่ายได้" };
     revalidateFeePaths();
   }
 
