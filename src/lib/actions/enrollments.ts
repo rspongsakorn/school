@@ -186,3 +186,63 @@ export async function deleteEnrollment(enrollmentId: string): Promise<ActionStat
   revalidatePath("/reports/collections");
   return { ok: true };
 }
+
+export async function enrollStudents(
+  studentIds: string[],
+  classroomId: string,
+): Promise<ActionState> {
+  const auth = await requireAdminAction();
+  if (!auth.ok) return auth;
+
+  if (studentIds.length === 0) return { ok: true };
+
+  const supabase = await createClient();
+
+  const { data: classroom, error: classroomError } = await supabase
+    .from("classrooms")
+    .select("id, academic_year_id, semester_id")
+    .eq("id", classroomId)
+    .maybeSingle();
+
+  if (classroomError || !classroom) {
+    return { ok: false, error: "ไม่พบห้องเรียน" };
+  }
+
+  // ดึง existing enrollments ของ studentIds ทั้งหมดในภาคนี้ (batch)
+  const { data: existing } = await supabase
+    .from("student_enrollments")
+    .select("id, student_id")
+    .eq("semester_id", classroom.semester_id)
+    .in("student_id", studentIds);
+
+  const existingMap = new Map((existing ?? []).map((e) => [e.student_id, e.id]));
+  const toUpdate = studentIds.filter((id) => existingMap.has(id));
+  const toInsert = studentIds.filter((id) => !existingMap.has(id));
+
+  if (toUpdate.length > 0) {
+    const enrollmentIds = toUpdate.map((sid) => existingMap.get(sid)!);
+    const { error } = await supabase
+      .from("student_enrollments")
+      .update({ classroom_id: classroomId, status: "enrolled" })
+      .in("id", enrollmentIds);
+    if (error) return { ok: false, error: "ไม่สามารถลงทะเบียนได้" };
+  }
+
+  if (toInsert.length > 0) {
+    const rows = toInsert.map((studentId) => ({
+      student_id: studentId,
+      classroom_id: classroomId,
+      academic_year_id: classroom.academic_year_id,
+      semester_id: classroom.semester_id,
+      status: "enrolled" as const,
+    }));
+    const { error } = await supabase.from("student_enrollments").insert(rows);
+    if (error?.code === "23505") {
+      return { ok: false, error: "นักเรียนบางคนลงทะเบียนในภาคนี้แล้ว" };
+    }
+    if (error) return { ok: false, error: "ไม่สามารถลงทะเบียนได้" };
+  }
+
+  revalidateRegistrationPaths();
+  return { ok: true };
+}
