@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { ActionState } from "@/lib/actions/academic-years";
 import { requireAdminAction } from "@/lib/auth/require-admin";
 import { getSemesterById } from "@/lib/data/semesters";
-import { validateClassroomName } from "@/lib/enrollment/validation";
+import { validateClassroomNumber } from "@/lib/enrollment/validation";
 import { createClient } from "@/lib/supabase/server";
 
 function revalidateRegistrationPaths() {
@@ -20,7 +20,7 @@ export async function createClassroom(
   const auth = await requireAdminAction();
   if (!auth.ok) return auth;
 
-  const validation = validateClassroomName(input.name);
+  const validation = validateClassroomNumber(input.name);
   if (!validation.ok) return { ok: false, error: validation.error };
 
   const semester = await getSemesterById(semesterId);
@@ -50,7 +50,7 @@ export async function updateClassroom(
   const auth = await requireAdminAction();
   if (!auth.ok) return auth;
 
-  const validation = validateClassroomName(input.name);
+  const validation = validateClassroomNumber(input.name);
   if (!validation.ok) return { ok: false, error: validation.error };
 
   const supabase = await createClient();

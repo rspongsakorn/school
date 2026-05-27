@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/table";
 import { upsertFeeRates, type FeeRateUpsertEntry } from "@/lib/actions/fee-rates";
 import { feeRateKey } from "@/lib/finance/fee-rate-keys";
+import { formatBaht } from "@/lib/format";
 import type { FeeRateMatrix } from "@/lib/data/fee-rates";
 
 type FeeRatesMatrixProps = {
@@ -41,6 +42,20 @@ export function FeeRatesMatrix({ semesterId, matrix }: FeeRatesMatrixProps) {
 
   const hasGrades = matrix.grades.length > 0;
   const hasItems = matrix.items.length > 0;
+
+  const gradeTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    for (const grade of matrix.grades) {
+      let sum = 0;
+      for (const item of matrix.items) {
+        const raw = draft[feeRateKey(grade.id, item.id)]?.trim() ?? "";
+        const amount = Number.parseFloat(raw);
+        if (Number.isFinite(amount) && amount > 0) sum += amount;
+      }
+      totals[grade.id] = sum;
+    }
+    return totals;
+  }, [draft, matrix]);
 
   const changedEntries = useMemo(() => {
     const entries: FeeRateUpsertEntry[] = [];
@@ -114,6 +129,7 @@ export function FeeRatesMatrix({ semesterId, matrix }: FeeRatesMatrixProps) {
                       {item.name}
                     </TableHead>
                   ))}
+                  <TableHead className="min-w-[120px] text-right text-amber-700">รวม</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -136,6 +152,9 @@ export function FeeRatesMatrix({ semesterId, matrix }: FeeRatesMatrixProps) {
                         </TableCell>
                       );
                     })}
+                    <TableCell className="text-right font-semibold tabular-nums text-amber-700">
+                      {gradeTotals[grade.id] > 0 ? formatBaht(gradeTotals[grade.id]) : <span className="text-muted-foreground font-normal">—</span>}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

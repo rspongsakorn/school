@@ -167,6 +167,7 @@ export function RegistrationPanel({
   }
 
   const selectedClassroom = classrooms.find((c) => c.id === selectedClassroomId);
+  const selectedGrade = grades.find((g) => g.id === selectedGradeId);
 
   const copySourceOptions = sourceSemesters
     .filter((s) => s.id !== semesterId)
@@ -513,6 +514,7 @@ export function RegistrationPanel({
               mode="create"
               semesterId={semesterId}
               gradeLevelId={selectedGradeId}
+              gradeName={selectedGrade?.name ?? ""}
             />
           )}
           {editingClassroom && selectedGradeId && (
@@ -522,6 +524,7 @@ export function RegistrationPanel({
               mode="edit"
               semesterId={semesterId}
               gradeLevelId={selectedGradeId}
+              gradeName={selectedGrade?.name ?? ""}
               initial={{
                 id: editingClassroom.id,
                 name: editingClassroom.name,

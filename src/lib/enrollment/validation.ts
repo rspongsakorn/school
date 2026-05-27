@@ -9,10 +9,13 @@ export function validateGradeLevelName(
   return { ok: true };
 }
 
-export function validateClassroomName(
-  name: string,
+export function validateClassroomNumber(
+  value: string,
 ): { ok: true } | { ok: false; error: string } {
-  if (!name.trim()) return { ok: false, error: "กรุณากรอกชื่อห้องเรียน" };
+  if (!value.trim()) return { ok: false, error: "กรุณากรอกหมายเลขห้อง" };
+  if (!/^\d+$/.test(value.trim())) return { ok: false, error: "หมายเลขห้องต้องเป็นตัวเลขเท่านั้น" };
+  const num = Number(value.trim());
+  if (num < 1 || num > 999) return { ok: false, error: "หมายเลขห้องต้องอยู่ระหว่าง 1–999" };
   return { ok: true };
 }
 
