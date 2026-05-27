@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -24,15 +24,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useRequireRole } from "@/components/providers/auth-provider";
+import { AppHeader } from "@/components/app-header";
 import { createReceiptType, updateReceiptType } from "@/lib/actions/receipt-types";
+import { fetchReceiptTypes } from "@/lib/queries/receipt-types";
 import type { ReceiptTypeRow } from "@/lib/data/receipt-types";
 
-type ReceiptTypesPanelProps = {
-  types: ReceiptTypeRow[];
-};
+export function ReceiptTypesPanel() {
+  useRequireRole("admin");
+  const queryClient = useQueryClient();
 
-export function ReceiptTypesPanel({ types }: ReceiptTypesPanelProps) {
-  const router = useRouter();
+  const { data: types = [], isLoading } = useQuery({
+    queryKey: ["receipt-types"],
+    queryFn: fetchReceiptTypes,
+  });
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [editTarget, setEditTarget] = useState<ReceiptTypeRow | null>(null);
@@ -78,21 +84,43 @@ export function ReceiptTypesPanel({ types }: ReceiptTypesPanelProps) {
 
     toast.success(mode === "create" ? "เพิ่มประเภทใบเสร็จแล้ว" : "บันทึกแล้ว");
     setDialogOpen(false);
-    router.refresh();
+    queryClient.invalidateQueries({ queryKey: ["receipt-types"] });
+  }
+
+  if (isLoading) {
+    return (
+      <>
+        <AppHeader title="ประเภทใบเสร็จ" />
+        <main className="p-6">
+          <Card className="border-border shadow-sm">
+            <CardContent className="p-6">
+              <div className="space-y-2">
+                <div className="h-10 bg-muted rounded animate-pulse" />
+                <div className="h-10 bg-muted rounded animate-pulse" />
+                <div className="h-10 bg-muted rounded animate-pulse" />
+              </div>
+            </CardContent>
+          </Card>
+        </main>
+      </>
+    );
   }
 
   return (
-    <Card className="border-border shadow-sm">
-      <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <div className="space-y-1">
-          <CardTitle>ประเภทใบเสร็จ</CardTitle>
-          <CardDescription>ใช้จัดประเภทรายรับในใบเสร็จ</CardDescription>
-        </div>
-        <Button type="button" size="sm" onClick={openCreate}>
-          <Plus className="mr-1 h-4 w-4" />
-          เพิ่มประเภท
-        </Button>
-      </CardHeader>
+    <>
+      <AppHeader title="ประเภทใบเสร็จ" />
+      <main className="p-6">
+        <Card className="border-border shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between gap-2">
+            <div className="space-y-1">
+              <CardTitle>ประเภทใบเสร็จ</CardTitle>
+              <CardDescription>ใช้จัดประเภทรายรับในใบเสร็จ</CardDescription>
+            </div>
+            <Button type="button" size="sm" onClick={openCreate}>
+              <Plus className="mr-1 h-4 w-4" />
+              เพิ่มประเภท
+            </Button>
+          </CardHeader>
       <CardContent className="px-0 pb-0">
         <Table>
           <TableHeader>
@@ -177,6 +205,8 @@ export function ReceiptTypesPanel({ types }: ReceiptTypesPanelProps) {
           </form>
         </DialogContent>
       </Dialog>
-    </Card>
+        </Card>
+      </main>
+    </>
   );
 }
