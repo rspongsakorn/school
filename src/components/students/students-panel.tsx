@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,7 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { PaginatedStudents, StudentListRow } from "@/lib/data/students";
+import type { StudentListRow } from "@/lib/data/students";
 import { deleteStudents } from "@/lib/actions/students";
 import {
   STUDENT_STATUS_FILTER_OPTIONS,
@@ -40,13 +42,17 @@ import { studentDeleteBlockedReason } from "@/lib/students/delete-eligibility";
 import { StudentImportDialog } from "@/components/students/student-import-dialog";
 import { StudentSheet } from "@/components/students/student-sheet";
 import { StudentSearchInput } from "@/components/students/student-search-input";
+import { AppHeader } from "@/components/app-header";
+import { useAuth } from "@/components/providers/auth-provider";
+import { useSemesterContext } from "@/hooks/use-semester-context";
+import { fetchStudentsPaginated } from "@/lib/queries/students";
 import { cn } from "@/lib/utils";
 
-type StudentsPanelProps = {
-  data: PaginatedStudents;
-  params: { q: string; status: string; page: number };
-  isAdmin: boolean;
-};
+function parseStatus(value?: string): StudentStatus | "all" {
+  if (!value) return "all";
+  const isValid = STUDENT_STATUS_FILTER_OPTIONS.some((option) => option.value === value);
+  return isValid ? (value as StudentStatus | "all") : "all";
+}
 
 function statusBadgeClass(status: StudentStatus) {
   if (status === "active") return "bg-emerald-50 text-emerald-700 hover:bg-emerald-50";
@@ -55,9 +61,28 @@ function statusBadgeClass(status: StudentStatus) {
   return "bg-slate-100 text-slate-700 hover:bg-slate-100";
 }
 
-export function StudentsPanel({ data, params, isAdmin }: StudentsPanelProps) {
+export function StudentsPanel() {
   const router = useRouter();
   const pathname = usePathname();
+  const rawSearchParams = useSearchParams();
+  const { profile } = useAuth();
+  const { ctx } = useSemesterContext();
+  const isAdmin = profile?.role === "admin";
+
+  const q = rawSearchParams.get("q") ?? "";
+  const status = parseStatus(rawSearchParams.get("status") ?? undefined);
+  const rawPage = Number.parseInt(rawSearchParams.get("page") ?? "1", 10);
+  const pageNum = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+  const params = { q, status, page: pageNum };
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["students", ctx?.semesterId ?? null, q, status, pageNum],
+    queryFn: () =>
+      fetchStudentsPaginated({ q, status, page: pageNum, semesterId: ctx?.semesterId ?? null }),
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
+  });
+
   const [createOpen, setCreateOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<StudentListRow | null>(null);
@@ -67,8 +92,8 @@ export function StudentsPanel({ data, params, isAdmin }: StudentsPanelProps) {
   const [isNavigating, startTransition] = useTransition();
 
   const deletableRows = useMemo(
-    () => data.rows.filter((row) => row.deletable),
-    [data.rows],
+    () => (data?.rows ?? []).filter((row) => row.deletable),
+    [data?.rows],
   );
 
   const allDeletableSelected =
@@ -76,18 +101,18 @@ export function StudentsPanel({ data, params, isAdmin }: StudentsPanelProps) {
 
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [data.page, params.q, params.status]);
+  }, [data?.page, q, status]);
 
   const pushParams = useCallback(
     (next: { q?: string; status?: string; page?: number }) => {
-      const q = (next.q ?? params.q).trim();
-      const status = next.status ?? params.status;
-      const page = next.page ?? params.page;
+      const nextQ = (next.q ?? q).trim();
+      const nextStatus = next.status ?? status;
+      const nextPage = next.page ?? pageNum;
       const query = new URLSearchParams();
 
-      if (q) query.set("q", q);
-      if (status && status !== "all") query.set("status", status);
-      query.set("page", String(Math.max(1, page)));
+      if (nextQ) query.set("q", nextQ);
+      if (nextStatus && nextStatus !== "all") query.set("status", nextStatus);
+      query.set("page", String(Math.max(1, nextPage)));
 
       const yearSemester = new URLSearchParams(window.location.search);
       if (yearSemester.get("year")) query.set("year", yearSemester.get("year")!);
@@ -98,7 +123,7 @@ export function StudentsPanel({ data, params, isAdmin }: StudentsPanelProps) {
         router.push(queryString ? `${pathname}?${queryString}` : pathname);
       });
     },
-    [params.page, params.q, params.status, pathname, router, startTransition],
+    [pageNum, q, status, pathname, router, startTransition],
   );
 
   const handleDebouncedSearch = useCallback(
@@ -156,8 +181,8 @@ export function StudentsPanel({ data, params, isAdmin }: StudentsPanelProps) {
     router.refresh();
   }
 
-  const canPrev = data.page > 1;
-  const canNext = data.page < data.totalPages;
+  const canPrev = (data?.page ?? 1) > 1;
+  const canNext = (data?.page ?? 1) < (data?.totalPages ?? 1);
   const sheetOpen = createOpen || Boolean(selectedStudent);
   const sheetMode = createOpen ? "create" : "edit";
   const bulkDeleteCount = selectedIds.size;
@@ -184,172 +209,193 @@ export function StudentsPanel({ data, params, isAdmin }: StudentsPanelProps) {
   }
 
   return (
-    <div className={cn("space-y-4 transition-opacity", isNavigating && "pointer-events-none opacity-60")}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
-          <StudentSearchInput
-            key={params.q}
-            initialQuery={params.q}
-            onDebouncedChange={handleDebouncedSearch}
-          />
-          <Select
-            value={params.status}
-            onValueChange={(value) => pushParams({ status: value ?? "all", page: 1 })}
-            items={STUDENT_STATUS_FILTER_OPTIONS}
-          >
-            <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder="สถานะ" />
-            </SelectTrigger>
-            <SelectContent>
-              {STUDENT_STATUS_FILTER_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+    <>
+      <AppHeader title="นักเรียน" basePath="/students" />
+      <main className="p-6">
+        <Card className="border-border shadow-sm">
+          <CardHeader>
+            <CardTitle>รายชื่อนักเรียน</CardTitle>
+            <CardDescription>
+              {data && data.total > 0 ? `${data.total} คน` : "ยังไม่มีนักเรียนในระบบ"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className={cn("space-y-4 transition-opacity", isNavigating && "pointer-events-none opacity-60")}>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+                  <StudentSearchInput
+                    key={q}
+                    initialQuery={q}
+                    onDebouncedChange={handleDebouncedSearch}
+                  />
+                  <Select
+                    value={params.status}
+                    onValueChange={(value) => pushParams({ status: value ?? "all", page: 1 })}
+                    items={STUDENT_STATUS_FILTER_OPTIONS}
+                  >
+                    <SelectTrigger className="w-full sm:w-[180px]">
+                      <SelectValue placeholder="สถานะ" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STUDENT_STATUS_FILTER_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-        {isAdmin ? (
-          <div className="flex flex-wrap gap-2">
-            {bulkDeleteCount > 0 ? (
-              <Button
-                type="button"
-                variant="outline"
-                className="text-destructive"
-                onClick={() => setDeleteTargetIds([...selectedIds])}
-              >
-                ลบที่เลือก ({bulkDeleteCount})
-              </Button>
-            ) : null}
-            <Button type="button" variant="outline" onClick={() => setImportOpen(true)}>
-              นำเข้า CSV
-            </Button>
-            <Button type="button" onClick={() => setCreateOpen(true)}>
-              เพิ่มนักเรียน
-            </Button>
-          </div>
-        ) : null}
-      </div>
+                {isAdmin ? (
+                  <div className="flex flex-wrap gap-2">
+                    {bulkDeleteCount > 0 ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="text-destructive"
+                        onClick={() => setDeleteTargetIds([...selectedIds])}
+                      >
+                        ลบที่เลือก ({bulkDeleteCount})
+                      </Button>
+                    ) : null}
+                    <Button type="button" variant="outline" onClick={() => setImportOpen(true)}>
+                      นำเข้า CSV
+                    </Button>
+                    <Button type="button" onClick={() => setCreateOpen(true)}>
+                      เพิ่มนักเรียน
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            {isAdmin ? (
-              <TableHead className="w-10">
-                <input
-                  type="checkbox"
-                  className="size-4 rounded border-border"
-                  checked={allDeletableSelected}
-                  disabled={deletableRows.length === 0}
-                  aria-label="เลือกทั้งหมดที่ลบได้"
-                  onChange={(e) => toggleSelectAll(e.target.checked)}
-                />
-              </TableHead>
-            ) : null}
-            <TableHead>รหัส</TableHead>
-            <TableHead>ชื่อ-นามสกุล</TableHead>
-            <TableHead>เลขบัตร</TableHead>
-            <TableHead>ชั้น</TableHead>
-            <TableHead>สถานะ</TableHead>
-            {isAdmin ? <TableHead className="w-[100px]" /> : null}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.rows.length === 0 ? (
-            <TableRow>
-              <TableCell
-                colSpan={isAdmin ? 7 : 5}
-                className="py-6 text-center text-muted-foreground"
-              >
-                ไม่พบข้อมูลนักเรียน
-              </TableCell>
-            </TableRow>
-          ) : (
-            data.rows.map((student) => {
-              const blockedReason = studentDeleteBlockedReason(!student.deletable);
-              return (
-                <TableRow
-                  key={student.id}
-                  className="cursor-pointer"
-                  onClick={() => setSelectedStudent(student)}
-                >
-                  {isAdmin ? (
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        className="size-4 rounded border-border"
-                        checked={selectedIds.has(student.id)}
-                        disabled={!student.deletable}
-                        title={blockedReason ?? undefined}
-                        aria-label={`เลือก ${student.studentCode}`}
-                        onChange={(e) => toggleRow(student.id, e.target.checked)}
-                      />
-                    </TableCell>
-                  ) : null}
-                  <TableCell className="font-medium tabular-nums">{student.studentCode}</TableCell>
-                  <TableCell>{student.name}</TableCell>
-                  <TableCell>{student.idCard ?? "—"}</TableCell>
-                  <TableCell>{student.grade}</TableCell>
-                  <TableCell>
-                    <Badge className={statusBadgeClass(student.statusRaw)}>
-                      {student.status}
-                    </Badge>
-                  </TableCell>
-                  {isAdmin ? (
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      {student.deletable ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="text-destructive"
-                          onClick={() => setDeleteTargetIds([student.id])}
-                        >
-                          ลบ
-                        </Button>
-                      ) : blockedReason ? (
-                        <span
-                          className="text-xs text-muted-foreground"
-                          title={blockedReason}
-                        >
-                          ลบไม่ได้
-                        </span>
-                      ) : null}
-                    </TableCell>
-                  ) : null}
-                </TableRow>
-              );
-            })
-          )}
-        </TableBody>
-      </Table>
+              {isLoading && !data ? (
+                <div className="h-40 animate-pulse rounded-lg bg-muted" />
+              ) : data ? (
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {isAdmin ? (
+                          <TableHead className="w-10">
+                            <input
+                              type="checkbox"
+                              className="size-4 rounded border-border"
+                              checked={allDeletableSelected}
+                              disabled={deletableRows.length === 0}
+                              aria-label="เลือกทั้งหมดที่ลบได้"
+                              onChange={(e) => toggleSelectAll(e.target.checked)}
+                            />
+                          </TableHead>
+                        ) : null}
+                        <TableHead>รหัส</TableHead>
+                        <TableHead>ชื่อ-นามสกุล</TableHead>
+                        <TableHead>เลขบัตร</TableHead>
+                        <TableHead>ชั้น</TableHead>
+                        <TableHead>สถานะ</TableHead>
+                        {isAdmin ? <TableHead className="w-[100px]" /> : null}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {data.rows.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={isAdmin ? 7 : 5}
+                            className="py-6 text-center text-muted-foreground"
+                          >
+                            ไม่พบข้อมูลนักเรียน
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        data.rows.map((student) => {
+                          const blockedReason = studentDeleteBlockedReason(!student.deletable);
+                          return (
+                            <TableRow
+                              key={student.id}
+                              className="cursor-pointer"
+                              onClick={() => setSelectedStudent(student)}
+                            >
+                              {isAdmin ? (
+                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                  <input
+                                    type="checkbox"
+                                    className="size-4 rounded border-border"
+                                    checked={selectedIds.has(student.id)}
+                                    disabled={!student.deletable}
+                                    title={blockedReason ?? undefined}
+                                    aria-label={`เลือก ${student.studentCode}`}
+                                    onChange={(e) => toggleRow(student.id, e.target.checked)}
+                                  />
+                                </TableCell>
+                              ) : null}
+                              <TableCell className="font-medium tabular-nums">{student.studentCode}</TableCell>
+                              <TableCell>{student.name}</TableCell>
+                              <TableCell>{student.idCard ?? "—"}</TableCell>
+                              <TableCell>{student.grade}</TableCell>
+                              <TableCell>
+                                <Badge className={statusBadgeClass(student.statusRaw)}>
+                                  {student.status}
+                                </Badge>
+                              </TableCell>
+                              {isAdmin ? (
+                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                  {student.deletable ? (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-destructive"
+                                      onClick={() => setDeleteTargetIds([student.id])}
+                                    >
+                                      ลบ
+                                    </Button>
+                                  ) : blockedReason ? (
+                                    <span
+                                      className="text-xs text-muted-foreground"
+                                      title={blockedReason}
+                                    >
+                                      ลบไม่ได้
+                                    </span>
+                                  ) : null}
+                                </TableCell>
+                              ) : null}
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
 
-      <div className="flex items-center justify-between text-sm">
-        <p className="text-muted-foreground">
-          {data.total > 0
-            ? `หน้า ${data.page} จาก ${Math.max(data.totalPages, 1)} (${data.total} คน)`
-            : "0 คน"}
-        </p>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => pushParams({ page: params.page - 1 })}
-            disabled={!canPrev}
-          >
-            ก่อนหน้า
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => pushParams({ page: params.page + 1 })}
-            disabled={!canNext}
-          >
-            ถัดไป
-          </Button>
-        </div>
-      </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <p className="text-muted-foreground">
+                      {data.total > 0
+                        ? `หน้า ${data.page} จาก ${Math.max(data.totalPages, 1)} (${data.total} คน)`
+                        : "0 คน"}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => pushParams({ page: pageNum - 1 })}
+                        disabled={!canPrev}
+                      >
+                        ก่อนหน้า
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => pushParams({ page: pageNum + 1 })}
+                        disabled={!canNext}
+                      >
+                        ถัดไป
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          </CardContent>
+        </Card>
+      </main>
 
       <StudentSheet
         open={sheetOpen}
@@ -390,6 +436,6 @@ export function StudentsPanel({ data, params, isAdmin }: StudentsPanelProps) {
           </AlertDialogContent>
         </AlertDialog>
       ) : null}
-    </div>
+    </>
   );
 }
