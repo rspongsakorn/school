@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +23,7 @@ type EnrollStudentDialogProps = {
   semesterId: string;
   classroomId: string;
   initialCandidates: StudentEnrollmentCandidate[];
+  onSuccess?: () => void;
 };
 
 export function EnrollStudentDialog({
@@ -32,8 +32,8 @@ export function EnrollStudentDialog({
   semesterId,
   classroomId,
   initialCandidates,
+  onSuccess,
 }: EnrollStudentDialogProps) {
-  const router = useRouter();
   const [query, setQuery] = useState("");
   const [candidates, setCandidates] = useState(initialCandidates);
   const [loading, setLoading] = useState(false);
@@ -101,7 +101,7 @@ export function EnrollStudentDialog({
 
     toast.success(`เพิ่ม ${ids.length} คนแล้ว`);
     onOpenChange(false);
-    router.refresh();
+    onSuccess?.();
   }
 
   const selectedList = Array.from(selectedStudents.values());

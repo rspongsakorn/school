@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +30,7 @@ type EnrollmentStatusDialogProps = {
   onOpenChange: (open: boolean) => void;
   enrollmentId: string;
   studentName: string;
+  onSuccess?: () => void;
 };
 
 export function EnrollmentStatusDialog({
@@ -38,8 +38,8 @@ export function EnrollmentStatusDialog({
   onOpenChange,
   enrollmentId,
   studentName,
+  onSuccess,
 }: EnrollmentStatusDialogProps) {
-  const router = useRouter();
   const [status, setStatus] = useState<Exclude<EnrollmentStatus, "enrolled">>("withdrawn");
   const [submitting, setSubmitting] = useState(false);
 
@@ -61,7 +61,7 @@ export function EnrollmentStatusDialog({
 
     toast.success("เปลี่ยนสถานะแล้ว");
     onOpenChange(false);
-    router.refresh();
+    onSuccess?.();
   }
 
   return (

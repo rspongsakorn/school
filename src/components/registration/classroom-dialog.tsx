@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +25,7 @@ type ClassroomDialogProps = {
   gradeLevelId: string;
   gradeName: string;
   initial?: { id: string; name: string };
+  onSuccess?: () => void;
 };
 
 export function ClassroomDialog({
@@ -36,8 +36,8 @@ export function ClassroomDialog({
   gradeLevelId,
   gradeName,
   initial,
+  onSuccess,
 }: ClassroomDialogProps) {
-  const router = useRouter();
   // roomNumber stores only the digit part, e.g. "3"
   const [roomNumber, setRoomNumber] = useState("");
   const [nameError, setNameError] = useState<string | undefined>();
@@ -76,7 +76,7 @@ export function ClassroomDialog({
 
     toast.success(mode === "create" ? "เพิ่มห้องเรียนแล้ว" : "บันทึกห้องเรียนแล้ว");
     onOpenChange(false);
-    router.refresh();
+    onSuccess?.();
   }
 
   return (

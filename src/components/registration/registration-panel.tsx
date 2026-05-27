@@ -558,6 +558,10 @@ export function RegistrationPanel() {
                 onOpenChange={setGradeCreateOpen}
                 mode="create"
                 semesterId={semesterId ?? ""}
+                onSuccess={() => {
+                  void queryClient.invalidateQueries({ queryKey: ["grade-levels", semesterId] });
+                  void queryClient.invalidateQueries({ queryKey: ["classrooms-by-grade", selectedGradeId] });
+                }}
               />
               {editingGrade && (
                 <GradeLevelDialog
@@ -570,6 +574,10 @@ export function RegistrationPanel() {
                     name: editingGrade.name,
                     sortOrder: editingGrade.sort_order,
                   }}
+                  onSuccess={() => {
+                    void queryClient.invalidateQueries({ queryKey: ["grade-levels", semesterId] });
+                    void queryClient.invalidateQueries({ queryKey: ["classrooms-by-grade", selectedGradeId] });
+                  }}
                 />
               )}
               {selectedGradeId && (
@@ -580,6 +588,10 @@ export function RegistrationPanel() {
                   semesterId={semesterId ?? ""}
                   gradeLevelId={selectedGradeId}
                   gradeName={selectedGrade?.name ?? ""}
+                  onSuccess={() => {
+                    void queryClient.invalidateQueries({ queryKey: ["classrooms-by-grade", selectedGradeId] });
+                    void queryClient.invalidateQueries({ queryKey: ["classrooms-by-semester", semesterId] });
+                  }}
                 />
               )}
               {editingClassroom && selectedGradeId && (
@@ -594,6 +606,10 @@ export function RegistrationPanel() {
                     id: editingClassroom.id,
                     name: editingClassroom.name,
                   }}
+                  onSuccess={() => {
+                    void queryClient.invalidateQueries({ queryKey: ["classrooms-by-grade", selectedGradeId] });
+                    void queryClient.invalidateQueries({ queryKey: ["classrooms-by-semester", semesterId] });
+                  }}
                 />
               )}
             </>
@@ -606,6 +622,11 @@ export function RegistrationPanel() {
               semesterId={semesterId ?? ""}
               classroomId={selectedClassroomId}
               initialCandidates={enrollCandidates}
+              onSuccess={() => {
+                void queryClient.invalidateQueries({ queryKey: ["classroom-roster", selectedClassroomId] });
+                void queryClient.invalidateQueries({ queryKey: ["enrollment-candidates", semesterId] });
+                void queryClient.invalidateQueries({ queryKey: ["classrooms-by-grade", selectedGradeId] });
+              }}
             />
           )}
 
@@ -617,6 +638,10 @@ export function RegistrationPanel() {
               studentName={moveTarget.name}
               currentClassroomId={selectedClassroomId}
               classrooms={allClassrooms}
+              onSuccess={() => {
+                void queryClient.invalidateQueries({ queryKey: ["classroom-roster", selectedClassroomId] });
+                void queryClient.invalidateQueries({ queryKey: ["classrooms-by-grade", selectedGradeId] });
+              }}
             />
           )}
 
@@ -626,6 +651,9 @@ export function RegistrationPanel() {
               onOpenChange={(open) => !open && setStatusTarget(null)}
               enrollmentId={statusTarget.enrollmentId}
               studentName={statusTarget.name}
+              onSuccess={() => {
+                void queryClient.invalidateQueries({ queryKey: ["classroom-roster", selectedClassroomId] });
+              }}
             />
           )}
 

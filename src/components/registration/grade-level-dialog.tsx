@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +23,7 @@ type GradeLevelDialogProps = {
   mode: "create" | "edit";
   semesterId: string;
   initial?: { id: string; name: string; sortOrder: number };
+  onSuccess?: () => void;
 };
 
 export function GradeLevelDialog({
@@ -32,8 +32,8 @@ export function GradeLevelDialog({
   mode,
   semesterId,
   initial,
+  onSuccess,
 }: GradeLevelDialogProps) {
-  const router = useRouter();
   const [name, setName] = useState("");
   const [sortOrder, setSortOrder] = useState("0");
   const [nameError, setNameError] = useState<string | undefined>();
@@ -70,7 +70,7 @@ export function GradeLevelDialog({
 
     toast.success(mode === "create" ? "เพิ่มชั้นเรียนแล้ว" : "บันทึกชั้นเรียนแล้ว");
     onOpenChange(false);
-    router.refresh();
+    onSuccess?.();
   }
 
   return (

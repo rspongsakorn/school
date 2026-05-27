@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,6 +31,7 @@ type MoveClassroomDialogProps = {
   studentName: string;
   currentClassroomId: string;
   classrooms: ClassroomWithGradeRow[];
+  onSuccess?: () => void;
 };
 
 export function MoveClassroomDialog({
@@ -41,8 +41,8 @@ export function MoveClassroomDialog({
   studentName,
   currentClassroomId,
   classrooms,
+  onSuccess,
 }: MoveClassroomDialogProps) {
-  const router = useRouter();
   const [selectedId, setSelectedId] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -81,7 +81,7 @@ export function MoveClassroomDialog({
 
     toast.success("ย้ายห้องเรียนแล้ว");
     onOpenChange(false);
-    router.refresh();
+    onSuccess?.();
   }
 
   return (
