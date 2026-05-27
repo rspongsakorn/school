@@ -120,3 +120,24 @@ export async function deleteFeeItems(ids: string[]): Promise<DeleteFeeItemsResul
 
   return { ok: true, deletedCount: canDelete.length, blocked };
 }
+
+export async function reorderFeeItems(
+  orderedIds: string[],
+): Promise<ActionState> {
+  const auth = await requireAdminAction();
+  if (!auth.ok) return auth;
+
+  const supabase = await createClient();
+
+  for (let i = 0; i < orderedIds.length; i++) {
+    const { error } = await supabase
+      .from("fee_items")
+      .update({ sort_order: i })
+      .eq("id", orderedIds[i]);
+
+    if (error) return { ok: false, error: "ไม่สามารถบันทึกลำดับได้" };
+  }
+
+  revalidateFeePaths();
+  return { ok: true };
+}
