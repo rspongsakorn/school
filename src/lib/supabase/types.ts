@@ -77,6 +77,7 @@ export type Database = {
         description: string | null;
         is_tuition: boolean;
         is_active: boolean;
+        sort_order: number;
       }>;
       receipt_types: TableDef<{
         id: string;

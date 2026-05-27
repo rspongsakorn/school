@@ -6,13 +6,15 @@ export type FeeItemRow = {
   description: string | null;
   isTuition: boolean;
   isActive: boolean;
+  sortOrder: number;
 };
 
 export async function listFeeItems(): Promise<FeeItemRow[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("fee_items")
-    .select("id, name, description, is_tuition, is_active")
+    .select("id, name, description, is_tuition, is_active, sort_order")
+    .order("sort_order", { ascending: true })
     .order("name", { ascending: true });
 
   if (error || !data) return [];
@@ -23,5 +25,6 @@ export async function listFeeItems(): Promise<FeeItemRow[]> {
     description: row.description,
     isTuition: row.is_tuition,
     isActive: row.is_active,
+    sortOrder: row.sort_order,
   }));
 }
