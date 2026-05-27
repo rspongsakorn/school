@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,9 +33,11 @@ import {
 } from "@/components/ui/table";
 import {
   createFeeItem,
-  updateFeeItem,
   deleteFeeItems,
+  reorderFeeItems,
+  updateFeeItem,
 } from "@/lib/actions/fee-items";
+import { reorderItems } from "@/lib/finance/reorder";
 import type { FeeItemRow } from "@/lib/data/fee-items";
 
 type FeeItemsSectionProps = {
@@ -43,6 +46,7 @@ type FeeItemsSectionProps = {
 
 export function FeeItemsSection({ items }: FeeItemsSectionProps) {
   const router = useRouter();
+  const [localItems, setLocalItems] = useState<FeeItemRow[]>(items);
 
   // Edit/Create state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -59,6 +63,11 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
   const [deleteTarget, setDeleteTarget] = useState<FeeItemRow[] | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Sync local items when server data changes (e.g. after router.refresh())
+  useEffect(() => {
+    setLocalItems(items);
+  }, [items]);
 
   // --- Edit/Create handlers ---
 
@@ -118,10 +127,10 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
   }
 
   function toggleSelectAll() {
-    if (selectedIds.size === items.length) {
+    if (selectedIds.size === localItems.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(items.map((i) => i.id)));
+      setSelectedIds(new Set(localItems.map((i) => i.id)));
     }
   }
 
@@ -131,7 +140,7 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
   }
 
   function openDeleteBulk() {
-    setDeleteTarget(items.filter((i) => selectedIds.has(i.id)));
+    setDeleteTarget(localItems.filter((i) => selectedIds.has(i.id)));
     setDeleteDialogOpen(true);
   }
 
@@ -161,15 +170,33 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
     router.refresh();
   }
 
-  const allSelected = items.length > 0 && selectedIds.size === items.length;
-  const someSelected = selectedIds.size > 0 && selectedIds.size < items.length;
+  // --- DnD handler ---
+
+  async function handleDragEnd(result: DropResult) {
+    if (!result.destination) return;
+    const { source, destination } = result;
+    if (source.index === destination.index) return;
+
+    const previous = localItems;
+    const reordered = reorderItems(localItems, source.index, destination.index);
+    setLocalItems(reordered); // optimistic update
+
+    const outcome = await reorderFeeItems(reordered.map((i) => i.id));
+    if (!outcome.ok) {
+      toast.error(outcome.error);
+      setLocalItems(previous); // revert on failure
+    }
+  }
+
+  const allSelected = localItems.length > 0 && selectedIds.size === localItems.length;
+  const someSelected = selectedIds.size > 0 && selectedIds.size < localItems.length;
 
   return (
     <Card className="border-border shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between gap-2">
         <div className="space-y-1">
           <CardTitle className="text-base">รายการค่าใช้จ่าย</CardTitle>
-          <CardDescription>ประเภทค่าธรรมเนียมที่ใช้ในใบแจ้งชำระ</CardDescription>
+          <CardDescription>ประเภทค่าธรรมเนียมที่ใช้ในใบแจ้งชำระ — ลากเพื่อเรียงลำดับคอลัมน์</CardDescription>
         </div>
         <div className="flex items-center gap-2">
           {selectedIds.size > 0 && (
@@ -191,93 +218,114 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
       </CardHeader>
 
       <CardContent className="px-0 pb-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[48px] pl-4">
-                <input
-                  type="checkbox"
-                  className="size-4 rounded border-border accent-primary"
-                  checked={allSelected}
-                  aria-label="เลือกทั้งหมด"
-                  ref={(el) => {
-                    if (el) el.indeterminate = someSelected;
-                  }}
-                  onChange={toggleSelectAll}
-                />
-              </TableHead>
-              <TableHead>ชื่อ</TableHead>
-              <TableHead>ประเภท</TableHead>
-              <TableHead>สถานะ</TableHead>
-              <TableHead className="w-[180px] text-right">จัดการ</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {items.length === 0 ? (
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell
-                  colSpan={5}
-                  className="py-6 text-center text-muted-foreground"
-                >
-                  ยังไม่มีรายการ — กดเพิ่มรายการ
-                </TableCell>
+                <TableHead className="w-[40px]" />
+                <TableHead className="w-[48px] pl-4">
+                  <input
+                    type="checkbox"
+                    className="size-4 rounded border-border accent-primary"
+                    checked={allSelected}
+                    aria-label="เลือกทั้งหมด"
+                    ref={(el) => {
+                      if (el) el.indeterminate = someSelected;
+                    }}
+                    onChange={toggleSelectAll}
+                  />
+                </TableHead>
+                <TableHead>ชื่อ</TableHead>
+                <TableHead>ประเภท</TableHead>
+                <TableHead>สถานะ</TableHead>
+                <TableHead className="w-[180px] text-right">จัดการ</TableHead>
               </TableRow>
-            ) : (
-              items.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="pl-4">
-                    <input
-                      type="checkbox"
-                      className="size-4 rounded border-border accent-primary"
-                      checked={selectedIds.has(item.id)}
-                      aria-label={`เลือก ${item.name}`}
-                      onChange={() => toggleSelect(item.id)}
-                    />
-                  </TableCell>
-                  <TableCell className="font-medium">{item.name}</TableCell>
-                  <TableCell>
-                    {item.isTuition ? (
-                      <Badge variant="secondary">ค่าเทอมหลัก</Badge>
-                    ) : (
-                      <span className="text-muted-foreground">รายการเพิ่มเติม</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {item.isActive ? (
-                      <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50">
-                        ใช้งาน
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline">ปิดใช้งาน</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openEdit(item)}
-                      >
-                        <Pencil className="mr-1 h-4 w-4" />
-                        แก้ไข
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openDeleteSingle(item)}
-                      >
-                        <Trash2 className="mr-1 h-4 w-4" />
-                        ลบ
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <Droppable droppableId="fee-items">
+              {(provided) => (
+                <TableBody ref={provided.innerRef} {...provided.droppableProps}>
+                  {localItems.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
+                        ยังไม่มีรายการ — กดเพิ่มรายการ
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    localItems.map((item, index) => (
+                      <Draggable key={item.id} draggableId={item.id} index={index}>
+                        {(drag, snapshot) => (
+                          <TableRow
+                            ref={drag.innerRef}
+                            {...drag.draggableProps}
+                            className={snapshot.isDragging ? "opacity-80 bg-muted" : undefined}
+                          >
+                            <TableCell className="w-[40px] px-2">
+                              <span
+                                {...drag.dragHandleProps}
+                                className="flex cursor-grab items-center justify-center text-muted-foreground active:cursor-grabbing"
+                              >
+                                <GripVertical className="h-4 w-4" />
+                              </span>
+                            </TableCell>
+                            <TableCell className="pl-4">
+                              <input
+                                type="checkbox"
+                                className="size-4 rounded border-border accent-primary"
+                                checked={selectedIds.has(item.id)}
+                                aria-label={`เลือก ${item.name}`}
+                                onChange={() => toggleSelect(item.id)}
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium">{item.name}</TableCell>
+                            <TableCell>
+                              {item.isTuition ? (
+                                <Badge variant="secondary">ค่าเทอมหลัก</Badge>
+                              ) : (
+                                <span className="text-muted-foreground">รายการเพิ่มเติม</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {item.isActive ? (
+                                <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50">
+                                  ใช้งาน
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline">ปิดใช้งาน</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => openEdit(item)}
+                                >
+                                  <Pencil className="mr-1 h-4 w-4" />
+                                  แก้ไข
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => openDeleteSingle(item)}
+                                >
+                                  <Trash2 className="mr-1 h-4 w-4" />
+                                  ลบ
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </Draggable>
+                    ))
+                  )}
+                  {provided.placeholder}
+                </TableBody>
+              )}
+            </Droppable>
+          </Table>
+        </DragDropContext>
       </CardContent>
 
       {/* Edit / Create Dialog */}
