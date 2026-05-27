@@ -1,7 +1,26 @@
 import { formatStudentName, formatThaiDate } from "@/lib/format";
-import { getStudentGradeMap } from "@/lib/data/enrollments";
 import { buildStudentSearchOrFilter } from "@/lib/students/search";
 import { createClient } from "@/lib/supabase/client";
+
+async function getStudentGradeMap(semesterId: string): Promise<Map<string, string>> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("student_enrollments")
+    .select("student_id, classrooms(name, grade_levels(name))")
+    .eq("semester_id", semesterId)
+    .eq("status", "enrolled");
+  const map = new Map<string, string>();
+  for (const row of (data ?? []) as unknown as {
+    student_id: string;
+    classrooms: { name: string; grade_levels: { name: string } | null } | null;
+  }[]) {
+    const grade = row.classrooms?.grade_levels?.name ?? null;
+    const classroom = row.classrooms?.name ?? null;
+    if (grade && classroom) map.set(row.student_id, `${grade}/${classroom}`);
+    else if (grade) map.set(row.student_id, grade);
+  }
+  return map;
+}
 
 export type PaymentListRow = {
   id: string;
