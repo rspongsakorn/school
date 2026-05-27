@@ -2,6 +2,7 @@
 
 import { ChevronDown, User } from "lucide-react";
 import { signOut } from "@/app/login/actions";
+import { useAuth } from "@/components/providers/auth-provider";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,7 +10,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export function UserMenu({ displayName }: { displayName: string }) {
+export function UserMenu() {
+  const { profile } = useAuth();
+  const displayName = profile?.display_name ?? "ผู้ใช้";
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium hover:bg-muted">

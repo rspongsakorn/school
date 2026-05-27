@@ -1,36 +1,21 @@
 "use client";
 
+import { useSemesterContext } from "@/hooks/use-semester-context";
 import { UserMenu } from "@/components/auth/user-menu";
 import { YearSemesterSelect } from "@/components/context/year-semester-select";
-import type { AcademicYearOption } from "@/lib/data/academic-years";
-import type { SemesterOption } from "@/lib/context/semester-params";
 
 type AppHeaderProps = {
   title: string;
-  displayName: string;
-  yearName?: string;
-  semesterNumber?: number;
-  showContextSelectors?: boolean;
-  context?: {
-    years: AcademicYearOption[];
-    semesters: SemesterOption[];
-    selectedYearId: string;
-    selectedSemesterNumber: number;
-    basePath: string;
-    clearGradeClassroomOnChange?: boolean;
-  };
+  basePath?: string;
+  clearGradeClassroomOnChange?: boolean;
 };
 
-export function AppHeader({
-  title,
-  displayName,
-  yearName,
-  semesterNumber,
-  showContextSelectors = true,
-  context,
-}: AppHeaderProps) {
-  const subtitleYear = context?.years.find((y) => y.id === context.selectedYearId)?.name ?? yearName;
-  const subtitleSemester = context?.selectedSemesterNumber ?? semesterNumber ?? 1;
+export function AppHeader({ title, basePath, clearGradeClassroomOnChange = false }: AppHeaderProps) {
+  const { years, semesters, ctx } = useSemesterContext();
+
+  const showSelectors = Boolean(basePath && ctx);
+  const subtitleYear = ctx?.academicYearName;
+  const subtitleSemester = ctx?.semesterNumber ?? 1;
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card px-6">
@@ -43,17 +28,17 @@ export function AppHeader({
         ) : null}
       </div>
       <div className="flex items-center gap-4">
-        {showContextSelectors && context ? (
+        {showSelectors && ctx && basePath ? (
           <YearSemesterSelect
-            years={context.years}
-            semesters={context.semesters}
-            selectedYearId={context.selectedYearId}
-            selectedSemesterNumber={context.selectedSemesterNumber}
-            basePath={context.basePath}
-            clearGradeClassroomOnChange={context.clearGradeClassroomOnChange}
+            years={years}
+            semesters={semesters}
+            selectedYearId={ctx.academicYearId}
+            selectedSemesterNumber={ctx.semesterNumber}
+            basePath={basePath}
+            clearGradeClassroomOnChange={clearGradeClassroomOnChange}
           />
         ) : null}
-        <UserMenu displayName={displayName} />
+        <UserMenu />
       </div>
     </header>
   );
