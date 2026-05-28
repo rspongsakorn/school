@@ -21,36 +21,38 @@ export function AppHeader({ title, basePath, clearGradeClassroomOnChange = false
   const subtitleSemester = ctx?.semesterNumber ?? 1;
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card px-6">
-      <div className="flex items-center">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card px-4 lg:px-6">
+      <div className="flex min-w-0 flex-1 items-center">
         <button
           type="button"
-          className="-ml-1 mr-3 flex h-8 w-8 items-center justify-center rounded-md text-foreground hover:bg-accent lg:hidden"
+          className="-ml-1 mr-3 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground hover:bg-accent lg:hidden"
           onClick={open}
           aria-label="เปิดเมนู"
           aria-expanded={isOpen}
         >
           <Menu className="h-5 w-5" />
         </button>
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">{title}</h1>
+        <div className="min-w-0">
+          <h1 className="truncate text-lg font-semibold text-foreground lg:text-xl">{title}</h1>
           {subtitleYear ? (
-            <p className="text-xs text-muted-foreground">
+            <p className="truncate text-xs text-muted-foreground">
               ภาคเรียนที่ {subtitleSemester} · ปี {subtitleYear}
             </p>
           ) : null}
         </div>
       </div>
-      <div className="flex items-center gap-4">
+      <div className="ml-3 flex shrink-0 items-center gap-2 lg:gap-4">
         {showSelectors && ctx && basePath ? (
-          <YearSemesterSelect
-            years={years}
-            semesters={semesters}
-            selectedYearId={ctx.academicYearId}
-            selectedSemesterNumber={ctx.semesterNumber}
-            basePath={basePath}
-            clearGradeClassroomOnChange={clearGradeClassroomOnChange}
-          />
+          <div className="hidden sm:block">
+            <YearSemesterSelect
+              years={years}
+              semesters={semesters}
+              selectedYearId={ctx.academicYearId}
+              selectedSemesterNumber={ctx.semesterNumber}
+              basePath={basePath}
+              clearGradeClassroomOnChange={clearGradeClassroomOnChange}
+            />
+          </div>
         ) : null}
         <UserMenu />
       </div>
