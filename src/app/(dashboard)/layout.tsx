@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/components/providers/auth-provider";
 import { AppSidebar } from "@/components/app-sidebar";
+import { SidebarProvider } from "@/hooks/use-sidebar";
 
 export default function DashboardLayout({
   children,
@@ -19,9 +20,11 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <AppSidebar />
-      <div className="ml-[260px]">{children}</div>
-    </div>
+    <SidebarProvider>
+      <div className="min-h-screen bg-background">
+        <AppSidebar />
+        <div className="md:ml-[260px]">{children}</div>
+      </div>
+    </SidebarProvider>
   );
 }
