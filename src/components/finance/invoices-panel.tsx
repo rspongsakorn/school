@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -74,6 +74,7 @@ export function InvoicesPanel() {
   useRequireRole("admin");
 
   const router = useRouter();
+  const queryClient = useQueryClient();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { ctx, isLoading: ctxLoading } = useSemesterContext();
@@ -284,6 +285,8 @@ export function InvoicesPanel() {
     } else {
       toast.success(`ลบใบแจ้งชำระแล้ว ${result.deleted} ใบ`);
     }
+    queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    queryClient.invalidateQueries({ queryKey: ["invoice-candidates"] });
     router.refresh();
   }
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +24,7 @@ type Props = {
 
 export function InvoiceReimbursableDialog({ open, onOpenChange, invoice }: Props) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
 
   if (!invoice) return null;
@@ -42,6 +44,7 @@ export function InvoiceReimbursableDialog({ open, onOpenChange, invoice }: Props
 
     toast.success(`เปลี่ยนเป็นราคา ${targetLabel} แล้ว`);
     onOpenChange(false);
+    queryClient.invalidateQueries({ queryKey: ["invoices"] });
     router.refresh();
   }
 

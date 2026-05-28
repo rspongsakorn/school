@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,6 +47,7 @@ export function InvoiceGenerateDialog({
   candidates,
 }: InvoiceGenerateDialogProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const activeItems = feeItems.filter((i) => i.isActive);
   const [mode, setMode] = useState<"all" | "selected">("all");
   const [selectedFeeItemIds, setSelectedFeeItemIds] = useState<Set<string>>(
@@ -140,6 +142,8 @@ export function InvoiceGenerateDialog({
 
     toast.success(`สร้างใบแจ้ง ${result.created} รายการ (ข้าม ${result.skipped})`);
     onOpenChange(false);
+    queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    queryClient.invalidateQueries({ queryKey: ["invoice-candidates"] });
     router.refresh();
   }
 

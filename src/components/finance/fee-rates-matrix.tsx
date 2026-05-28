@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +28,7 @@ type FeeRatesMatrixProps = {
 
 export function FeeRatesMatrix({ semesterId, matrix }: FeeRatesMatrixProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   type DraftCell = { amount: string; amountReimbursable: string };
 
   const [draft, setDraft] = useState<Record<string, DraftCell>>(() => {
@@ -130,6 +132,7 @@ export function FeeRatesMatrix({ semesterId, matrix }: FeeRatesMatrixProps) {
     }
 
     toast.success("บันทึกอัตราค่าธรรมเนียมแล้ว");
+    queryClient.invalidateQueries({ queryKey: ["fee-rate-matrix"] });
     router.refresh();
   }
 

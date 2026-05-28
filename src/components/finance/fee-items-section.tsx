@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
@@ -46,7 +47,14 @@ type FeeItemsSectionProps = {
 
 export function FeeItemsSection({ items }: FeeItemsSectionProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [localItems, setLocalItems] = useState<FeeItemRow[]>(items);
+
+  function refreshLists() {
+    queryClient.invalidateQueries({ queryKey: ["fee-items"] });
+    queryClient.invalidateQueries({ queryKey: ["fee-rate-matrix"] });
+    router.refresh();
+  }
 
   // Edit/Create state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -116,7 +124,7 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
 
     toast.success(mode === "create" ? "เพิ่มรายการแล้ว" : "บันทึกรายการแล้ว");
     setDialogOpen(false);
-    router.refresh();
+    refreshLists();
   }
 
   // --- Delete handlers ---
@@ -179,7 +187,7 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
     }
 
     setDeleteDialogOpen(false);
-    router.refresh();
+    refreshLists();
   }
 
   // --- DnD handler ---
