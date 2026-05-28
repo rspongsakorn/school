@@ -183,7 +183,7 @@ export function PaymentsPanel() {
     const hasScope = searchGrade !== "all" || searchClassroom !== "all";
 
     if (q.length < 2 && !hasScope) {
-      setSearchResults([]);
+      startTransition(() => setSearchResults([]));
       return;
     }
 
@@ -285,7 +285,7 @@ export function PaymentsPanel() {
     return (
       <>
         <AppHeader title="การชำระเงิน" basePath="/payments" />
-        <main className="p-6">
+        <main className="p-4 lg:p-6">
           <div className="h-32 animate-pulse rounded-lg bg-muted" />
         </main>
       </>
@@ -296,7 +296,7 @@ export function PaymentsPanel() {
     return (
       <>
         <AppHeader title="การชำระเงิน" basePath="/payments" />
-        <main className="p-6">
+        <main className="p-4 lg:p-6">
           <p className="text-sm text-muted-foreground">ยังไม่มีปีการศึกษา/ภาคเรียนในระบบ</p>
         </main>
       </>
@@ -306,7 +306,7 @@ export function PaymentsPanel() {
   return (
     <>
       <AppHeader title="การชำระเงิน" basePath="/payments" />
-      <main className="p-6">
+      <main className="p-4 lg:p-6">
         <div
           className={cn(
             "grid gap-6 transition-opacity lg:grid-cols-[320px_1fr]",
@@ -530,42 +530,26 @@ export function PaymentsPanel() {
                 </div>
               </CardHeader>
               <CardContent className="px-0 pb-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="hidden md:table-cell">เลขที่</TableHead>
-                      <TableHead className="hidden md:table-cell">รหัส</TableHead>
-                      <TableHead>นักเรียน</TableHead>
-                      <TableHead className="hidden md:table-cell">ชั้น/ห้อง</TableHead>
-                      <TableHead>วันที่</TableHead>
-                      <TableHead className="hidden md:table-cell">วิธี</TableHead>
-                      <TableHead className="text-right">จำนวน</TableHead>
-                      <TableHead>สถานะ</TableHead>
-                      <TableHead className="text-right">จัดการ</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredPayments.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={9} className="py-6 text-center text-muted-foreground">
-                          ไม่พบรายการการชำระตามตัวกรอง
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredPayments.map((p) => (
-                        <TableRow key={p.id}>
-                          <TableCell className="hidden tabular-nums md:table-cell">{p.receiptNumber}</TableCell>
-                          <TableCell className="hidden tabular-nums md:table-cell">{p.studentCode}</TableCell>
-                          <TableCell>{p.studentName}</TableCell>
-                          <TableCell className="hidden text-muted-foreground md:table-cell">{p.gradeClassroom}</TableCell>
-                          <TableCell className="whitespace-nowrap text-muted-foreground">
-                            {p.paidAtLabel}
-                          </TableCell>
-                          <TableCell className="hidden md:table-cell">{PAYMENT_METHOD_LABELS[p.paymentMethod]}</TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {formatBaht(p.amount)}
-                          </TableCell>
-                          <TableCell>
+                {/* Mobile stacked cards */}
+                {filteredPayments.length === 0 ? (
+                  <p className="px-4 py-6 text-center text-sm text-muted-foreground sm:hidden">
+                    ไม่พบรายการการชำระตามตัวกรอง
+                  </p>
+                ) : (
+                  <div className="sm:hidden divide-y divide-border">
+                    {filteredPayments.map((p) => (
+                      <div key={p.id} className="space-y-2 px-4 py-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="truncate font-medium">{p.studentName}</p>
+                            <p className="mt-0.5 text-sm text-muted-foreground">
+                              {p.paidAtLabel} · {PAYMENT_METHOD_LABELS[p.paymentMethod]}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 flex-col items-end gap-1">
+                            <span className="font-semibold tabular-nums">
+                              {formatBaht(p.amount)}
+                            </span>
                             {p.status === "active" ? (
                               <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50">
                                 ปกติ
@@ -573,35 +557,109 @@ export function PaymentsPanel() {
                             ) : (
                               <Badge variant="outline">ยกเลิก</Badge>
                             )}
+                          </div>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openReprint(p)}
+                          >
+                            พิมพ์ซ้ำ
+                          </Button>
+                          {p.status === "active" ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="text-destructive"
+                              onClick={() => setVoidTarget(p)}
+                            >
+                              ยกเลิก
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Desktop table */}
+                <div className="hidden sm:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>เลขที่</TableHead>
+                        <TableHead>รหัส</TableHead>
+                        <TableHead>นักเรียน</TableHead>
+                        <TableHead>ชั้น/ห้อง</TableHead>
+                        <TableHead>วันที่</TableHead>
+                        <TableHead>วิธี</TableHead>
+                        <TableHead className="text-right">จำนวน</TableHead>
+                        <TableHead>สถานะ</TableHead>
+                        <TableHead className="text-right">จัดการ</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredPayments.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={9} className="py-6 text-center text-muted-foreground">
+                            ไม่พบรายการการชำระตามตัวกรอง
                           </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => openReprint(p)}
-                              >
-                                พิมพ์ซ้ำ
-                              </Button>
+                        </TableRow>
+                      ) : (
+                        filteredPayments.map((p) => (
+                          <TableRow key={p.id}>
+                            <TableCell className="tabular-nums">{p.receiptNumber}</TableCell>
+                            <TableCell className="tabular-nums">{p.studentCode}</TableCell>
+                            <TableCell>{p.studentName}</TableCell>
+                            <TableCell className="text-muted-foreground">{p.gradeClassroom}</TableCell>
+                            <TableCell className="whitespace-nowrap text-muted-foreground">
+                              {p.paidAtLabel}
+                            </TableCell>
+                            <TableCell>{PAYMENT_METHOD_LABELS[p.paymentMethod]}</TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {formatBaht(p.amount)}
+                            </TableCell>
+                            <TableCell>
                               {p.status === "active" ? (
+                                <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50">
+                                  ปกติ
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline">ยกเลิก</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
                                 <Button
                                   type="button"
                                   size="sm"
                                   variant="outline"
-                                  className="text-destructive"
-                                  onClick={() => setVoidTarget(p)}
+                                  onClick={() => openReprint(p)}
                                 >
-                                  ยกเลิก
+                                  พิมพ์ซ้ำ
                                 </Button>
-                              ) : null}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+                                {p.status === "active" ? (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-destructive"
+                                    onClick={() => setVoidTarget(p)}
+                                  >
+                                    ยกเลิก
+                                  </Button>
+                                ) : null}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </div>

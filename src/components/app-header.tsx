@@ -14,7 +14,7 @@ type AppHeaderProps = {
 
 export function AppHeader({ title, basePath, clearGradeClassroomOnChange = false }: AppHeaderProps) {
   const { years, semesters, ctx } = useSemesterContext();
-  const { open } = useSidebarContext();
+  const { isOpen, open } = useSidebarContext();
 
   const showSelectors = Boolean(basePath && ctx);
   const subtitleYear = ctx?.academicYearName;
@@ -28,6 +28,7 @@ export function AppHeader({ title, basePath, clearGradeClassroomOnChange = false
           className="-ml-1 mr-3 flex h-8 w-8 items-center justify-center rounded-md text-foreground hover:bg-accent lg:hidden"
           onClick={open}
           aria-label="เปิดเมนู"
+          aria-expanded={isOpen}
         >
           <Menu className="h-5 w-5" />
         </button>

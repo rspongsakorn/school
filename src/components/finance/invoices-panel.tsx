@@ -162,7 +162,7 @@ export function InvoicesPanel() {
     deletableRows.length > 0 && deletableRows.every((row) => selectedIds.has(row.id));
 
   useEffect(() => {
-    setSelectedIds(new Set());
+    startTransition(() => setSelectedIds(new Set()));
   }, [data.page, qParam, status, gradeParam, classroomParam]);
 
   // Build a grade name lookup map
@@ -270,7 +270,7 @@ export function InvoicesPanel() {
   return (
     <>
       <AppHeader title="ใบแจ้งชำระ" basePath="/invoices" />
-      <main className="p-6">
+      <main className="p-4 lg:p-6">
         {!ctx && !ctxLoading ? (
           <p className="text-sm text-muted-foreground">ยังไม่มีปีการศึกษา/ภาคเรียนในระบบ</p>
         ) : isLoading ? (
@@ -353,107 +353,183 @@ export function InvoicesPanel() {
               </div>
             </div>
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10">
-                    <input
-                      type="checkbox"
-                      className="size-4 rounded border-border"
-                      checked={allDeletableSelected}
-                      disabled={deletableRows.length === 0}
-                      aria-label="เลือกทั้งหมดที่ลบได้"
-                      onChange={(e) => toggleSelectAll(e.target.checked)}
-                    />
-                  </TableHead>
-                  <TableHead className="hidden md:table-cell">รหัส</TableHead>
-                  <TableHead>ชื่อ-นามสกุล</TableHead>
-                  <TableHead className="hidden md:table-cell">ชั้น/ห้อง</TableHead>
-                  <TableHead className="hidden md:table-cell">ใบแจ้ง</TableHead>
-                  <TableHead className="text-right">ต้องชำระ</TableHead>
-                  <TableHead className="text-right">ค้าง</TableHead>
-                  <TableHead>สถานะ</TableHead>
-                  <TableHead className="w-[140px]" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.rows.length === 0 ? (
+            {/* Mobile stacked cards */}
+            {data.rows.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground sm:hidden">
+                ไม่พบใบแจ้งชำระ
+              </p>
+            ) : (
+              <div className="sm:hidden divide-y divide-border rounded-lg border border-border">
+                {data.rows.map((row) => {
+                  const deleteCtx = deleteContextFor(row);
+                  const deletable = canDeleteInvoice(deleteCtx);
+                  const blockedReason = invoiceDeleteBlockedReason(deleteCtx);
+                  return (
+                    <div key={row.id} className="space-y-2 px-4 py-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{row.studentName}</p>
+                          <p className="mt-0.5 text-sm text-muted-foreground">
+                            {row.studentCode} · {row.gradeClassroom}
+                          </p>
+                          <p className="mt-0.5 max-w-[200px] truncate text-sm text-muted-foreground">
+                            {row.invoiceName}
+                          </p>
+                        </div>
+                        <Badge className={statusBadgeClass(row.status)}>
+                          {INVOICE_STATUS_LABELS[row.status]}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">
+                          ต้องชำระ{" "}
+                          <span className="tabular-nums text-foreground">
+                            {formatBaht(row.totalAmount)}
+                          </span>
+                        </span>
+                        {row.outstanding > 0 ? (
+                          <span className="text-amber-700 tabular-nums">
+                            ค้าง {formatBaht(row.outstanding)}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        {row.paidAmount === 0 ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setDiscountTarget(row)}
+                          >
+                            ส่วนลด
+                          </Button>
+                        ) : null}
+                        {deletable ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="text-destructive"
+                            onClick={() => setDeleteTargetIds([row.id])}
+                          >
+                            ลบ
+                          </Button>
+                        ) : blockedReason ? (
+                          <span className="text-xs text-muted-foreground" title={blockedReason}>
+                            ลบไม่ได้
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Desktop table */}
+            <div className="hidden sm:block">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={9} className="py-6 text-center text-muted-foreground">
-                      ไม่พบใบแจ้งชำระ
-                    </TableCell>
+                    <TableHead className="w-10">
+                      <input
+                        type="checkbox"
+                        className="size-4 rounded border-border"
+                        checked={allDeletableSelected}
+                        disabled={deletableRows.length === 0}
+                        aria-label="เลือกทั้งหมดที่ลบได้"
+                        onChange={(e) => toggleSelectAll(e.target.checked)}
+                      />
+                    </TableHead>
+                    <TableHead>รหัส</TableHead>
+                    <TableHead>ชื่อ-นามสกุล</TableHead>
+                    <TableHead>ชั้น/ห้อง</TableHead>
+                    <TableHead>ใบแจ้ง</TableHead>
+                    <TableHead className="text-right">ต้องชำระ</TableHead>
+                    <TableHead className="text-right">ค้าง</TableHead>
+                    <TableHead>สถานะ</TableHead>
+                    <TableHead className="w-[140px]" />
                   </TableRow>
-                ) : (
-                  data.rows.map((row) => {
-                    const deleteCtx = deleteContextFor(row);
-                    const deletable = canDeleteInvoice(deleteCtx);
-                    const blockedReason = invoiceDeleteBlockedReason(deleteCtx);
-                    return (
-                      <TableRow key={row.id}>
-                        <TableCell>
-                          <input
-                            type="checkbox"
-                            className="size-4 rounded border-border"
-                            checked={selectedIds.has(row.id)}
-                            disabled={!deletable}
-                            title={blockedReason ?? undefined}
-                            aria-label={`เลือก ${row.studentCode}`}
-                            onChange={(e) => toggleRow(row.id, e.target.checked)}
-                          />
-                        </TableCell>
-                        <TableCell className="hidden tabular-nums md:table-cell">{row.studentCode}</TableCell>
-                        <TableCell>{row.studentName}</TableCell>
-                        <TableCell className="hidden md:table-cell">{row.gradeClassroom}</TableCell>
-                        <TableCell className="hidden max-w-[180px] truncate md:table-cell">{row.invoiceName}</TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatBaht(row.totalAmount)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatBaht(row.outstanding)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={statusBadgeClass(row.status)}>
-                            {INVOICE_STATUS_LABELS[row.status]}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap justify-end gap-2">
-                            {row.paidAmount === 0 ? (
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setDiscountTarget(row)}
-                              >
-                                ส่วนลด
-                              </Button>
-                            ) : null}
-                            {deletable ? (
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="text-destructive"
-                                onClick={() => setDeleteTargetIds([row.id])}
-                              >
-                                ลบ
-                              </Button>
-                            ) : blockedReason ? (
-                              <span
-                                className="text-xs text-muted-foreground"
-                                title={blockedReason}
-                              >
-                                ลบไม่ได้
-                              </span>
-                            ) : null}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {data.rows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="py-6 text-center text-muted-foreground">
+                        ไม่พบใบแจ้งชำระ
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    data.rows.map((row) => {
+                      const deleteCtx = deleteContextFor(row);
+                      const deletable = canDeleteInvoice(deleteCtx);
+                      const blockedReason = invoiceDeleteBlockedReason(deleteCtx);
+                      return (
+                        <TableRow key={row.id}>
+                          <TableCell>
+                            <input
+                              type="checkbox"
+                              className="size-4 rounded border-border"
+                              checked={selectedIds.has(row.id)}
+                              disabled={!deletable}
+                              title={blockedReason ?? undefined}
+                              aria-label={`เลือก ${row.studentCode}`}
+                              onChange={(e) => toggleRow(row.id, e.target.checked)}
+                            />
+                          </TableCell>
+                          <TableCell className="tabular-nums">{row.studentCode}</TableCell>
+                          <TableCell>{row.studentName}</TableCell>
+                          <TableCell>{row.gradeClassroom}</TableCell>
+                          <TableCell className="max-w-[180px] truncate">{row.invoiceName}</TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatBaht(row.totalAmount)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatBaht(row.outstanding)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={statusBadgeClass(row.status)}>
+                              {INVOICE_STATUS_LABELS[row.status]}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap justify-end gap-2">
+                              {row.paidAmount === 0 ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setDiscountTarget(row)}
+                                >
+                                  ส่วนลด
+                                </Button>
+                              ) : null}
+                              {deletable ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-destructive"
+                                  onClick={() => setDeleteTargetIds([row.id])}
+                                >
+                                  ลบ
+                                </Button>
+                              ) : blockedReason ? (
+                                <span
+                                  className="text-xs text-muted-foreground"
+                                  title={blockedReason}
+                                >
+                                  ลบไม่ได้
+                                </span>
+                              ) : null}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
 
             <div className="flex items-center justify-between text-sm">
               <p className="text-muted-foreground">

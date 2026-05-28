@@ -10,7 +10,7 @@ export function NewAcademicYearShell() {
   return (
     <>
       <AppHeader title="เพิ่มปีการศึกษา" />
-      <main className="p-6">
+      <main className="p-4 lg:p-6">
         <AcademicYearFormPage mode="create" />
       </main>
     </>

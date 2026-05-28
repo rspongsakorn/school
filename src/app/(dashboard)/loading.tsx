@@ -8,7 +8,7 @@ export default function DashboardLoading() {
         </div>
         <div className="h-9 w-28 animate-pulse rounded-md bg-muted" />
       </div>
-      <main className="p-6">
+      <main className="p-4 lg:p-6">
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
           <div className="mb-6 space-y-2">
             <div className="h-6 w-48 animate-pulse rounded-md bg-muted" />

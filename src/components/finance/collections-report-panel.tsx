@@ -38,7 +38,7 @@ export function CollectionsReportPanel() {
   return (
     <>
       <AppHeader title="รายงานการจัดเก็บ" basePath="/reports/collections" />
-      <main className="p-6">
+      <main className="p-4 lg:p-6">
         <Table>
           <TableHeader>
             <TableRow>

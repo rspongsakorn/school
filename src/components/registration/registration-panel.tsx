@@ -248,7 +248,7 @@ export function RegistrationPanel() {
     return (
       <>
         <AppHeader title="ลงทะเบียน" basePath="/registration" clearGradeClassroomOnChange={true} />
-        <main className="p-6">
+        <main className="p-4 lg:p-6">
           <p className="text-sm text-muted-foreground">ยังไม่มีปีการศึกษาในระบบ</p>
         </main>
       </>
@@ -258,7 +258,7 @@ export function RegistrationPanel() {
   return (
     <>
       <AppHeader title="ลงทะเบียน" basePath="/registration" clearGradeClassroomOnChange={true} />
-      <main className="p-6">
+      <main className="p-4 lg:p-6">
         <div className="space-y-6">
           {isAdmin && grades.length === 0 && copySourceOptions.length > 0 && (
             <div className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3">

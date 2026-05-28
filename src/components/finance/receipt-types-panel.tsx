@@ -91,7 +91,7 @@ export function ReceiptTypesPanel() {
     return (
       <>
         <AppHeader title="ประเภทใบเสร็จ" />
-        <main className="p-6">
+        <main className="p-4 lg:p-6">
           <Card className="border-border shadow-sm">
             <CardContent className="p-6">
               <div className="space-y-2">
@@ -109,7 +109,7 @@ export function ReceiptTypesPanel() {
   return (
     <>
       <AppHeader title="ประเภทใบเสร็จ" />
-      <main className="p-6">
+      <main className="p-4 lg:p-6">
         <Card className="border-border shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between gap-2">
             <div className="space-y-1">

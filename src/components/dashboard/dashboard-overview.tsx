@@ -31,7 +31,7 @@ export function DashboardOverview() {
   return (
     <>
       <AppHeader title="ภาพรวม" basePath="/" />
-      <main className="p-6">
+      <main className="p-4 lg:p-6">
         {!ctx && !ctxLoading ? (
           <Card className="mb-6 border-amber-200 bg-amber-50">
             <CardHeader>
@@ -48,7 +48,7 @@ export function DashboardOverview() {
         ) : null}
         {isLoading ? (
           <div className="space-y-6">
-            <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
               {[...Array(4)].map((_, i) => (
                 <div key={i} className="h-24 animate-pulse rounded-lg bg-muted" />
               ))}

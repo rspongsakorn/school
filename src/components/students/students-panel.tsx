@@ -100,7 +100,7 @@ export function StudentsPanel() {
     deletableRows.length > 0 && deletableRows.every((row) => selectedIds.has(row.id));
 
   useEffect(() => {
-    setSelectedIds(new Set());
+    startTransition(() => setSelectedIds(new Set()));
   }, [data?.page, q, status]);
 
   const pushParams = useCallback(
@@ -211,7 +211,7 @@ export function StudentsPanel() {
   return (
     <>
       <AppHeader title="นักเรียน" basePath="/students" />
-      <main className="p-6">
+      <main className="p-4 lg:p-6">
         <Card className="border-border shadow-sm">
           <CardHeader>
             <CardTitle>รายชื่อนักเรียน</CardTitle>
@@ -272,98 +272,128 @@ export function StudentsPanel() {
                 <div className="h-40 animate-pulse rounded-lg bg-muted" />
               ) : data ? (
                 <>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        {isAdmin ? (
-                          <TableHead className="w-10">
-                            <input
-                              type="checkbox"
-                              className="size-4 rounded border-border"
-                              checked={allDeletableSelected}
-                              disabled={deletableRows.length === 0}
-                              aria-label="เลือกทั้งหมดที่ลบได้"
-                              onChange={(e) => toggleSelectAll(e.target.checked)}
-                            />
-                          </TableHead>
-                        ) : null}
-                        <TableHead className="hidden md:table-cell">รหัส</TableHead>
-                        <TableHead>ชื่อ-นามสกุล</TableHead>
-                        <TableHead className="hidden md:table-cell">เลขบัตร</TableHead>
-                        <TableHead>ชั้น</TableHead>
-                        <TableHead>สถานะ</TableHead>
-                        {isAdmin ? <TableHead className="w-[100px]" /> : null}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {data.rows.length === 0 ? (
+                  {/* Mobile stacked cards */}
+                  {data.rows.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground sm:hidden">
+                      ไม่พบข้อมูลนักเรียน
+                    </p>
+                  ) : (
+                    <div className="sm:hidden divide-y divide-border rounded-lg border border-border">
+                      {data.rows.map((student) => (
+                        <div
+                          key={student.id}
+                          className="flex cursor-pointer items-start justify-between gap-3 px-4 py-3 hover:bg-muted/50"
+                          onClick={() => setSelectedStudent(student)}
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate font-medium">{student.name}</p>
+                            <p className="mt-0.5 text-sm text-muted-foreground tabular-nums">
+                              {student.studentCode} · {student.grade}
+                            </p>
+                          </div>
+                          <Badge className={statusBadgeClass(student.statusRaw)}>
+                            {student.status}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Desktop table */}
+                  <div className="hidden sm:block">
+                    <Table>
+                      <TableHeader>
                         <TableRow>
-                          <TableCell
-                            colSpan={isAdmin ? 7 : 5}
-                            className="py-6 text-center text-muted-foreground"
-                          >
-                            ไม่พบข้อมูลนักเรียน
-                          </TableCell>
+                          {isAdmin ? (
+                            <TableHead className="w-10">
+                              <input
+                                type="checkbox"
+                                className="size-4 rounded border-border"
+                                checked={allDeletableSelected}
+                                disabled={deletableRows.length === 0}
+                                aria-label="เลือกทั้งหมดที่ลบได้"
+                                onChange={(e) => toggleSelectAll(e.target.checked)}
+                              />
+                            </TableHead>
+                          ) : null}
+                          <TableHead>รหัส</TableHead>
+                          <TableHead>ชื่อ-นามสกุล</TableHead>
+                          <TableHead>เลขบัตร</TableHead>
+                          <TableHead>ชั้น</TableHead>
+                          <TableHead>สถานะ</TableHead>
+                          {isAdmin ? <TableHead className="w-[100px]" /> : null}
                         </TableRow>
-                      ) : (
-                        data.rows.map((student) => {
-                          const blockedReason = studentDeleteBlockedReason(!student.deletable);
-                          return (
-                            <TableRow
-                              key={student.id}
-                              className="cursor-pointer"
-                              onClick={() => setSelectedStudent(student)}
+                      </TableHeader>
+                      <TableBody>
+                        {data.rows.length === 0 ? (
+                          <TableRow>
+                            <TableCell
+                              colSpan={isAdmin ? 7 : 5}
+                              className="py-6 text-center text-muted-foreground"
                             >
-                              {isAdmin ? (
-                                <TableCell onClick={(e) => e.stopPropagation()}>
-                                  <input
-                                    type="checkbox"
-                                    className="size-4 rounded border-border"
-                                    checked={selectedIds.has(student.id)}
-                                    disabled={!student.deletable}
-                                    title={blockedReason ?? undefined}
-                                    aria-label={`เลือก ${student.studentCode}`}
-                                    onChange={(e) => toggleRow(student.id, e.target.checked)}
-                                  />
+                              ไม่พบข้อมูลนักเรียน
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          data.rows.map((student) => {
+                            const blockedReason = studentDeleteBlockedReason(!student.deletable);
+                            return (
+                              <TableRow
+                                key={student.id}
+                                className="cursor-pointer"
+                                onClick={() => setSelectedStudent(student)}
+                              >
+                                {isAdmin ? (
+                                  <TableCell onClick={(e) => e.stopPropagation()}>
+                                    <input
+                                      type="checkbox"
+                                      className="size-4 rounded border-border"
+                                      checked={selectedIds.has(student.id)}
+                                      disabled={!student.deletable}
+                                      title={blockedReason ?? undefined}
+                                      aria-label={`เลือก ${student.studentCode}`}
+                                      onChange={(e) => toggleRow(student.id, e.target.checked)}
+                                    />
+                                  </TableCell>
+                                ) : null}
+                                <TableCell className="font-medium tabular-nums">{student.studentCode}</TableCell>
+                                <TableCell>{student.name}</TableCell>
+                                <TableCell>{student.idCard ?? "—"}</TableCell>
+                                <TableCell>{student.grade}</TableCell>
+                                <TableCell>
+                                  <Badge className={statusBadgeClass(student.statusRaw)}>
+                                    {student.status}
+                                  </Badge>
                                 </TableCell>
-                              ) : null}
-                              <TableCell className="hidden font-medium tabular-nums md:table-cell">{student.studentCode}</TableCell>
-                              <TableCell>{student.name}</TableCell>
-                              <TableCell className="hidden md:table-cell">{student.idCard ?? "—"}</TableCell>
-                              <TableCell>{student.grade}</TableCell>
-                              <TableCell>
-                                <Badge className={statusBadgeClass(student.statusRaw)}>
-                                  {student.status}
-                                </Badge>
-                              </TableCell>
-                              {isAdmin ? (
-                                <TableCell onClick={(e) => e.stopPropagation()}>
-                                  {student.deletable ? (
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      className="text-destructive"
-                                      onClick={() => setDeleteTargetIds([student.id])}
-                                    >
-                                      ลบ
-                                    </Button>
-                                  ) : blockedReason ? (
-                                    <span
-                                      className="text-xs text-muted-foreground"
-                                      title={blockedReason}
-                                    >
-                                      ลบไม่ได้
-                                    </span>
-                                  ) : null}
-                                </TableCell>
-                              ) : null}
-                            </TableRow>
-                          );
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
+                                {isAdmin ? (
+                                  <TableCell onClick={(e) => e.stopPropagation()}>
+                                    {student.deletable ? (
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        className="text-destructive"
+                                        onClick={() => setDeleteTargetIds([student.id])}
+                                      >
+                                        ลบ
+                                      </Button>
+                                    ) : blockedReason ? (
+                                      <span
+                                        className="text-xs text-muted-foreground"
+                                        title={blockedReason}
+                                      >
+                                        ลบไม่ได้
+                                      </span>
+                                    ) : null}
+                                  </TableCell>
+                                ) : null}
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
 
                   <div className="flex items-center justify-between text-sm">
                     <p className="text-muted-foreground">

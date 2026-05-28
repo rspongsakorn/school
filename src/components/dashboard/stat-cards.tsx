@@ -49,7 +49,7 @@ export function StatCards({ stats }: { stats: DashboardStats }) {
   ];
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {items.map((stat) => {
         const Icon = stat.icon;
         const DeltaIcon = stat.positive ? ArrowUpRight : ArrowDownRight;

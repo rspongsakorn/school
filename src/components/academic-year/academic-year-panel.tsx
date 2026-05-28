@@ -22,7 +22,7 @@ export function AcademicYearPanel() {
   return (
     <>
       <AppHeader title="ปีการศึกษา" />
-      <main className="p-6">
+      <main className="p-4 lg:p-6">
         {isLoading ? (
           <div className="h-40 animate-pulse rounded-lg bg-muted" />
         ) : (

@@ -120,7 +120,7 @@ export function OutstandingReportPanel() {
   return (
     <>
       <AppHeader title="รายงานค้างชำระ" basePath="/reports/outstanding" />
-      <main className="p-6">
+      <main className="p-4 lg:p-6">
         <div className="space-y-4">
           <div className="flex flex-wrap gap-2">
             <Select

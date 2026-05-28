@@ -24,7 +24,7 @@ export function EditAcademicYearWrapper({ id }: { id: string }) {
     return (
       <>
         <AppHeader title="แก้ไขปีการศึกษา" />
-        <main className="p-6">
+        <main className="p-4 lg:p-6">
           <div className="h-40 animate-pulse rounded-lg bg-muted" />
         </main>
       </>
@@ -36,7 +36,7 @@ export function EditAcademicYearWrapper({ id }: { id: string }) {
   return (
     <>
       <AppHeader title="แก้ไขปีการศึกษา" />
-      <main className="p-6">
+      <main className="p-4 lg:p-6">
         <AcademicYearFormPage mode="edit" year={year} />
       </main>
     </>
