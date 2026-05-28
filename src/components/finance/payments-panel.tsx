@@ -533,12 +533,12 @@ export function PaymentsPanel() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>เลขที่</TableHead>
-                      <TableHead>รหัส</TableHead>
+                      <TableHead className="hidden md:table-cell">เลขที่</TableHead>
+                      <TableHead className="hidden md:table-cell">รหัส</TableHead>
                       <TableHead>นักเรียน</TableHead>
-                      <TableHead>ชั้น/ห้อง</TableHead>
+                      <TableHead className="hidden md:table-cell">ชั้น/ห้อง</TableHead>
                       <TableHead>วันที่</TableHead>
-                      <TableHead>วิธี</TableHead>
+                      <TableHead className="hidden md:table-cell">วิธี</TableHead>
                       <TableHead className="text-right">จำนวน</TableHead>
                       <TableHead>สถานะ</TableHead>
                       <TableHead className="text-right">จัดการ</TableHead>
@@ -554,14 +554,14 @@ export function PaymentsPanel() {
                     ) : (
                       filteredPayments.map((p) => (
                         <TableRow key={p.id}>
-                          <TableCell className="tabular-nums">{p.receiptNumber}</TableCell>
-                          <TableCell className="tabular-nums">{p.studentCode}</TableCell>
+                          <TableCell className="hidden tabular-nums md:table-cell">{p.receiptNumber}</TableCell>
+                          <TableCell className="hidden tabular-nums md:table-cell">{p.studentCode}</TableCell>
                           <TableCell>{p.studentName}</TableCell>
-                          <TableCell className="text-muted-foreground">{p.gradeClassroom}</TableCell>
+                          <TableCell className="hidden text-muted-foreground md:table-cell">{p.gradeClassroom}</TableCell>
                           <TableCell className="whitespace-nowrap text-muted-foreground">
                             {p.paidAtLabel}
                           </TableCell>
-                          <TableCell>{PAYMENT_METHOD_LABELS[p.paymentMethod]}</TableCell>
+                          <TableCell className="hidden md:table-cell">{PAYMENT_METHOD_LABELS[p.paymentMethod]}</TableCell>
                           <TableCell className="text-right tabular-nums">
                             {formatBaht(p.amount)}
                           </TableCell>
