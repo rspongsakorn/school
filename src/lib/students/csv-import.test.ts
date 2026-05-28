@@ -108,3 +108,73 @@ describe("validateAndBuildImportRows", () => {
     expect(result.errors[0].message).toMatch(/ซ้ำในไฟล์/);
   });
 });
+
+import { parseClassroomCell } from "@/lib/students/csv-import";
+
+describe("parseClassroomCell", () => {
+  it("returns empty for empty string", () => {
+    expect(parseClassroomCell("")).toEqual({ ok: true, empty: true });
+  });
+
+  it("returns empty for whitespace only", () => {
+    expect(parseClassroomCell("   ")).toEqual({ ok: true, empty: true });
+  });
+
+  it("splits ม.2/1 into grade and classroom number", () => {
+    expect(parseClassroomCell("ม.2/1")).toEqual({
+      ok: true,
+      empty: false,
+      gradeName: "ม.2",
+      classroomNumber: "1",
+    });
+  });
+
+  it("trims surrounding whitespace", () => {
+    expect(parseClassroomCell("  ม.2/1  ")).toEqual({
+      ok: true,
+      empty: false,
+      gradeName: "ม.2",
+      classroomNumber: "1",
+    });
+  });
+
+  it("errors when no slash", () => {
+    const r = parseClassroomCell("ม.2");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/ชั้น\/เลขห้อง/);
+  });
+
+  it("errors when grade is empty", () => {
+    const r = parseClassroomCell("/1");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/ขาดชื่อชั้น/);
+  });
+
+  it("errors when classroom number is empty", () => {
+    const r = parseClassroomCell("ม.2/");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/เลขห้อง/);
+  });
+
+  it("errors when classroom number is non-numeric", () => {
+    const r = parseClassroomCell("ม.2/abc");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/เลขห้อง/);
+  });
+
+  it("errors when classroom number out of range (0)", () => {
+    const r = parseClassroomCell("ม.2/0");
+    expect(r.ok).toBe(false);
+  });
+
+  it("errors when classroom number out of range (1000)", () => {
+    const r = parseClassroomCell("ม.2/1000");
+    expect(r.ok).toBe(false);
+  });
+
+  it("splits on first slash only", () => {
+    const r = parseClassroomCell("ม.2/1/extra");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/เลขห้อง/);
+  });
+});

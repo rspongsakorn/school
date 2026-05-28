@@ -216,3 +216,33 @@ export function importRowToCsvInput(row: ImportStudentRow, rowNumber: number): C
     id_card: row.idCard ?? "",
   };
 }
+
+export type ParsedClassroom =
+  | { ok: true; empty: true }
+  | { ok: true; empty: false; gradeName: string; classroomNumber: string }
+  | { ok: false; error: string };
+
+export function parseClassroomCell(raw: string): ParsedClassroom {
+  const trimmed = raw.trim();
+  if (!trimmed) return { ok: true, empty: true };
+
+  const slashIndex = trimmed.indexOf("/");
+  if (slashIndex === -1) {
+    return { ok: false, error: "ต้องระบุในรูปแบบ ชั้น/เลขห้อง" };
+  }
+
+  const gradeName = trimmed.slice(0, slashIndex).trim();
+  const classroomNumber = trimmed.slice(slashIndex + 1).trim();
+
+  if (!gradeName) return { ok: false, error: "ขาดชื่อชั้นเรียน" };
+
+  if (!/^\d+$/.test(classroomNumber)) {
+    return { ok: false, error: "เลขห้องต้องเป็นตัวเลข 1–999" };
+  }
+  const num = Number(classroomNumber);
+  if (num < 1 || num > 999) {
+    return { ok: false, error: "เลขห้องต้องเป็นตัวเลข 1–999" };
+  }
+
+  return { ok: true, empty: false, gradeName, classroomNumber };
+}
