@@ -31,7 +31,9 @@ type RawPayment = {
   academic_years: { name: string } | null;
   receipts: { snapshot_data: SnapshotData } | null;
   payment_allocations: Array<{
+    amount: string;
     student_invoices: {
+      invoice_name: string;
       semesters: { number: number } | null;
       invoice_lines: Array<{
         amount: string;
@@ -58,7 +60,9 @@ export async function getReceiptPrintData(
       academic_years ( name ),
       receipts ( snapshot_data ),
       payment_allocations (
+        amount,
         student_invoices (
+          invoice_name,
           semesters ( number ),
           invoice_lines ( amount, fee_items ( name ) )
         )
@@ -73,12 +77,25 @@ export async function getReceiptPrintData(
   const payment = raw as unknown as RawPayment;
   const snapshot = payment.receipts?.snapshot_data ?? {};
 
-  const lineItems = (payment.payment_allocations ?? [])
-    .flatMap((pa) => pa.student_invoices?.invoice_lines ?? [])
-    .map((line) => ({
-      name: line.fee_items?.name ?? "รายการค่าธรรมเนียม",
-      amount: Number(line.amount),
-    }));
+  const lineItems = (payment.payment_allocations ?? []).flatMap((pa) => {
+    const inv = pa.student_invoices;
+    if (!inv) return [];
+    const allocAmount = Number(pa.amount);
+    const lines = inv.invoice_lines ?? [];
+    const linesTotal =
+      Math.round(lines.reduce((sum, l) => sum + Number(l.amount), 0) * 100) / 100;
+
+    // Full payment of this invoice — expand to individual fee line items
+    if (Math.round(allocAmount * 100) / 100 === linesTotal) {
+      return lines.map((line) => ({
+        name: line.fee_items?.name ?? "รายการค่าธรรมเนียม",
+        amount: Number(line.amount),
+      }));
+    }
+
+    // Partial payment — single consolidated line to avoid total mismatch
+    return [{ name: inv.invoice_name, amount: allocAmount }];
+  });
 
   const semesterNumber =
     (payment.payment_allocations ?? [])
