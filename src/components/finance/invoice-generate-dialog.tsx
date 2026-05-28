@@ -53,6 +53,7 @@ export function InvoiceGenerateDialog({
   );
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
+  const [reimbursableStudentIds, setReimbursableStudentIds] = useState<Set<string>>(new Set());
 
   const selectableCandidates = useMemo(
     () => candidates.filter((c) => !c.hasInvoice),
@@ -81,6 +82,29 @@ export function InvoiceGenerateDialog({
     setSelectedStudentIds(new Set(selectableCandidates.map((c) => c.studentId)));
   }
 
+  function toggleReimbursable(id: string) {
+    setReimbursableStudentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function setAllReimbursable(value: boolean) {
+    if (!value) {
+      setReimbursableStudentIds(new Set());
+      return;
+    }
+    if (mode === "selected") {
+      setReimbursableStudentIds(new Set(selectedStudentIds));
+    } else {
+      setReimbursableStudentIds(
+        new Set(selectableCandidates.map((c) => c.studentId)),
+      );
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const feeItemIds = [...selectedFeeItemIds];
@@ -105,6 +129,7 @@ export function InvoiceGenerateDialog({
       semesterNumber,
       feeItemIds,
       studentIds,
+      reimbursableStudentIds: [...reimbursableStudentIds],
     });
     setSubmitting(false);
 
@@ -173,9 +198,64 @@ export function InvoiceGenerateDialog({
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label>นักเรียน (ยังไม่มีใบ)</Label>
-                  <Button type="button" size="sm" variant="outline" onClick={selectAllStudents}>
-                    เลือกทั้งหมด
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" variant="outline" onClick={selectAllStudents}>
+                      เลือกทั้งหมด
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => setAllReimbursable(true)}>
+                      ตั้งเบิกได้ทุกคน
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => setAllReimbursable(false)}>
+                      ล้างเบิกได้
+                    </Button>
+                  </div>
+                </div>
+                <div className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-border p-3">
+                  {selectableCandidates.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">ไม่มีนักเรียนที่สร้างใบได้</p>
+                  ) : (
+                    selectableCandidates.map((c) => (
+                      <div
+                        key={c.studentId}
+                        className="flex items-center justify-between gap-2 text-sm"
+                      >
+                        <Label className="flex cursor-pointer items-center gap-2 font-normal">
+                          <input
+                            type="checkbox"
+                            className="size-4 rounded border-border accent-primary"
+                            checked={selectedStudentIds.has(c.studentId)}
+                            onChange={() => toggleStudent(c.studentId)}
+                          />
+                          <span className="tabular-nums">{c.studentCode}</span>
+                          <span>{c.studentName}</span>
+                          <span className="text-muted-foreground">({c.gradeClassroom})</span>
+                        </Label>
+                        <Label className="flex cursor-pointer items-center gap-1 text-xs text-sky-700">
+                          <input
+                            type="checkbox"
+                            className="size-3.5 rounded border-border accent-sky-600"
+                            checked={reimbursableStudentIds.has(c.studentId)}
+                            onChange={() => toggleReimbursable(c.studentId)}
+                          />
+                          เบิกได้
+                        </Label>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>ระบุ &quot;เบิกได้&quot; ในโหมดทั้งภาค</Label>
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" variant="outline" onClick={() => setAllReimbursable(true)}>
+                      ตั้งเบิกได้ทุกคน
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => setAllReimbursable(false)}>
+                      ล้างเบิกได้
+                    </Button>
+                  </div>
                 </div>
                 <div className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-border p-3">
                   {selectableCandidates.length === 0 ? (
@@ -184,23 +264,28 @@ export function InvoiceGenerateDialog({
                     selectableCandidates.map((c) => (
                       <Label
                         key={c.studentId}
-                        className="flex cursor-pointer items-center gap-2 text-sm font-normal"
+                        className="flex cursor-pointer items-center justify-between gap-2 text-sm font-normal"
                       >
-                        <input
-                          type="checkbox"
-                          className="size-4 rounded border-border accent-primary"
-                          checked={selectedStudentIds.has(c.studentId)}
-                          onChange={() => toggleStudent(c.studentId)}
-                        />
-                        <span className="tabular-nums">{c.studentCode}</span>
-                        <span>{c.studentName}</span>
-                        <span className="text-muted-foreground">({c.gradeClassroom})</span>
+                        <span className="flex items-center gap-2">
+                          <span className="tabular-nums">{c.studentCode}</span>
+                          <span>{c.studentName}</span>
+                          <span className="text-muted-foreground">({c.gradeClassroom})</span>
+                        </span>
+                        <span className="flex items-center gap-1 text-xs text-sky-700">
+                          <input
+                            type="checkbox"
+                            className="size-3.5 rounded border-border accent-sky-600"
+                            checked={reimbursableStudentIds.has(c.studentId)}
+                            onChange={() => toggleReimbursable(c.studentId)}
+                          />
+                          เบิกได้
+                        </span>
                       </Label>
                     ))
                   )}
                 </div>
               </div>
-            ) : null}
+            )}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
