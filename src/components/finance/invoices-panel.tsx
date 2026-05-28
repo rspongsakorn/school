@@ -366,10 +366,10 @@ export function InvoicesPanel() {
                       onChange={(e) => toggleSelectAll(e.target.checked)}
                     />
                   </TableHead>
-                  <TableHead>รหัส</TableHead>
+                  <TableHead className="hidden md:table-cell">รหัส</TableHead>
                   <TableHead>ชื่อ-นามสกุล</TableHead>
-                  <TableHead>ชั้น/ห้อง</TableHead>
-                  <TableHead>ใบแจ้ง</TableHead>
+                  <TableHead className="hidden md:table-cell">ชั้น/ห้อง</TableHead>
+                  <TableHead className="hidden md:table-cell">ใบแจ้ง</TableHead>
                   <TableHead className="text-right">ต้องชำระ</TableHead>
                   <TableHead className="text-right">ค้าง</TableHead>
                   <TableHead>สถานะ</TableHead>
@@ -401,10 +401,10 @@ export function InvoicesPanel() {
                             onChange={(e) => toggleRow(row.id, e.target.checked)}
                           />
                         </TableCell>
-                        <TableCell className="tabular-nums">{row.studentCode}</TableCell>
+                        <TableCell className="hidden tabular-nums md:table-cell">{row.studentCode}</TableCell>
                         <TableCell>{row.studentName}</TableCell>
-                        <TableCell>{row.gradeClassroom}</TableCell>
-                        <TableCell className="max-w-[180px] truncate">{row.invoiceName}</TableCell>
+                        <TableCell className="hidden md:table-cell">{row.gradeClassroom}</TableCell>
+                        <TableCell className="hidden max-w-[180px] truncate md:table-cell">{row.invoiceName}</TableCell>
                         <TableCell className="text-right tabular-nums">
                           {formatBaht(row.totalAmount)}
                         </TableCell>
