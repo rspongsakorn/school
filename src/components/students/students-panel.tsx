@@ -436,7 +436,14 @@ export function StudentsPanel() {
       />
 
       {isAdmin ? (
-        <StudentImportDialog open={importOpen} onOpenChange={setImportOpen} />
+        <StudentImportDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          semesterId={ctx?.semesterId ?? null}
+          semesterLabel={
+            ctx ? `ภาคเรียนที่ ${ctx.semesterNumber}/${ctx.academicYearName}` : null
+          }
+        />
       ) : null}
 
       {isAdmin ? (
