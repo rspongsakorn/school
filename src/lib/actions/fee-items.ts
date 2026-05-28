@@ -15,6 +15,7 @@ export async function createFeeItem(input: {
   name: string;
   description?: string;
   isTuition: boolean;
+  hasReimbursableVariant: boolean;
 }): Promise<ActionState> {
   const auth = await requireAdminAction();
   if (!auth.ok) return auth;
@@ -28,6 +29,7 @@ export async function createFeeItem(input: {
     description: input.description?.trim() || null,
     is_tuition: input.isTuition,
     is_active: true,
+    has_reimbursable_variant: input.hasReimbursableVariant,
   });
 
   if (error) return { ok: false, error: "ไม่สามารถเพิ่มรายการค่าใช้จ่ายได้" };
@@ -43,6 +45,7 @@ export async function updateFeeItem(
     description?: string;
     isTuition: boolean;
     isActive: boolean;
+    hasReimbursableVariant: boolean;
   },
 ): Promise<ActionState> {
   const auth = await requireAdminAction();
@@ -59,6 +62,7 @@ export async function updateFeeItem(
       description: input.description?.trim() || null,
       is_tuition: input.isTuition,
       is_active: input.isActive,
+      has_reimbursable_variant: input.hasReimbursableVariant,
     })
     .eq("id", id);
 
