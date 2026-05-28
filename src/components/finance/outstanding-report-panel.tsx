@@ -33,6 +33,12 @@ const STATUS_ITEMS = [
   { value: "partial", label: "ชำระบางส่วน" },
 ];
 
+const REIMBURSABLE_ITEMS = [
+  { value: "all", label: "ทุกประเภท" },
+  { value: "reimbursable", label: "เบิกได้" },
+  { value: "standard", label: "เบิกไม่ได้" },
+];
+
 export function OutstandingReportPanel() {
   useRequireRole(["admin", "finance", "teacher"]);
 
@@ -48,6 +54,12 @@ export function OutstandingReportPanel() {
   const statusParam =
     rawStatus === "unpaid" || rawStatus === "partial" ? rawStatus : ("all" as const);
 
+  const variantParam = searchParams.get("variant") ?? "all";
+  const variantValue: "all" | "standard" | "reimbursable" =
+    variantParam === "reimbursable" || variantParam === "standard"
+      ? variantParam
+      : "all";
+
   const teacherProfileId = profile?.role === "teacher" ? profile.id : undefined;
 
   const { data: rows = [], isLoading: rowsLoading } = useQuery({
@@ -58,6 +70,7 @@ export function OutstandingReportPanel() {
       gradeParam,
       classroomParam,
       statusParam,
+      variantValue,
       teacherProfileId,
     ],
     queryFn: () =>
@@ -67,6 +80,7 @@ export function OutstandingReportPanel() {
         gradeLevelId: gradeParam !== "all" ? gradeParam : undefined,
         classroomId: classroomParam !== "all" ? classroomParam : undefined,
         status: statusParam,
+        variant: variantValue,
         teacherProfileId,
       }),
     enabled: !!ctx,
@@ -84,7 +98,7 @@ export function OutstandingReportPanel() {
     enabled: !!ctx,
   });
 
-  const params = { grade: gradeParam, classroom: classroomParam, status: statusParam };
+  const params = { grade: gradeParam, classroom: classroomParam, status: statusParam, variant: variantValue };
 
   const pushParams = useCallback(
     (next: Partial<typeof params>) => {
@@ -92,6 +106,7 @@ export function OutstandingReportPanel() {
       const grade = next.grade ?? params.grade;
       const classroom = next.classroom ?? params.classroom;
       const status = next.status ?? params.status;
+      const variant = next.variant ?? params.variant;
 
       if (grade !== "all") query.set("grade", grade);
       else query.delete("grade");
@@ -99,6 +114,8 @@ export function OutstandingReportPanel() {
       else query.delete("classroom");
       if (status !== "all") query.set("status", status);
       else query.delete("status");
+      if (variant !== "all") query.set("variant", variant);
+      else query.delete("variant");
 
       router.push(`${pathname}?${query.toString()}`);
     },
@@ -171,6 +188,22 @@ export function OutstandingReportPanel() {
                 ))}
               </SelectContent>
             </Select>
+            <Select
+              value={params.variant}
+              onValueChange={(v) => pushParams({ variant: (v ?? "all") as typeof params.variant })}
+              items={REIMBURSABLE_ITEMS}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="ประเภท" />
+              </SelectTrigger>
+              <SelectContent>
+                {REIMBURSABLE_ITEMS.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Mobile stacked cards */}
@@ -186,7 +219,12 @@ export function OutstandingReportPanel() {
                 <div key={row.studentId} className="rounded-lg border border-border px-4 py-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="truncate font-medium">{row.studentName}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="truncate font-medium">{row.studentName}</p>
+                        {row.isReimbursable ? (
+                          <Badge className="bg-sky-50 text-sky-700 hover:bg-sky-50">เบิกได้</Badge>
+                        ) : null}
+                      </div>
                       <p className="mt-0.5 text-sm text-muted-foreground">
                         {row.studentCode} · {row.gradeClassroom}
                       </p>
@@ -240,7 +278,14 @@ export function OutstandingReportPanel() {
                   rows.map((row) => (
                     <TableRow key={row.studentId}>
                       <TableCell className="tabular-nums">{row.studentCode}</TableCell>
-                      <TableCell>{row.studentName}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span>{row.studentName}</span>
+                          {row.isReimbursable ? (
+                            <Badge className="bg-sky-50 text-sky-700 hover:bg-sky-50">เบิกได้</Badge>
+                          ) : null}
+                        </div>
+                      </TableCell>
                       <TableCell>{row.gradeClassroom}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatBaht(row.subtotal)}</TableCell>
                       <TableCell className="text-right">{row.discountLabel}</TableCell>

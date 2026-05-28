@@ -13,6 +13,7 @@ export type OutstandingReportRow = {
   paidAmount: number;
   outstanding: number;
   status: "unpaid" | "partial" | "paid";
+  isReimbursable: boolean;
 };
 
 export type CollectionsReportRow = {
@@ -38,6 +39,7 @@ export async function listOutstandingReport(params: {
   gradeLevelId?: string;
   classroomId?: string;
   status?: "unpaid" | "partial" | "paid" | "all";
+  variant?: "standard" | "reimbursable" | "all";
   teacherProfileId?: string;
 }): Promise<OutstandingReportRow[]> {
   const supabase = await createClient();
@@ -99,6 +101,7 @@ export async function listOutstandingReport(params: {
       total_amount,
       paid_amount,
       status,
+      is_reimbursable,
       students!inner ( student_code, first_name, last_name )
     `,
     )
@@ -110,6 +113,12 @@ export async function listOutstandingReport(params: {
     query = query.eq("status", params.status);
   } else {
     query = query.in("status", ["unpaid", "partial"]);
+  }
+
+  if (params.variant === "reimbursable") {
+    query = query.eq("is_reimbursable", true);
+  } else if (params.variant === "standard") {
+    query = query.eq("is_reimbursable", false);
   }
 
   if (allowedStudentIds) {
@@ -126,6 +135,7 @@ export async function listOutstandingReport(params: {
     total_amount: number;
     paid_amount: number;
     status: "unpaid" | "partial" | "paid";
+    is_reimbursable: boolean;
     students: { student_code: string; first_name: string; last_name: string };
   };
 
@@ -143,6 +153,7 @@ export async function listOutstandingReport(params: {
       totalAmount,
       paidAmount,
       outstanding: Math.max(0, round2(totalAmount - paidAmount)),
+      isReimbursable: row.is_reimbursable,
       status: row.status,
     };
   });
