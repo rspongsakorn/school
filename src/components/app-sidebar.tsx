@@ -15,6 +15,8 @@ import {
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { useSidebarContext } from "@/hooks/use-sidebar";
 
 const basicNav = [
   { href: "/", label: "ภาพรวม", icon: LayoutDashboard },
@@ -73,9 +75,9 @@ function NavSection({
   );
 }
 
-export function AppSidebar() {
+function SidebarContent() {
   return (
-    <aside className="fixed left-0 top-0 z-40 flex h-screen w-[260px] flex-col border-r border-border bg-sidebar">
+    <>
       <div className="flex items-center gap-3 border-b border-border px-5 py-5">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
           <GraduationCap className="h-6 w-6 text-primary-foreground" />
@@ -89,6 +91,26 @@ export function AppSidebar() {
         <NavSection title="ข้อมูลพื้นฐาน" items={basicNav} />
         <NavSection title="การเงิน" items={financeNav} />
       </nav>
-    </aside>
+    </>
+  );
+}
+
+export function AppSidebar() {
+  const { isOpen, close } = useSidebarContext();
+
+  return (
+    <>
+      {/* Desktop: fixed sidebar, hidden on mobile */}
+      <aside className="fixed left-0 top-0 z-40 hidden h-screen w-[260px] flex-col border-r border-border bg-sidebar md:flex">
+        <SidebarContent />
+      </aside>
+
+      {/* Mobile: Sheet drawer */}
+      <Sheet open={isOpen} onOpenChange={(open) => { if (!open) close(); }}>
+        <SheetContent side="left" className="w-[260px] p-0" showCloseButton={false}>
+          <SidebarContent />
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }
