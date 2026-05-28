@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -46,9 +47,18 @@ export function ReceiptDialog({ open, onOpenChange, snapshot }: ReceiptDialogPro
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md print:shadow-none">
         <div id="receipt-print-area" className="space-y-4">
-          <DialogHeader className="text-center">
-            <DialogTitle>ใบเสร็จรับเงิน</DialogTitle>
-            <p className="text-sm text-muted-foreground">โรงเรียนตัวอย่าง</p>
+          <DialogHeader className="items-center text-center">
+            <Image
+              src="/logo.png"
+              alt="โรงเรียนบัวใหญ่วิทยา"
+              width={64}
+              height={64}
+              className="mx-auto rounded-full object-cover"
+              priority
+            />
+            <p className="mt-2 text-base font-semibold">โรงเรียนบัวใหญ่วิทยา</p>
+            <p className="text-xs text-muted-foreground">อ.บัวใหญ่ จ.นครราชสีมา</p>
+            <DialogTitle className="mt-2">ใบเสร็จรับเงิน</DialogTitle>
           </DialogHeader>
 
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm">
