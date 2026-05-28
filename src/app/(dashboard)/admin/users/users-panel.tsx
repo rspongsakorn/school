@@ -169,6 +169,7 @@ export function UsersPanel({
     if (!result.ok) { toast.error(result.error); return; }
     toast.success("เปลี่ยนรหัสผ่านแล้ว");
     closeDialog();
+    router.refresh();
   }
 
   async function handleToggleActive(user: UserRow) {
