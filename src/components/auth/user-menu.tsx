@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, User } from "lucide-react";
-import { signOut } from "@/app/login/actions";
+import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/providers/auth-provider";
 import {
   DropdownMenu,
@@ -14,6 +14,12 @@ export function UserMenu() {
   const { profile } = useAuth();
   const displayName = profile?.display_name ?? "ผู้ใช้";
 
+  const handleSignOut = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    window.location.href = "/login";
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium hover:bg-muted">
@@ -24,11 +30,7 @@ export function UserMenu() {
         <ChevronDown className="h-4 w-4 text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem
-          onClick={() => {
-            void signOut();
-          }}
-        >
+        <DropdownMenuItem onClick={() => void handleSignOut()}>
           ออกจากระบบ
         </DropdownMenuItem>
       </DropdownMenuContent>
