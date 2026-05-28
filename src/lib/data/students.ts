@@ -75,20 +75,14 @@ async function loadStudentIdsWithBlockingReferences(studentIds: string[]): Promi
   if (studentIds.length === 0) return new Set();
 
   const supabase = await createClient();
-  const [enrollments, invoices, activePayments] = await Promise.all([
-    supabase.from("student_enrollments").select("student_id").in("student_id", studentIds),
-    supabase.from("student_invoices").select("student_id").in("student_id", studentIds),
-    supabase
-      .from("payments")
-      .select("student_id")
-      .in("student_id", studentIds)
-      .eq("status", "active"),
-  ]);
+  const { data: activePayments } = await supabase
+    .from("payments")
+    .select("student_id")
+    .in("student_id", studentIds)
+    .eq("status", "active");
 
   const blocked = new Set<string>();
-  for (const row of enrollments.data ?? []) blocked.add(row.student_id);
-  for (const row of invoices.data ?? []) blocked.add(row.student_id);
-  for (const row of activePayments.data ?? []) blocked.add(row.student_id);
+  for (const row of activePayments ?? []) blocked.add(row.student_id);
   return blocked;
 }
 

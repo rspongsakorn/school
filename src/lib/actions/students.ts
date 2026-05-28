@@ -549,6 +549,35 @@ async function deleteVoidedPaymentsForStudent(
   return { ok: true };
 }
 
+async function deleteStudentDependents(
+  supabase: SupabaseClient,
+  studentId: string,
+): Promise<ActionState> {
+  // Voided payments + their allocations, voids, receipts
+  const paymentsCleanup = await deleteVoidedPaymentsForStudent(supabase, studentId);
+  if (!paymentsCleanup.ok) return paymentsCleanup;
+
+  // Invoices (invoice_lines cascade via ON DELETE CASCADE)
+  const { error: invoiceError } = await supabase
+    .from("student_invoices")
+    .delete()
+    .eq("student_id", studentId);
+  if (invoiceError) {
+    return { ok: false, error: "ไม่สามารถลบใบแจ้งชำระของนักเรียนได้" };
+  }
+
+  // Enrollments
+  const { error: enrollmentError } = await supabase
+    .from("student_enrollments")
+    .delete()
+    .eq("student_id", studentId);
+  if (enrollmentError) {
+    return { ok: false, error: "ไม่สามารถลบการลงทะเบียนของนักเรียนได้" };
+  }
+
+  return { ok: true };
+}
+
 async function deleteStudentRecord(studentId: string): Promise<ActionState> {
   const counts = await getStudentReferenceCounts(studentId);
   if (!isStudentDeletable(counts)) {
@@ -556,7 +585,7 @@ async function deleteStudentRecord(studentId: string): Promise<ActionState> {
   }
 
   const supabase = await createClient();
-  const cleanup = await deleteVoidedPaymentsForStudent(supabase, studentId);
+  const cleanup = await deleteStudentDependents(supabase, studentId);
   if (!cleanup.ok) return cleanup;
 
   const { error } = await supabase.from("students").delete().eq("id", studentId);
@@ -588,20 +617,15 @@ export async function deleteStudents(studentIds: string[]): Promise<DeleteStuden
   }
 
   const supabase = await createClient();
-  const [enrollments, invoices, activePayments] = await Promise.all([
-    supabase.from("student_enrollments").select("student_id").in("student_id", uniqueIds),
-    supabase.from("student_invoices").select("student_id").in("student_id", uniqueIds),
-    supabase
-      .from("payments")
-      .select("student_id")
-      .in("student_id", uniqueIds)
-      .eq("status", "active"),
-  ]);
+  const { data: activePayments } = await supabase
+    .from("payments")
+    .select("student_id")
+    .in("student_id", uniqueIds)
+    .eq("status", "active");
 
-  const blockedIds = new Set<string>();
-  for (const row of enrollments.data ?? []) blockedIds.add(row.student_id);
-  for (const row of invoices.data ?? []) blockedIds.add(row.student_id);
-  for (const row of activePayments.data ?? []) blockedIds.add(row.student_id);
+  const blockedIds = new Set<string>(
+    (activePayments ?? []).map((row) => row.student_id),
+  );
 
   const deletableIds = uniqueIds.filter((id) => !blockedIds.has(id));
   const skipped = uniqueIds.length - deletableIds.length;
@@ -609,12 +633,12 @@ export async function deleteStudents(studentIds: string[]): Promise<DeleteStuden
   if (deletableIds.length === 0) {
     return {
       ok: false,
-      error: "ไม่สามารถลบได้ — นักเรียนที่เลือกมีประวัติการลงทะเบียนหรือการเงิน",
+      error: "ไม่สามารถลบได้ — นักเรียนที่เลือกมีใบเสร็จที่ยังไม่ยกเลิก",
     };
   }
 
   for (const studentId of deletableIds) {
-    const cleanup = await deleteVoidedPaymentsForStudent(supabase, studentId);
+    const cleanup = await deleteStudentDependents(supabase, studentId);
     if (!cleanup.ok) return cleanup;
 
     const { error } = await supabase.from("students").delete().eq("id", studentId);
