@@ -1,15 +1,14 @@
 export type StudentReferenceCounts = {
-  enrollments: number | null;
+  /** Current enrollment (status='enrolled') — must be removed before delete. */
+  activeEnrollments: number | null;
+  /** Historical invoices — cascade-cleaned on delete, not a blocker. */
   invoices: number | null;
-  /**
-   * Only active (non-voided) payments block delete. Voided payments,
-   * enrollments, and invoices are cascade-cleaned when the student is deleted.
-   */
+  /** Active (non-voided) payments — must be voided before delete. */
   activePayments: number | null;
 };
 
 export function studentHasBlockingReferences(counts: StudentReferenceCounts): boolean {
-  return (counts.activePayments ?? 0) > 0;
+  return (counts.activeEnrollments ?? 0) > 0 || (counts.activePayments ?? 0) > 0;
 }
 
 export function canDeleteStudent(hasBlockingReferences: boolean): boolean {
@@ -18,5 +17,5 @@ export function canDeleteStudent(hasBlockingReferences: boolean): boolean {
 
 export function studentDeleteBlockedReason(hasBlockingReferences: boolean): string | null {
   if (canDeleteStudent(hasBlockingReferences)) return null;
-  return "มีใบเสร็จที่ยังไม่ยกเลิก — ต้องยกเลิกใบเสร็จก่อน";
+  return "นักเรียนยังลงทะเบียนในห้อง หรือมีใบเสร็จที่ยังไม่ยกเลิก";
 }

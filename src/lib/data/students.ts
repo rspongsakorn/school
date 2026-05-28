@@ -75,26 +75,35 @@ async function loadStudentIdsWithBlockingReferences(studentIds: string[]): Promi
   if (studentIds.length === 0) return new Set();
 
   const supabase = await createClient();
-  const { data: activePayments } = await supabase
-    .from("payments")
-    .select("student_id")
-    .in("student_id", studentIds)
-    .eq("status", "active");
+  const [activeEnrollments, activePayments] = await Promise.all([
+    supabase
+      .from("student_enrollments")
+      .select("student_id")
+      .in("student_id", studentIds)
+      .eq("status", "enrolled"),
+    supabase
+      .from("payments")
+      .select("student_id")
+      .in("student_id", studentIds)
+      .eq("status", "active"),
+  ]);
 
   const blocked = new Set<string>();
-  for (const row of activePayments ?? []) blocked.add(row.student_id);
+  for (const row of activeEnrollments.data ?? []) blocked.add(row.student_id);
+  for (const row of activePayments.data ?? []) blocked.add(row.student_id);
   return blocked;
 }
 
 export async function getStudentReferenceCounts(
   studentId: string,
-): Promise<{ enrollments: number; invoices: number; activePayments: number }> {
+): Promise<{ activeEnrollments: number; invoices: number; activePayments: number }> {
   const supabase = await createClient();
-  const [enrollments, invoices, activePayments] = await Promise.all([
+  const [activeEnrollments, invoices, activePayments] = await Promise.all([
     supabase
       .from("student_enrollments")
       .select("id", { count: "exact", head: true })
-      .eq("student_id", studentId),
+      .eq("student_id", studentId)
+      .eq("status", "enrolled"),
     supabase
       .from("student_invoices")
       .select("id", { count: "exact", head: true })
@@ -107,14 +116,14 @@ export async function getStudentReferenceCounts(
   ]);
 
   return {
-    enrollments: enrollments.count ?? 0,
+    activeEnrollments: activeEnrollments.count ?? 0,
     invoices: invoices.count ?? 0,
     activePayments: activePayments.count ?? 0,
   };
 }
 
 export function isStudentDeletable(counts: {
-  enrollments: number;
+  activeEnrollments: number;
   invoices: number;
   activePayments: number;
 }): boolean {

@@ -508,7 +508,7 @@ export async function updateStudent(id: string, input: StudentFormInput): Promis
 }
 
 const STUDENT_DELETE_BLOCKED_MESSAGE =
-  "ไม่สามารถลบได้ — มีประวัติการลงทะเบียน ใบแจ้งชำระ หรือใบเสร็จที่ยังไม่ยกเลิก กรุณาจัดการก่อน";
+  "ไม่สามารถลบได้ — นักเรียนยังลงทะเบียนในห้อง หรือมีใบเสร็จที่ยังไม่ยกเลิก กรุณาจัดการก่อน";
 
 async function deleteVoidedPaymentsForStudent(
   supabase: SupabaseClient,
@@ -617,15 +617,22 @@ export async function deleteStudents(studentIds: string[]): Promise<DeleteStuden
   }
 
   const supabase = await createClient();
-  const { data: activePayments } = await supabase
-    .from("payments")
-    .select("student_id")
-    .in("student_id", uniqueIds)
-    .eq("status", "active");
+  const [activeEnrollments, activePayments] = await Promise.all([
+    supabase
+      .from("student_enrollments")
+      .select("student_id")
+      .in("student_id", uniqueIds)
+      .eq("status", "enrolled"),
+    supabase
+      .from("payments")
+      .select("student_id")
+      .in("student_id", uniqueIds)
+      .eq("status", "active"),
+  ]);
 
-  const blockedIds = new Set<string>(
-    (activePayments ?? []).map((row) => row.student_id),
-  );
+  const blockedIds = new Set<string>();
+  for (const row of activeEnrollments.data ?? []) blockedIds.add(row.student_id);
+  for (const row of activePayments.data ?? []) blockedIds.add(row.student_id);
 
   const deletableIds = uniqueIds.filter((id) => !blockedIds.has(id));
   const skipped = uniqueIds.length - deletableIds.length;
@@ -633,7 +640,7 @@ export async function deleteStudents(studentIds: string[]): Promise<DeleteStuden
   if (deletableIds.length === 0) {
     return {
       ok: false,
-      error: "ไม่สามารถลบได้ — นักเรียนที่เลือกมีใบเสร็จที่ยังไม่ยกเลิก",
+      error: "ไม่สามารถลบได้ — นักเรียนยังลงทะเบียนในห้อง หรือมีใบเสร็จที่ยังไม่ยกเลิก",
     };
   }
 
