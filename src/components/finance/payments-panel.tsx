@@ -34,7 +34,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ReceiptDialog } from "@/components/finance/receipt-dialog";
 import { AppHeader } from "@/components/app-header";
 import { useRequireRole } from "@/components/providers/auth-provider";
 import { useSemesterContext } from "@/hooks/use-semester-context";
@@ -86,10 +85,6 @@ export function PaymentsPanel() {
   const [transferRef, setTransferRef] = useState("");
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [receiptSnapshot, setReceiptSnapshot] = useState<Record<string, unknown> | null>(
-    null,
-  );
-  const [receiptOpen, setReceiptOpen] = useState(false);
   const [voidTarget, setVoidTarget] = useState<PaymentListRow | null>(null);
   const [voidReason, setVoidReason] = useState("");
   const [voiding, setVoiding] = useState(false);
@@ -243,8 +238,7 @@ export function PaymentsPanel() {
     }
 
     toast.success("บันทึกการชำระและออกใบเสร็จแล้ว");
-    setReceiptSnapshot(result.snapshot);
-    setReceiptOpen(true);
+    window.open(`/receipts/${result.paymentId}`, "_blank", "noopener,noreferrer");
     setSelectedStudent(null);
     setOutstanding([]);
     setAmount("");
@@ -268,15 +262,6 @@ export function PaymentsPanel() {
 
     toast.success("ยกเลิกใบเสร็จแล้ว");
     router.refresh();
-  }
-
-  function openReprint(payment: PaymentListRow) {
-    if (!payment.snapshot) {
-      toast.error("ไม่พบข้อมูลใบเสร็จ");
-      return;
-    }
-    setReceiptSnapshot(payment.snapshot);
-    setReceiptOpen(true);
   }
 
   const isLoading = ctxLoading || paymentsLoading;
@@ -560,14 +545,11 @@ export function PaymentsPanel() {
                           </div>
                         </div>
                         <div className="flex justify-end gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openReprint(p)}
-                          >
-                            พิมพ์ซ้ำ
-                          </Button>
+                          <a href={`/receipts/${p.id}`} target="_blank" rel="noopener noreferrer">
+                            <Button type="button" size="sm" variant="outline">
+                              ใบเสร็จ
+                            </Button>
+                          </a>
                           {p.status === "active" ? (
                             <Button
                               type="button"
@@ -633,14 +615,11 @@ export function PaymentsPanel() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openReprint(p)}
-                                >
-                                  พิมพ์ซ้ำ
-                                </Button>
+                                <a href={`/receipts/${p.id}`} target="_blank" rel="noopener noreferrer">
+                                  <Button type="button" size="sm" variant="outline">
+                                    ใบเสร็จ
+                                  </Button>
+                                </a>
                                 {p.status === "active" ? (
                                   <Button
                                     type="button"
@@ -663,12 +642,6 @@ export function PaymentsPanel() {
               </CardContent>
             </Card>
           </div>
-
-          <ReceiptDialog
-            open={receiptOpen}
-            onOpenChange={setReceiptOpen}
-            snapshot={receiptSnapshot}
-          />
 
           <AlertDialog open={Boolean(voidTarget)} onOpenChange={(o) => !o && setVoidTarget(null)}>
             <AlertDialogContent>
