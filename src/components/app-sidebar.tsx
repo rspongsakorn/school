@@ -108,7 +108,9 @@ export function AppSidebar() {
       {/* Mobile: Sheet drawer */}
       <Sheet open={isOpen} onOpenChange={(open) => { if (!open) close(); }}>
         <SheetContent side="left" className="w-[260px] p-0" showCloseButton={false}>
-          <SidebarContent />
+          <div className="flex h-full flex-col">
+            <SidebarContent />
+          </div>
         </SheetContent>
       </Sheet>
     </>

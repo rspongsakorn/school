@@ -24,6 +24,7 @@ export function AppHeader({ title, basePath, clearGradeClassroomOnChange = false
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card px-6">
       <div className="flex items-center">
         <button
+          type="button"
           className="-ml-1 mr-3 flex h-8 w-8 items-center justify-center rounded-md text-foreground hover:bg-accent md:hidden"
           onClick={open}
           aria-label="เปิดเมนู"
