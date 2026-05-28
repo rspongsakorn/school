@@ -4,7 +4,11 @@ ALTER TABLE public.fee_items
 
 -- fee_rates: optional reimbursable price (nullable, fallback to amount)
 ALTER TABLE public.fee_rates
-  ADD COLUMN amount_reimbursable numeric(10,2);
+  ADD COLUMN amount_reimbursable numeric(12,2);
+
+ALTER TABLE public.fee_rates
+  ADD CONSTRAINT fee_rates_amount_reimbursable_non_negative
+    CHECK (amount_reimbursable IS NULL OR amount_reimbursable >= 0);
 
 -- student_invoices: per-invoice variant flag
 ALTER TABLE public.student_invoices
