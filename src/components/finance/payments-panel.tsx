@@ -238,7 +238,14 @@ export function PaymentsPanel() {
     }
 
     toast.success("บันทึกการชำระและออกใบเสร็จแล้ว");
-    window.open(`/receipts/${result.paymentId}`, "_blank", "noopener,noreferrer");
+    const receiptUrl = `/receipts/${result.paymentId}`;
+    const w = window.open(receiptUrl, "_blank", "noopener,noreferrer");
+    if (!w) {
+      toast.warning("ป๊อปอัปถูกบล็อก — คลิกเพื่อเปิดใบเสร็จ", {
+        action: { label: "เปิดใบเสร็จ", onClick: () => window.open(receiptUrl, "_blank", "noopener,noreferrer") },
+        duration: 10000,
+      });
+    }
     setSelectedStudent(null);
     setOutstanding([]);
     setAmount("");
