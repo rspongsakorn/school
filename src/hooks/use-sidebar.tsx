@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, startTransition, useContext, useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 
 type SidebarContextValue = {
@@ -17,7 +17,9 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
   useEffect(() => {
-    setIsOpen(false)
+    startTransition(() => {
+      setIsOpen(false)
+    })
   }, [pathname])
 
   return (
