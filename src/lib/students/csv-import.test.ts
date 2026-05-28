@@ -6,6 +6,7 @@ import {
   parseCsvText,
   parseThaiBirthdateShort,
   validateAndBuildImportRows,
+  type ImportStudentRow,
 } from "@/lib/students/csv-import";
 
 describe("parseCsvText", () => {
@@ -73,6 +74,7 @@ describe("validateAndBuildImportRows", () => {
     const result = validateAndBuildImportRows([baseRow], new Set());
     expect(result.ready).toHaveLength(1);
     expect(result.ready[0].studentCode).toBe("12390");
+    expect(result.ready[0].classroom).toBeNull();
     expect(result.errors).toHaveLength(0);
   });
 
@@ -90,6 +92,7 @@ describe("validateAndBuildImportRows", () => {
       gender: "male" as const,
       dateOfBirth: "2012-04-21",
       idCard: null,
+      classroom: null,
     };
     const csvRow = importRowToCsvInput(row, 2);
     const result = validateAndBuildImportRows([csvRow], new Set());
@@ -106,6 +109,59 @@ describe("validateAndBuildImportRows", () => {
     expect(result.ready).toHaveLength(1);
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0].message).toMatch(/ซ้ำในไฟล์/);
+  });
+
+  it("captures valid classroom from row", () => {
+    const result = validateAndBuildImportRows(
+      [{ ...baseRow, classroom: "ม.2/1" }],
+      new Set(),
+    );
+    expect(result.ready).toHaveLength(1);
+    expect(result.ready[0].classroom).toEqual({
+      gradeName: "ม.2",
+      classroomNumber: "1",
+    });
+  });
+
+  it("treats empty classroom as null", () => {
+    const result = validateAndBuildImportRows(
+      [{ ...baseRow, classroom: "" }],
+      new Set(),
+    );
+    expect(result.ready[0].classroom).toBeNull();
+  });
+
+  it("treats omitted classroom field as null", () => {
+    const result = validateAndBuildImportRows([baseRow], new Set());
+    expect(result.ready[0].classroom).toBeNull();
+  });
+
+  it("errors on classroom parse failure", () => {
+    const result = validateAndBuildImportRows(
+      [{ ...baseRow, classroom: "ม.2" }],
+      new Set(),
+    );
+    expect(result.ready).toHaveLength(0);
+    expect(result.errors[0].message).toMatch(/ห้องเรียน/);
+  });
+
+  it("re-validates classroom round-trip via importRowToCsvInput", () => {
+    const row: ImportStudentRow = {
+      studentCode: "12390",
+      firstName: "ทดสอบ",
+      lastName: "นามสกุล",
+      gender: "male" as const,
+      dateOfBirth: "2012-04-21",
+      idCard: null,
+      classroom: { gradeName: "ม.2", classroomNumber: "1" },
+    };
+    const csvRow = importRowToCsvInput(row, 2);
+    expect(csvRow.classroom).toBe("ม.2/1");
+    const result = validateAndBuildImportRows([csvRow], new Set());
+    expect(result.ready[0].classroom).toEqual({
+      gradeName: "ม.2",
+      classroomNumber: "1",
+    });
   });
 });
 
