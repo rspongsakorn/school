@@ -339,7 +339,7 @@ export async function confirmStudentCsvImport(
         const { error: classroomError } = await supabase
           .from("classrooms")
           .upsert(inserts, {
-            onConflict: "grade_level_id,name",
+            onConflict: "semester_id,grade_level_id,name",
             ignoreDuplicates: true,
           });
         if (classroomError) {
