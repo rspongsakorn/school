@@ -8,6 +8,7 @@ const thaiDateFormatterLong = new Intl.DateTimeFormat("th-TH", {
   day: "numeric",
   month: "long",
   year: "numeric",
+  timeZone: "Asia/Bangkok",
 });
 
 export function formatBaht(amount: number) {
