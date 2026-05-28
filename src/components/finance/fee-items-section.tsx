@@ -56,6 +56,7 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
   const [description, setDescription] = useState("");
   const [isTuition, setIsTuition] = useState(false);
   const [isActive, setIsActive] = useState(true);
+  const [hasReimbursableVariant, setHasReimbursableVariant] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Delete state
@@ -78,6 +79,7 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
     setDescription("");
     setIsTuition(false);
     setIsActive(true);
+    setHasReimbursableVariant(false);
     setDialogOpen(true);
   }
 
@@ -88,6 +90,7 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
     setDescription(item.description ?? "");
     setIsTuition(item.isTuition);
     setIsActive(item.isActive);
+    setHasReimbursableVariant(item.hasReimbursableVariant);
     setDialogOpen(true);
   }
 
@@ -96,12 +99,13 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
     setSubmitting(true);
     const result =
       mode === "create"
-        ? await createFeeItem({ name, description, isTuition })
+        ? await createFeeItem({ name, description, isTuition, hasReimbursableVariant })
         : await updateFeeItem(editTarget!.id, {
             name,
             description,
             isTuition,
             isActive,
+            hasReimbursableVariant,
           });
     setSubmitting(false);
 
@@ -286,11 +290,16 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
                             </TableCell>
                             <TableCell className="font-medium">{item.name}</TableCell>
                             <TableCell>
-                              {item.isTuition ? (
-                                <Badge variant="secondary">ค่าเทอมหลัก</Badge>
-                              ) : (
-                                <span className="text-muted-foreground">รายการเพิ่มเติม</span>
-                              )}
+                              <div className="flex flex-wrap items-center gap-1">
+                                {item.isTuition ? (
+                                  <Badge variant="secondary">ค่าเทอมหลัก</Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">รายการเพิ่มเติม</span>
+                                )}
+                                {item.hasReimbursableVariant ? (
+                                  <Badge className="bg-sky-50 text-sky-700 hover:bg-sky-50">2 ราคา</Badge>
+                                ) : null}
+                              </div>
                             </TableCell>
                             <TableCell>
                               {item.isActive ? (
@@ -373,6 +382,15 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
                   onChange={(e) => setIsTuition(e.target.checked)}
                 />
                 เป็นค่าเทอมหลัก
+              </Label>
+              <Label className="flex w-fit cursor-pointer items-center gap-3">
+                <input
+                  type="checkbox"
+                  className="size-4 rounded border-border accent-primary"
+                  checked={hasReimbursableVariant}
+                  onChange={(e) => setHasReimbursableVariant(e.target.checked)}
+                />
+                มีราคาเบิกได้แยก
               </Label>
               {mode === "edit" ? (
                 <Label className="flex w-fit cursor-pointer items-center gap-3">
