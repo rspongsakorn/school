@@ -45,7 +45,7 @@ function NavSection({
 
   return (
     <div className="mb-6">
-      <h3 className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+      <h3 className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-sidebar-accent-foreground/60">
         {title}
       </h3>
       <ul className="space-y-1">
@@ -60,7 +60,7 @@ function NavSection({
                 className={cn(
                   "flex h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
                   active
-                    ? "bg-primary text-primary-foreground"
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground"
                     : "text-sidebar-foreground hover:bg-sidebar-accent",
                 )}
               >
@@ -78,7 +78,7 @@ function NavSection({
 function SidebarContent() {
   return (
     <>
-      <div className="flex items-center gap-3 border-b border-border px-4 py-4">
+      <div className="flex items-center gap-3 border-b border-sidebar-border px-4 py-4">
         <Image
           src="/logo.png"
           alt="โรงเรียนบัวใหญ่วิทยา"
@@ -88,10 +88,10 @@ function SidebarContent() {
           priority
         />
         <div className="flex min-w-0 flex-col gap-0.5">
-          <span className="truncate text-sm font-semibold leading-tight text-foreground">
+          <span className="truncate text-sm font-semibold leading-tight text-sidebar-foreground">
             โรงเรียนบัวใหญ่วิทยา
           </span>
-          <span className="truncate text-xs leading-tight text-muted-foreground">
+          <span className="truncate text-xs leading-tight text-sidebar-accent-foreground/60">
             อ.บัวใหญ่ จ.นครราชสีมา
           </span>
         </div>
@@ -110,13 +110,13 @@ export function AppSidebar() {
   return (
     <>
       {/* Desktop: fixed sidebar, hidden on mobile */}
-      <aside className="fixed left-0 top-0 z-40 hidden h-screen w-[260px] flex-col border-r border-border bg-sidebar lg:flex">
+      <aside className="fixed left-0 top-0 z-40 hidden h-screen w-[260px] flex-col border-r border-sidebar-border bg-sidebar lg:flex">
         <SidebarContent />
       </aside>
 
       {/* Mobile: Sheet drawer */}
       <Sheet open={isOpen} onOpenChange={(open) => { if (!open) close(); }}>
-        <SheetContent side="left" className="w-[260px] p-0" showCloseButton={false}>
+        <SheetContent side="left" className="w-[260px] bg-sidebar p-0" showCloseButton={false}>
           <div className="flex h-full flex-col">
             <SidebarContent />
           </div>
