@@ -187,8 +187,21 @@ export async function previewStudentCsvImport(
   }
 }
 
+async function getSemesterAcademicYearId(
+  supabase: SupabaseClient,
+  semesterId: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from("semesters")
+    .select("academic_year_id")
+    .eq("id", semesterId)
+    .maybeSingle();
+  return data?.academic_year_id ?? null;
+}
+
 export async function confirmStudentCsvImport(
   rows: ImportStudentRow[],
+  semesterId: string | null,
 ): Promise<ConfirmStudentCsvImportResult> {
   const auth = await requireAdminAction();
   if (!auth.ok) return auth;
@@ -214,7 +227,142 @@ export async function confirmStudentCsvImport(
       return { ok: true, imported: 0, errors };
     }
 
+    const rowsWithClassroom = ready.filter((r) => r.classroom != null);
+    if (rowsWithClassroom.length > 0 && !semesterId) {
+      return {
+        ok: false,
+        error: "ต้องตั้งภาคเรียนปัจจุบันก่อนใช้คอลัมน์ classroom",
+      };
+    }
+
     const supabase = await createClient();
+
+    // Step A — ensure grade_levels exist
+    const gradeNameToId = new Map<string, string>();
+    let academicYearId: string | null = null;
+
+    if (semesterId && rowsWithClassroom.length > 0) {
+      academicYearId = await getSemesterAcademicYearId(supabase, semesterId);
+      if (!academicYearId) {
+        return { ok: false, error: "ไม่พบภาคเรียน" };
+      }
+
+      const { data: existingGrades } = await supabase
+        .from("grade_levels")
+        .select("id, name")
+        .eq("semester_id", semesterId);
+      for (const row of existingGrades ?? []) {
+        gradeNameToId.set(row.name, row.id);
+      }
+
+      const missingGradeNames = new Set<string>();
+      for (const row of rowsWithClassroom) {
+        if (row.classroom && !gradeNameToId.has(row.classroom.gradeName)) {
+          missingGradeNames.add(row.classroom.gradeName);
+        }
+      }
+
+      if (missingGradeNames.size > 0) {
+        const inserts = [...missingGradeNames].map((name) => ({
+          semester_id: semesterId,
+          academic_year_id: academicYearId!,
+          name,
+          sort_order: 0,
+        }));
+        const { error: gradeError } = await supabase
+          .from("grade_levels")
+          .upsert(inserts, {
+            onConflict: "semester_id,name",
+            ignoreDuplicates: true,
+          });
+        if (gradeError) {
+          return { ok: false, error: "ไม่สามารถสร้างชั้นเรียนได้" };
+        }
+
+        const { data: refreshedGrades } = await supabase
+          .from("grade_levels")
+          .select("id, name")
+          .eq("semester_id", semesterId);
+        gradeNameToId.clear();
+        for (const row of refreshedGrades ?? []) {
+          gradeNameToId.set(row.name, row.id);
+        }
+      }
+    }
+
+    // Step B — ensure classrooms exist
+    const classroomKeyToId = new Map<string, string>(); // gradeName|number -> id
+
+    if (semesterId && rowsWithClassroom.length > 0) {
+      const gradeIds = [...gradeNameToId.values()];
+      if (gradeIds.length > 0) {
+        const { data: existingClassrooms } = await supabase
+          .from("classrooms")
+          .select("id, name, grade_level_id")
+          .in("grade_level_id", gradeIds);
+        const gradeIdToName = new Map<string, string>();
+        for (const [name, id] of gradeNameToId) gradeIdToName.set(id, name);
+        for (const row of existingClassrooms ?? []) {
+          const gradeName = gradeIdToName.get(row.grade_level_id);
+          if (!gradeName) continue;
+          classroomKeyToId.set(`${gradeName}|${row.name}`, row.id);
+        }
+      }
+
+      const missingClassroomEntries: Array<{
+        gradeName: string;
+        classroomNumber: string;
+        gradeLevelId: string;
+      }> = [];
+      const seenMissing = new Set<string>();
+      for (const row of rowsWithClassroom) {
+        if (!row.classroom) continue;
+        const key = `${row.classroom.gradeName}|${row.classroom.classroomNumber}`;
+        if (classroomKeyToId.has(key) || seenMissing.has(key)) continue;
+        const gradeLevelId = gradeNameToId.get(row.classroom.gradeName);
+        if (!gradeLevelId) continue;
+        missingClassroomEntries.push({
+          gradeName: row.classroom.gradeName,
+          classroomNumber: row.classroom.classroomNumber,
+          gradeLevelId,
+        });
+        seenMissing.add(key);
+      }
+
+      if (missingClassroomEntries.length > 0) {
+        const inserts = missingClassroomEntries.map((e) => ({
+          semester_id: semesterId,
+          academic_year_id: academicYearId!,
+          grade_level_id: e.gradeLevelId,
+          name: e.classroomNumber,
+        }));
+        const { error: classroomError } = await supabase
+          .from("classrooms")
+          .upsert(inserts, {
+            onConflict: "grade_level_id,name",
+            ignoreDuplicates: true,
+          });
+        if (classroomError) {
+          return { ok: false, error: "ไม่สามารถสร้างห้องเรียนได้" };
+        }
+
+        const gradeIds2 = [...gradeNameToId.values()];
+        const { data: refreshedClassrooms } = await supabase
+          .from("classrooms")
+          .select("id, name, grade_level_id")
+          .in("grade_level_id", gradeIds2);
+        const gradeIdToName2 = new Map<string, string>();
+        for (const [name, id] of gradeNameToId) gradeIdToName2.set(id, name);
+        classroomKeyToId.clear();
+        for (const row of refreshedClassrooms ?? []) {
+          const gradeName = gradeIdToName2.get(row.grade_level_id);
+          if (!gradeName) continue;
+          classroomKeyToId.set(`${gradeName}|${row.name}`, row.id);
+        }
+      }
+    }
+
+    // Step C — insert students (chunked) and collect ids
     const inserts = ready.map((row) => ({
       student_code: row.studentCode,
       first_name: row.firstName,
@@ -225,15 +373,61 @@ export async function confirmStudentCsvImport(
       status: "active" as const,
     }));
 
+    const studentCodeToId = new Map<string, string>();
     for (let offset = 0; offset < inserts.length; offset += INSERT_CHUNK_SIZE) {
       const chunk = inserts.slice(offset, offset + INSERT_CHUNK_SIZE);
-      const { error } = await supabase.from("students").insert(chunk);
-      if (error) {
+      const { data, error } = await supabase
+        .from("students")
+        .insert(chunk)
+        .select("id, student_code");
+      if (error || !data) {
         return { ok: false, error: "ไม่สามารถนำเข้านักเรียนได้" };
+      }
+      for (const row of data) {
+        studentCodeToId.set(row.student_code, row.id);
+      }
+    }
+
+    // Step D — insert student_enrollments for rows that carry classroom
+    if (semesterId && rowsWithClassroom.length > 0) {
+      const enrollmentInserts: Array<{
+        student_id: string;
+        classroom_id: string;
+        academic_year_id: string;
+        semester_id: string;
+        status: "enrolled";
+      }> = [];
+      for (const row of rowsWithClassroom) {
+        if (!row.classroom) continue;
+        const studentId = studentCodeToId.get(row.studentCode);
+        if (!studentId) continue;
+        const classroomId = classroomKeyToId.get(
+          `${row.classroom.gradeName}|${row.classroom.classroomNumber}`,
+        );
+        if (!classroomId) continue;
+        enrollmentInserts.push({
+          student_id: studentId,
+          classroom_id: classroomId,
+          academic_year_id: academicYearId!,
+          semester_id: semesterId,
+          status: "enrolled",
+        });
+      }
+
+      for (let offset = 0; offset < enrollmentInserts.length; offset += INSERT_CHUNK_SIZE) {
+        const chunk = enrollmentInserts.slice(offset, offset + INSERT_CHUNK_SIZE);
+        const { error } = await supabase.from("student_enrollments").insert(chunk);
+        if (error) {
+          return {
+            ok: false,
+            error: "นำเข้านักเรียนสำเร็จ แต่ลงทะเบียนเข้าห้องไม่สำเร็จ กรุณาลงทะเบียนเองในหน้า registration",
+          };
+        }
       }
     }
 
     revalidatePath("/students");
+    revalidatePath("/registration");
     return { ok: true, imported: ready.length, errors };
   } catch {
     return { ok: false, error: "ไม่สามารถนำเข้านักเรียนได้" };
