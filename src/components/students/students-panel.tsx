@@ -287,9 +287,9 @@ export function StudentsPanel() {
                             />
                           </TableHead>
                         ) : null}
-                        <TableHead>รหัส</TableHead>
+                        <TableHead className="hidden md:table-cell">รหัส</TableHead>
                         <TableHead>ชื่อ-นามสกุล</TableHead>
-                        <TableHead>เลขบัตร</TableHead>
+                        <TableHead className="hidden md:table-cell">เลขบัตร</TableHead>
                         <TableHead>ชั้น</TableHead>
                         <TableHead>สถานะ</TableHead>
                         {isAdmin ? <TableHead className="w-[100px]" /> : null}
@@ -327,9 +327,9 @@ export function StudentsPanel() {
                                   />
                                 </TableCell>
                               ) : null}
-                              <TableCell className="font-medium tabular-nums">{student.studentCode}</TableCell>
+                              <TableCell className="hidden font-medium tabular-nums md:table-cell">{student.studentCode}</TableCell>
                               <TableCell>{student.name}</TableCell>
-                              <TableCell>{student.idCard ?? "—"}</TableCell>
+                              <TableCell className="hidden md:table-cell">{student.idCard ?? "—"}</TableCell>
                               <TableCell>{student.grade}</TableCell>
                               <TableCell>
                                 <Badge className={statusBadgeClass(student.statusRaw)}>
