@@ -35,9 +35,14 @@ async function fetchStudentGradeMap(semesterId: string): Promise<Map<string, str
 async function fetchBlockedStudentIds(studentIds: string[]): Promise<Set<string>> {
   if (studentIds.length === 0) return new Set();
   const supabase = createClient();
-  const [enrollments, invoices, payments] = await Promise.all([
-    supabase.from("student_enrollments").select("student_id").in("student_id", studentIds),
-    supabase.from("student_invoices").select("student_id").in("student_id", studentIds),
+  // Block if currently enrolled (must unenroll first) or has an active payment
+  // (must void receipt first). Invoices + voided payments are cascade-cleaned.
+  const [activeEnrollments, activePayments] = await Promise.all([
+    supabase
+      .from("student_enrollments")
+      .select("student_id")
+      .in("student_id", studentIds)
+      .eq("status", "enrolled"),
     supabase
       .from("payments")
       .select("student_id")
@@ -45,9 +50,8 @@ async function fetchBlockedStudentIds(studentIds: string[]): Promise<Set<string>
       .eq("status", "active"),
   ]);
   const blocked = new Set<string>();
-  for (const r of enrollments.data ?? []) blocked.add(r.student_id);
-  for (const r of invoices.data ?? []) blocked.add(r.student_id);
-  for (const r of payments.data ?? []) blocked.add(r.student_id);
+  for (const r of activeEnrollments.data ?? []) blocked.add(r.student_id);
+  for (const r of activePayments.data ?? []) blocked.add(r.student_id);
   return blocked;
 }
 

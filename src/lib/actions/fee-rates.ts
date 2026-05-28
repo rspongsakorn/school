@@ -10,6 +10,7 @@ export type FeeRateUpsertEntry = {
   gradeLevelId: string;
   feeItemId: string;
   amount: number;
+  amountReimbursable: number | null;
 };
 
 function revalidateFeePaths() {
@@ -42,6 +43,9 @@ export async function upsertFeeRates(
     if (entry.amount < 0) {
       return { ok: false, error: "จำนวนเงินต้องไม่ติดลบ" };
     }
+    if (entry.amountReimbursable != null && entry.amountReimbursable < 0) {
+      return { ok: false, error: "ราคาเบิกได้ต้องไม่ติดลบ" };
+    }
 
     const { error } = await supabase.from("fee_rates").upsert(
       {
@@ -50,6 +54,7 @@ export async function upsertFeeRates(
         grade_level_id: entry.gradeLevelId,
         fee_item_id: entry.feeItemId,
         amount: entry.amount,
+        amount_reimbursable: entry.amountReimbursable,
         receipt_type_id: receiptTypeId,
       },
       { onConflict: "academic_year_id,semester_id,grade_level_id,fee_item_id" },

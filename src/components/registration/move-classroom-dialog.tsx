@@ -53,6 +53,11 @@ export function MoveClassroomDialog({
     return acc;
   }, new Map());
 
+  const selectItems = classrooms.map((room) => ({
+    value: room.id,
+    label: `${room.grade_name}/${room.name}`,
+  }));
+
   useEffect(() => {
     if (!open) return;
     const firstOther = classrooms.find((c) => c.id !== currentClassroomId);
@@ -98,6 +103,7 @@ export function MoveClassroomDialog({
               <Select
                 value={selectedId}
                 onValueChange={(value) => value && setSelectedId(value)}
+                items={selectItems}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="เลือกห้องเรียน" />

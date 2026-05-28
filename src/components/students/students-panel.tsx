@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -63,6 +63,7 @@ function statusBadgeClass(status: StudentStatus) {
 
 export function StudentsPanel() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const pathname = usePathname();
   const rawSearchParams = useSearchParams();
   const { profile } = useAuth();
@@ -178,6 +179,10 @@ export function StudentsPanel() {
     } else {
       toast.success(`ลบนักเรียนแล้ว ${result.deleted} คน`);
     }
+    void queryClient.invalidateQueries({ queryKey: ["students"] });
+    void queryClient.invalidateQueries({ queryKey: ["enrollment-candidates"] });
+    void queryClient.invalidateQueries({ queryKey: ["classroom-roster"] });
+    void queryClient.invalidateQueries({ queryKey: ["classrooms-by-grade"] });
     router.refresh();
   }
 
@@ -436,7 +441,14 @@ export function StudentsPanel() {
       />
 
       {isAdmin ? (
-        <StudentImportDialog open={importOpen} onOpenChange={setImportOpen} />
+        <StudentImportDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          semesterId={ctx?.semesterId ?? null}
+          semesterLabel={
+            ctx ? `ภาคเรียนที่ ${ctx.semesterNumber}/${ctx.academicYearName}` : null
+          }
+        />
       ) : null}
 
       {isAdmin ? (

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
@@ -46,7 +47,14 @@ type FeeItemsSectionProps = {
 
 export function FeeItemsSection({ items }: FeeItemsSectionProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [localItems, setLocalItems] = useState<FeeItemRow[]>(items);
+
+  function refreshLists() {
+    queryClient.invalidateQueries({ queryKey: ["fee-items"] });
+    queryClient.invalidateQueries({ queryKey: ["fee-rate-matrix"] });
+    router.refresh();
+  }
 
   // Edit/Create state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -56,6 +64,7 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
   const [description, setDescription] = useState("");
   const [isTuition, setIsTuition] = useState(false);
   const [isActive, setIsActive] = useState(true);
+  const [hasReimbursableVariant, setHasReimbursableVariant] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Delete state
@@ -78,6 +87,7 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
     setDescription("");
     setIsTuition(false);
     setIsActive(true);
+    setHasReimbursableVariant(false);
     setDialogOpen(true);
   }
 
@@ -88,6 +98,7 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
     setDescription(item.description ?? "");
     setIsTuition(item.isTuition);
     setIsActive(item.isActive);
+    setHasReimbursableVariant(item.hasReimbursableVariant);
     setDialogOpen(true);
   }
 
@@ -96,12 +107,13 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
     setSubmitting(true);
     const result =
       mode === "create"
-        ? await createFeeItem({ name, description, isTuition })
+        ? await createFeeItem({ name, description, isTuition, hasReimbursableVariant })
         : await updateFeeItem(editTarget!.id, {
             name,
             description,
             isTuition,
             isActive,
+            hasReimbursableVariant,
           });
     setSubmitting(false);
 
@@ -112,7 +124,7 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
 
     toast.success(mode === "create" ? "เพิ่มรายการแล้ว" : "บันทึกรายการแล้ว");
     setDialogOpen(false);
-    router.refresh();
+    refreshLists();
   }
 
   // --- Delete handlers ---
@@ -175,7 +187,7 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
     }
 
     setDeleteDialogOpen(false);
-    router.refresh();
+    refreshLists();
   }
 
   // --- DnD handler ---
@@ -286,11 +298,16 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
                             </TableCell>
                             <TableCell className="font-medium">{item.name}</TableCell>
                             <TableCell>
-                              {item.isTuition ? (
-                                <Badge variant="secondary">ค่าเทอมหลัก</Badge>
-                              ) : (
-                                <span className="text-muted-foreground">รายการเพิ่มเติม</span>
-                              )}
+                              <div className="flex flex-wrap items-center gap-1">
+                                {item.isTuition ? (
+                                  <Badge variant="secondary">ค่าเทอมหลัก</Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">รายการเพิ่มเติม</span>
+                                )}
+                                {item.hasReimbursableVariant ? (
+                                  <Badge className="bg-sky-50 text-sky-700 hover:bg-sky-50">2 ราคา</Badge>
+                                ) : null}
+                              </div>
                             </TableCell>
                             <TableCell>
                               {item.isActive ? (
@@ -373,6 +390,15 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
                   onChange={(e) => setIsTuition(e.target.checked)}
                 />
                 เป็นค่าเทอมหลัก
+              </Label>
+              <Label className="flex w-fit cursor-pointer items-center gap-3">
+                <input
+                  type="checkbox"
+                  className="size-4 rounded border-border accent-primary"
+                  checked={hasReimbursableVariant}
+                  onChange={(e) => setHasReimbursableVariant(e.target.checked)}
+                />
+                มีราคาเบิกได้แยก
               </Label>
               {mode === "edit" ? (
                 <Label className="flex w-fit cursor-pointer items-center gap-3">

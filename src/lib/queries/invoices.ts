@@ -18,6 +18,7 @@ export type InvoiceListRow = {
   status: InvoiceStatus;
   discountType: "percent" | "fixed" | null;
   discountValue: number | null;
+  isReimbursable: boolean;
   createdAt: string;
   hasActivePaymentAllocation: boolean;
 };
@@ -149,6 +150,7 @@ export async function fetchInvoicesPaginated(params: {
       status,
       discount_type,
       discount_value,
+      is_reimbursable,
       created_at,
       students!inner ( student_code, first_name, last_name )
     `,
@@ -190,6 +192,7 @@ export async function fetchInvoicesPaginated(params: {
     status: InvoiceStatus;
     discount_type: "percent" | "fixed" | null;
     discount_value: number | null;
+    is_reimbursable: boolean;
     created_at: string;
     students: { student_code: string; first_name: string; last_name: string };
   };
@@ -214,6 +217,7 @@ export async function fetchInvoicesPaginated(params: {
       status: row.status,
       discountType: row.discount_type,
       discountValue: row.discount_value != null ? Number(row.discount_value) : null,
+      isReimbursable: row.is_reimbursable,
       createdAt: row.created_at,
       hasActivePaymentAllocation: activeAllocationInvoiceIds.has(row.id),
     };

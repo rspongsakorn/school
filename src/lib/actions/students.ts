@@ -23,23 +23,38 @@ import { formatThaiBirthDate } from "@/lib/students/dates";
 import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type ImportStudentPreview = {
-  studentCode: string;
-  idCard: string | null;
-  name: string;
-  genderLabel: string;
-  birthDateLabel: string;
+export type ImportNewClassroom = {
+  gradeName: string;
+  number: string;
+  gradeIsNew: boolean;
 };
 
 export type PreviewStudentCsvImportResult =
   | { ok: false; error: string }
   | {
       ok: true;
-      stats: { ready: number; errors: number };
+      stats: {
+        ready: number;
+        errors: number;
+        willEnroll: number;
+        willCreateGrades: number;
+        willCreateClassrooms: number;
+      };
       ready: ImportStudentRow[];
       preview: ImportStudentPreview[];
       errors: ImportRowError[];
+      newGradeLevels: { name: string }[];
+      newClassrooms: ImportNewClassroom[];
     };
+
+export type ImportStudentPreview = {
+  studentCode: string;
+  idCard: string | null;
+  name: string;
+  genderLabel: string;
+  birthDateLabel: string;
+  classroomLabel: string | null;
+};
 
 export type ConfirmStudentCsvImportResult =
   | { ok: false; error: string }
@@ -64,6 +79,7 @@ async function loadExistingStudentCodes(codes: string[]): Promise<Set<string>> {
 
 export async function previewStudentCsvImport(
   rows: CsvStudentInputRow[],
+  semesterId: string | null,
 ): Promise<PreviewStudentCsvImportResult> {
   const auth = await requireAdminAction();
   if (!auth.ok) return auth;
@@ -80,28 +96,112 @@ export async function previewStudentCsvImport(
     const existingSet = await loadExistingStudentCodes(codes);
     const { ready, errors } = validateAndBuildImportRows(rows, existingSet);
 
+    const rowsWithClassroom = ready.filter((r) => r.classroom != null);
+    if (rowsWithClassroom.length > 0 && !semesterId) {
+      return {
+        ok: false,
+        error: "ต้องตั้งภาคเรียนปัจจุบันก่อนใช้คอลัมน์ classroom",
+      };
+    }
+
+    const supabase = await createClient();
+
+    const existingGradeMap = new Map<string, string>(); // name -> id
+    const existingClassroomMap = new Map<string, string>(); // gradeName|number -> id
+
+    if (semesterId) {
+      const { data: gradeRows } = await supabase
+        .from("grade_levels")
+        .select("id, name")
+        .eq("semester_id", semesterId);
+      for (const row of gradeRows ?? []) {
+        existingGradeMap.set(row.name, row.id);
+      }
+
+      if (existingGradeMap.size > 0) {
+        const gradeIds = [...existingGradeMap.values()];
+        const { data: classroomRows } = await supabase
+          .from("classrooms")
+          .select("id, name, grade_level_id")
+          .in("grade_level_id", gradeIds);
+        const gradeIdToName = new Map<string, string>();
+        for (const [name, id] of existingGradeMap) gradeIdToName.set(id, name);
+        for (const row of classroomRows ?? []) {
+          const gradeName = gradeIdToName.get(row.grade_level_id);
+          if (!gradeName) continue;
+          existingClassroomMap.set(`${gradeName}|${row.name}`, row.id);
+        }
+      }
+    }
+
+    const newGradeSet = new Set<string>();
+    const newClassroomMap = new Map<string, ImportNewClassroom>();
+
+    for (const row of rowsWithClassroom) {
+      if (!row.classroom) continue;
+      const { gradeName, classroomNumber } = row.classroom;
+      const gradeIsNew = !existingGradeMap.has(gradeName);
+      if (gradeIsNew) newGradeSet.add(gradeName);
+
+      const key = `${gradeName}|${classroomNumber}`;
+      if (!existingClassroomMap.has(key) && !newClassroomMap.has(key)) {
+        newClassroomMap.set(key, {
+          gradeName,
+          number: classroomNumber,
+          gradeIsNew,
+        });
+      }
+    }
+
+    const newGradeLevels = [...newGradeSet].map((name) => ({ name }));
+    const newClassrooms = [...newClassroomMap.values()];
+
     const preview: ImportStudentPreview[] = ready.map((row) => ({
       studentCode: row.studentCode,
       idCard: row.idCard,
       name: `${row.firstName} ${row.lastName}`,
       genderLabel: STUDENT_GENDER_LABELS[row.gender],
       birthDateLabel: formatThaiBirthDate(row.dateOfBirth),
+      classroomLabel: row.classroom
+        ? `${row.classroom.gradeName}/${row.classroom.classroomNumber}`
+        : null,
     }));
 
     return {
       ok: true,
-      stats: { ready: ready.length, errors: errors.length },
+      stats: {
+        ready: ready.length,
+        errors: errors.length,
+        willEnroll: rowsWithClassroom.length,
+        willCreateGrades: newGradeLevels.length,
+        willCreateClassrooms: newClassrooms.length,
+      },
       ready,
       preview,
       errors,
+      newGradeLevels,
+      newClassrooms,
     };
   } catch {
     return { ok: false, error: "ไม่สามารถตรวจสอบไฟล์ได้" };
   }
 }
 
+async function getSemesterAcademicYearId(
+  supabase: SupabaseClient,
+  semesterId: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from("semesters")
+    .select("academic_year_id")
+    .eq("id", semesterId)
+    .maybeSingle();
+  return data?.academic_year_id ?? null;
+}
+
 export async function confirmStudentCsvImport(
   rows: ImportStudentRow[],
+  semesterId: string | null,
 ): Promise<ConfirmStudentCsvImportResult> {
   const auth = await requireAdminAction();
   if (!auth.ok) return auth;
@@ -127,7 +227,142 @@ export async function confirmStudentCsvImport(
       return { ok: true, imported: 0, errors };
     }
 
+    const rowsWithClassroom = ready.filter((r) => r.classroom != null);
+    if (rowsWithClassroom.length > 0 && !semesterId) {
+      return {
+        ok: false,
+        error: "ต้องตั้งภาคเรียนปัจจุบันก่อนใช้คอลัมน์ classroom",
+      };
+    }
+
     const supabase = await createClient();
+
+    // Step A — ensure grade_levels exist
+    const gradeNameToId = new Map<string, string>();
+    let academicYearId: string | null = null;
+
+    if (semesterId && rowsWithClassroom.length > 0) {
+      academicYearId = await getSemesterAcademicYearId(supabase, semesterId);
+      if (!academicYearId) {
+        return { ok: false, error: "ไม่พบภาคเรียน" };
+      }
+
+      const { data: existingGrades } = await supabase
+        .from("grade_levels")
+        .select("id, name")
+        .eq("semester_id", semesterId);
+      for (const row of existingGrades ?? []) {
+        gradeNameToId.set(row.name, row.id);
+      }
+
+      const missingGradeNames = new Set<string>();
+      for (const row of rowsWithClassroom) {
+        if (row.classroom && !gradeNameToId.has(row.classroom.gradeName)) {
+          missingGradeNames.add(row.classroom.gradeName);
+        }
+      }
+
+      if (missingGradeNames.size > 0) {
+        const inserts = [...missingGradeNames].map((name) => ({
+          semester_id: semesterId,
+          academic_year_id: academicYearId!,
+          name,
+          sort_order: 0,
+        }));
+        const { error: gradeError } = await supabase
+          .from("grade_levels")
+          .upsert(inserts, {
+            onConflict: "semester_id,name",
+            ignoreDuplicates: true,
+          });
+        if (gradeError) {
+          return { ok: false, error: "ไม่สามารถสร้างชั้นเรียนได้" };
+        }
+
+        const { data: refreshedGrades } = await supabase
+          .from("grade_levels")
+          .select("id, name")
+          .eq("semester_id", semesterId);
+        gradeNameToId.clear();
+        for (const row of refreshedGrades ?? []) {
+          gradeNameToId.set(row.name, row.id);
+        }
+      }
+    }
+
+    // Step B — ensure classrooms exist
+    const classroomKeyToId = new Map<string, string>(); // gradeName|number -> id
+
+    if (semesterId && rowsWithClassroom.length > 0) {
+      const gradeIds = [...gradeNameToId.values()];
+      if (gradeIds.length > 0) {
+        const { data: existingClassrooms } = await supabase
+          .from("classrooms")
+          .select("id, name, grade_level_id")
+          .in("grade_level_id", gradeIds);
+        const gradeIdToName = new Map<string, string>();
+        for (const [name, id] of gradeNameToId) gradeIdToName.set(id, name);
+        for (const row of existingClassrooms ?? []) {
+          const gradeName = gradeIdToName.get(row.grade_level_id);
+          if (!gradeName) continue;
+          classroomKeyToId.set(`${gradeName}|${row.name}`, row.id);
+        }
+      }
+
+      const missingClassroomEntries: Array<{
+        gradeName: string;
+        classroomNumber: string;
+        gradeLevelId: string;
+      }> = [];
+      const seenMissing = new Set<string>();
+      for (const row of rowsWithClassroom) {
+        if (!row.classroom) continue;
+        const key = `${row.classroom.gradeName}|${row.classroom.classroomNumber}`;
+        if (classroomKeyToId.has(key) || seenMissing.has(key)) continue;
+        const gradeLevelId = gradeNameToId.get(row.classroom.gradeName);
+        if (!gradeLevelId) continue;
+        missingClassroomEntries.push({
+          gradeName: row.classroom.gradeName,
+          classroomNumber: row.classroom.classroomNumber,
+          gradeLevelId,
+        });
+        seenMissing.add(key);
+      }
+
+      if (missingClassroomEntries.length > 0) {
+        const inserts = missingClassroomEntries.map((e) => ({
+          semester_id: semesterId,
+          academic_year_id: academicYearId!,
+          grade_level_id: e.gradeLevelId,
+          name: e.classroomNumber,
+        }));
+        const { error: classroomError } = await supabase
+          .from("classrooms")
+          .upsert(inserts, {
+            onConflict: "semester_id,grade_level_id,name",
+            ignoreDuplicates: true,
+          });
+        if (classroomError) {
+          return { ok: false, error: "ไม่สามารถสร้างห้องเรียนได้" };
+        }
+
+        const gradeIds2 = [...gradeNameToId.values()];
+        const { data: refreshedClassrooms } = await supabase
+          .from("classrooms")
+          .select("id, name, grade_level_id")
+          .in("grade_level_id", gradeIds2);
+        const gradeIdToName2 = new Map<string, string>();
+        for (const [name, id] of gradeNameToId) gradeIdToName2.set(id, name);
+        classroomKeyToId.clear();
+        for (const row of refreshedClassrooms ?? []) {
+          const gradeName = gradeIdToName2.get(row.grade_level_id);
+          if (!gradeName) continue;
+          classroomKeyToId.set(`${gradeName}|${row.name}`, row.id);
+        }
+      }
+    }
+
+    // Step C — insert students (chunked) and collect ids
     const inserts = ready.map((row) => ({
       student_code: row.studentCode,
       first_name: row.firstName,
@@ -138,15 +373,61 @@ export async function confirmStudentCsvImport(
       status: "active" as const,
     }));
 
+    const studentCodeToId = new Map<string, string>();
     for (let offset = 0; offset < inserts.length; offset += INSERT_CHUNK_SIZE) {
       const chunk = inserts.slice(offset, offset + INSERT_CHUNK_SIZE);
-      const { error } = await supabase.from("students").insert(chunk);
-      if (error) {
+      const { data, error } = await supabase
+        .from("students")
+        .insert(chunk)
+        .select("id, student_code");
+      if (error || !data) {
         return { ok: false, error: "ไม่สามารถนำเข้านักเรียนได้" };
+      }
+      for (const row of data) {
+        studentCodeToId.set(row.student_code, row.id);
+      }
+    }
+
+    // Step D — insert student_enrollments for rows that carry classroom
+    if (semesterId && rowsWithClassroom.length > 0) {
+      const enrollmentInserts: Array<{
+        student_id: string;
+        classroom_id: string;
+        academic_year_id: string;
+        semester_id: string;
+        status: "enrolled";
+      }> = [];
+      for (const row of rowsWithClassroom) {
+        if (!row.classroom) continue;
+        const studentId = studentCodeToId.get(row.studentCode);
+        if (!studentId) continue;
+        const classroomId = classroomKeyToId.get(
+          `${row.classroom.gradeName}|${row.classroom.classroomNumber}`,
+        );
+        if (!classroomId) continue;
+        enrollmentInserts.push({
+          student_id: studentId,
+          classroom_id: classroomId,
+          academic_year_id: academicYearId!,
+          semester_id: semesterId,
+          status: "enrolled",
+        });
+      }
+
+      for (let offset = 0; offset < enrollmentInserts.length; offset += INSERT_CHUNK_SIZE) {
+        const chunk = enrollmentInserts.slice(offset, offset + INSERT_CHUNK_SIZE);
+        const { error } = await supabase.from("student_enrollments").insert(chunk);
+        if (error) {
+          return {
+            ok: false,
+            error: "นำเข้านักเรียนสำเร็จ แต่ลงทะเบียนเข้าห้องไม่สำเร็จ กรุณาลงทะเบียนเองในหน้า registration",
+          };
+        }
       }
     }
 
     revalidatePath("/students");
+    revalidatePath("/registration");
     return { ok: true, imported: ready.length, errors };
   } catch {
     return { ok: false, error: "ไม่สามารถนำเข้านักเรียนได้" };
@@ -227,7 +508,7 @@ export async function updateStudent(id: string, input: StudentFormInput): Promis
 }
 
 const STUDENT_DELETE_BLOCKED_MESSAGE =
-  "ไม่สามารถลบได้ — มีประวัติการลงทะเบียน ใบแจ้งชำระ หรือใบเสร็จที่ยังไม่ยกเลิก กรุณาจัดการก่อน";
+  "ไม่สามารถลบได้ — นักเรียนยังลงทะเบียนในห้อง หรือมีใบเสร็จที่ยังไม่ยกเลิก กรุณาจัดการก่อน";
 
 async function deleteVoidedPaymentsForStudent(
   supabase: SupabaseClient,
@@ -268,6 +549,35 @@ async function deleteVoidedPaymentsForStudent(
   return { ok: true };
 }
 
+async function deleteStudentDependents(
+  supabase: SupabaseClient,
+  studentId: string,
+): Promise<ActionState> {
+  // Voided payments + their allocations, voids, receipts
+  const paymentsCleanup = await deleteVoidedPaymentsForStudent(supabase, studentId);
+  if (!paymentsCleanup.ok) return paymentsCleanup;
+
+  // Invoices (invoice_lines cascade via ON DELETE CASCADE)
+  const { error: invoiceError } = await supabase
+    .from("student_invoices")
+    .delete()
+    .eq("student_id", studentId);
+  if (invoiceError) {
+    return { ok: false, error: "ไม่สามารถลบใบแจ้งชำระของนักเรียนได้" };
+  }
+
+  // Enrollments
+  const { error: enrollmentError } = await supabase
+    .from("student_enrollments")
+    .delete()
+    .eq("student_id", studentId);
+  if (enrollmentError) {
+    return { ok: false, error: "ไม่สามารถลบการลงทะเบียนของนักเรียนได้" };
+  }
+
+  return { ok: true };
+}
+
 async function deleteStudentRecord(studentId: string): Promise<ActionState> {
   const counts = await getStudentReferenceCounts(studentId);
   if (!isStudentDeletable(counts)) {
@@ -275,7 +585,7 @@ async function deleteStudentRecord(studentId: string): Promise<ActionState> {
   }
 
   const supabase = await createClient();
-  const cleanup = await deleteVoidedPaymentsForStudent(supabase, studentId);
+  const cleanup = await deleteStudentDependents(supabase, studentId);
   if (!cleanup.ok) return cleanup;
 
   const { error } = await supabase.from("students").delete().eq("id", studentId);
@@ -307,9 +617,12 @@ export async function deleteStudents(studentIds: string[]): Promise<DeleteStuden
   }
 
   const supabase = await createClient();
-  const [enrollments, invoices, activePayments] = await Promise.all([
-    supabase.from("student_enrollments").select("student_id").in("student_id", uniqueIds),
-    supabase.from("student_invoices").select("student_id").in("student_id", uniqueIds),
+  const [activeEnrollments, activePayments] = await Promise.all([
+    supabase
+      .from("student_enrollments")
+      .select("student_id")
+      .in("student_id", uniqueIds)
+      .eq("status", "enrolled"),
     supabase
       .from("payments")
       .select("student_id")
@@ -318,8 +631,7 @@ export async function deleteStudents(studentIds: string[]): Promise<DeleteStuden
   ]);
 
   const blockedIds = new Set<string>();
-  for (const row of enrollments.data ?? []) blockedIds.add(row.student_id);
-  for (const row of invoices.data ?? []) blockedIds.add(row.student_id);
+  for (const row of activeEnrollments.data ?? []) blockedIds.add(row.student_id);
   for (const row of activePayments.data ?? []) blockedIds.add(row.student_id);
 
   const deletableIds = uniqueIds.filter((id) => !blockedIds.has(id));
@@ -328,12 +640,12 @@ export async function deleteStudents(studentIds: string[]): Promise<DeleteStuden
   if (deletableIds.length === 0) {
     return {
       ok: false,
-      error: "ไม่สามารถลบได้ — นักเรียนที่เลือกมีประวัติการลงทะเบียนหรือการเงิน",
+      error: "ไม่สามารถลบได้ — นักเรียนยังลงทะเบียนในห้อง หรือมีใบเสร็จที่ยังไม่ยกเลิก",
     };
   }
 
   for (const studentId of deletableIds) {
-    const cleanup = await deleteVoidedPaymentsForStudent(supabase, studentId);
+    const cleanup = await deleteStudentDependents(supabase, studentId);
     if (!cleanup.ok) return cleanup;
 
     const { error } = await supabase.from("students").delete().eq("id", studentId);

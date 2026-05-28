@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,13 +28,20 @@ type FeeRatesMatrixProps = {
 
 export function FeeRatesMatrix({ semesterId, matrix }: FeeRatesMatrixProps) {
   const router = useRouter();
-  const [draft, setDraft] = useState<Record<string, string>>(() => {
-    const initial: Record<string, string> = {};
+  const queryClient = useQueryClient();
+  type DraftCell = { amount: string; amountReimbursable: string };
+
+  const [draft, setDraft] = useState<Record<string, DraftCell>>(() => {
+    const initial: Record<string, DraftCell> = {};
     for (const grade of matrix.grades) {
       for (const item of matrix.items) {
         const key = feeRateKey(grade.id, item.id);
-        const amount = matrix.rates[key]?.amount;
-        initial[key] = amount != null ? String(amount) : "";
+        const cell = matrix.rates[key];
+        initial[key] = {
+          amount: cell?.amount != null ? String(cell.amount) : "",
+          amountReimbursable:
+            cell?.amountReimbursable != null ? String(cell.amountReimbursable) : "",
+        };
       }
     }
     return initial;
@@ -48,7 +56,7 @@ export function FeeRatesMatrix({ semesterId, matrix }: FeeRatesMatrixProps) {
     for (const grade of matrix.grades) {
       let sum = 0;
       for (const item of matrix.items) {
-        const raw = draft[feeRateKey(grade.id, item.id)]?.trim() ?? "";
+        const raw = draft[feeRateKey(grade.id, item.id)]?.amount.trim() ?? "";
         const amount = Number.parseFloat(raw);
         if (Number.isFinite(amount) && amount > 0) sum += amount;
       }
@@ -62,20 +70,50 @@ export function FeeRatesMatrix({ semesterId, matrix }: FeeRatesMatrixProps) {
     for (const grade of matrix.grades) {
       for (const item of matrix.items) {
         const key = feeRateKey(grade.id, item.id);
-        const raw = draft[key]?.trim() ?? "";
-        if (!raw) continue;
-        const amount = Number.parseFloat(raw);
+        const cell = draft[key];
+        const rawAmount = cell?.amount.trim() ?? "";
+        if (!rawAmount) continue;
+        const amount = Number.parseFloat(rawAmount);
         if (!Number.isFinite(amount)) continue;
-        const previous = matrix.rates[key]?.amount;
-        if (previous === amount) continue;
-        entries.push({ gradeLevelId: grade.id, feeItemId: item.id, amount });
+
+        let amountReimbursable: number | null = null;
+        if (item.hasReimbursableVariant) {
+          const rawReim = cell?.amountReimbursable.trim() ?? "";
+          if (rawReim) {
+            const parsed = Number.parseFloat(rawReim);
+            if (Number.isFinite(parsed)) amountReimbursable = parsed;
+          }
+        }
+
+        const previous = matrix.rates[key];
+        if (
+          previous &&
+          previous.amount === amount &&
+          previous.amountReimbursable === amountReimbursable
+        ) {
+          continue;
+        }
+
+        entries.push({
+          gradeLevelId: grade.id,
+          feeItemId: item.id,
+          amount,
+          amountReimbursable,
+        });
       }
     }
     return entries;
   }, [draft, matrix]);
 
-  function updateCell(key: string, value: string) {
-    setDraft((prev) => ({ ...prev, [key]: value }));
+  function updateCell(
+    key: string,
+    field: "amount" | "amountReimbursable",
+    value: string,
+  ) {
+    setDraft((prev) => ({
+      ...prev,
+      [key]: { ...prev[key], [field]: value },
+    }));
   }
 
   async function handleSave() {
@@ -94,6 +132,7 @@ export function FeeRatesMatrix({ semesterId, matrix }: FeeRatesMatrixProps) {
     }
 
     toast.success("บันทึกอัตราค่าธรรมเนียมแล้ว");
+    queryClient.invalidateQueries({ queryKey: ["fee-rate-matrix"] });
     router.refresh();
   }
 
@@ -125,8 +164,13 @@ export function FeeRatesMatrix({ semesterId, matrix }: FeeRatesMatrixProps) {
                 <TableRow>
                   <TableHead className="sticky left-0 bg-card">ชั้น</TableHead>
                   {matrix.items.map((item) => (
-                    <TableHead key={item.id} className="min-w-[120px] text-right">
-                      {item.name}
+                    <TableHead key={item.id} className="min-w-[180px] text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <span>{item.name}</span>
+                        {item.hasReimbursableVariant ? (
+                          <span className="rounded bg-sky-50 px-1 text-[10px] text-sky-700">2 ราคา</span>
+                        ) : null}
+                      </div>
                     </TableHead>
                   ))}
                   <TableHead className="min-w-[120px] text-right text-amber-700">รวม</TableHead>
@@ -139,16 +183,45 @@ export function FeeRatesMatrix({ semesterId, matrix }: FeeRatesMatrixProps) {
                     {matrix.items.map((item) => {
                       const key = feeRateKey(grade.id, item.id);
                       return (
-                        <TableCell key={item.id} className="text-right">
-                          <Input
-                            type="number"
-                            min={0}
-                            step="0.01"
-                            className="ml-auto w-[110px] tabular-nums"
-                            value={draft[key] ?? ""}
-                            onChange={(e) => updateCell(key, e.target.value)}
-                            placeholder="0"
-                          />
+                        <TableCell key={item.id} className="text-right align-top">
+                          {item.hasReimbursableVariant ? (
+                            <div className="ml-auto flex w-[110px] flex-col gap-1">
+                              <div className="flex items-center gap-1">
+                                <span className="w-12 text-left text-[10px] text-muted-foreground">ปกติ</span>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  className="tabular-nums"
+                                  value={draft[key]?.amount ?? ""}
+                                  onChange={(e) => updateCell(key, "amount", e.target.value)}
+                                  placeholder="0"
+                                />
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="w-12 text-left text-[10px] text-sky-700">เบิกได้</span>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  className="tabular-nums"
+                                  value={draft[key]?.amountReimbursable ?? ""}
+                                  onChange={(e) => updateCell(key, "amountReimbursable", e.target.value)}
+                                  placeholder="(ว่าง = ใช้ราคาปกติ)"
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              className="ml-auto w-[110px] tabular-nums"
+                              value={draft[key]?.amount ?? ""}
+                              onChange={(e) => updateCell(key, "amount", e.target.value)}
+                              placeholder="0"
+                            />
+                          )}
                         </TableCell>
                       );
                     })}

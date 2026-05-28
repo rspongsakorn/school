@@ -39,11 +39,17 @@ export const CSV_FORMAT_TABLE = [
     description: "เลขบัตรประชาชน (ไม่บังคับ)",
     example: "1101000391474",
   },
+  {
+    key: "classroom",
+    description: "ห้องเรียน — ชั้น/เลขห้อง (ไม่บังคับ; ถ้าระบุจะลงทะเบียนให้อัตโนมัติ)",
+    example: "ม.2/1",
+  },
 ] as const;
 
 export const SAMPLE_CSV_CONTENT = [
-  "id_card,student_code,gender,first_name,last_name,birthdate",
-  '1101000391474,12390,เด็กหญิง,สุพิชชานันท์,เจิมกลาง,"21 เม.ย. 55"',
+  "id_card,student_code,gender,first_name,last_name,birthdate,classroom",
+  '1101000391474,12390,เด็กหญิง,สุพิชชานันท์,เจิมกลาง,"21 เม.ย. 55",ม.2/1',
+  ',12391,เด็กชาย,สมชาย,ทดสอบ,"15 พ.ค. 55",',
 ].join("\n");
 
 export const SAMPLE_CSV_FILENAME = "student-import-sample.csv";

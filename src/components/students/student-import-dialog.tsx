@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,13 +45,23 @@ import {
 type StudentImportDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  semesterId: string | null;
+  semesterLabel: string | null;
 };
 
 type ParsedState = {
-  stats: { ready: number; errors: number };
+  stats: {
+    ready: number;
+    errors: number;
+    willEnroll: number;
+    willCreateGrades: number;
+    willCreateClassrooms: number;
+  };
   ready: ImportStudentRow[];
   preview: ImportStudentPreview[];
   errors: ImportRowError[];
+  newGradeLevels: { name: string }[];
+  newClassrooms: { gradeName: string; number: string; gradeIsNew: boolean }[];
 };
 
 type ImportPhase = "setup" | "review";
@@ -65,8 +76,14 @@ function downloadSampleCsv() {
   URL.revokeObjectURL(url);
 }
 
-export function StudentImportDialog({ open, onOpenChange }: StudentImportDialogProps) {
+export function StudentImportDialog({
+  open,
+  onOpenChange,
+  semesterId,
+  semesterLabel,
+}: StudentImportDialogProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [phase, setPhase] = useState<ImportPhase>("setup");
   const [parsing, setParsing] = useState(false);
@@ -123,7 +140,7 @@ export function StudentImportDialog({ open, onOpenChange }: StudentImportDialogP
       }
 
       const rows = csvRowsToObjects(header, dataRows);
-      const result: PreviewStudentCsvImportResult = await previewStudentCsvImport(rows);
+      const result: PreviewStudentCsvImportResult = await previewStudentCsvImport(rows, semesterId);
       if (!result.ok) {
         setParseError(result.error);
         return;
@@ -134,6 +151,8 @@ export function StudentImportDialog({ open, onOpenChange }: StudentImportDialogP
         ready: result.ready,
         preview: result.preview,
         errors: result.errors,
+        newGradeLevels: result.newGradeLevels,
+        newClassrooms: result.newClassrooms,
       });
     } catch {
       setParseError("ไม่สามารถอ่านไฟล์ได้");
@@ -147,7 +166,7 @@ export function StudentImportDialog({ open, onOpenChange }: StudentImportDialogP
     if (!parsed || parsed.ready.length === 0) return;
 
     setImporting(true);
-    const result = await confirmStudentCsvImport(parsed.ready);
+    const result = await confirmStudentCsvImport(parsed.ready, semesterId);
     setImporting(false);
 
     if (!result.ok) {
@@ -169,6 +188,11 @@ export function StudentImportDialog({ open, onOpenChange }: StudentImportDialogP
     }
 
     onOpenChange(false);
+    void queryClient.invalidateQueries({ queryKey: ["students"] });
+    void queryClient.invalidateQueries({ queryKey: ["grade-levels"] });
+    void queryClient.invalidateQueries({ queryKey: ["classrooms-by-grade"] });
+    void queryClient.invalidateQueries({ queryKey: ["classrooms-by-semester"] });
+    void queryClient.invalidateQueries({ queryKey: ["classroom-roster"] });
     router.refresh();
   }
 
@@ -189,6 +213,19 @@ export function StudentImportDialog({ open, onOpenChange }: StudentImportDialogP
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
           {phase === "setup" ? (
             <>
+              <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
+                {semesterId ? (
+                  <span>
+                    จะลงทะเบียนนักเรียนเข้าภาคเรียน:{" "}
+                    <span className="font-medium">{semesterLabel ?? "—"}</span>
+                  </span>
+                ) : (
+                  <span className="text-amber-700">
+                    ยังไม่มีปีการศึกษา/ภาคเรียนปัจจุบัน — ใช้ได้แต่จะไม่ลงทะเบียนห้องเรียนให้
+                  </span>
+                )}
+              </div>
+
               <div className="overflow-x-auto rounded-md border">
                 <Table className="w-full">
                   <TableHeader>
@@ -245,8 +282,45 @@ export function StudentImportDialog({ open, onOpenChange }: StudentImportDialogP
                 <div className="space-y-4">
                   <p className="text-sm text-muted-foreground">
                     พร้อมนำเข้า {parsed.stats.ready} แถว
+                    {parsed.stats.willEnroll > 0 ? ` · ลงทะเบียน ${parsed.stats.willEnroll} คน` : ""}
+                    {parsed.stats.willCreateClassrooms > 0
+                      ? ` · สร้างห้องใหม่ ${parsed.stats.willCreateClassrooms} ห้อง`
+                      : ""}
                     {parsed.stats.errors > 0 ? ` · มีข้อผิดพลาด ${parsed.stats.errors} แถว` : ""}
                   </p>
+
+                  {parsed.newClassrooms.length > 0 ? (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-medium">
+                        ห้องเรียนที่จะสร้างใหม่ ({parsed.newClassrooms.length} ห้อง)
+                      </h3>
+                      <div className="max-h-40 overflow-y-auto rounded-md border">
+                        <Table className="w-full">
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>ชั้น</TableHead>
+                              <TableHead>ห้อง</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {parsed.newClassrooms.map((c) => (
+                              <TableRow key={`${c.gradeName}-${c.number}`}>
+                                <TableCell>
+                                  <span>{c.gradeName}</span>
+                                  {c.gradeIsNew ? (
+                                    <span className="ml-2 rounded bg-sky-50 px-1 text-[10px] text-sky-700">
+                                      ใหม่
+                                    </span>
+                                  ) : null}
+                                </TableCell>
+                                <TableCell>{c.number}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : null}
 
                   {parsed.errors.length > 0 ? (
                     <div className="space-y-2">
@@ -290,6 +364,7 @@ export function StudentImportDialog({ open, onOpenChange }: StudentImportDialogP
                               <TableHead>ชื่อ-นามสกุล</TableHead>
                               <TableHead>เพศ</TableHead>
                               <TableHead>วันเกิด</TableHead>
+                              <TableHead>ห้องเรียน</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -304,6 +379,7 @@ export function StudentImportDialog({ open, onOpenChange }: StudentImportDialogP
                                 <TableCell>{row.name}</TableCell>
                                 <TableCell>{row.genderLabel}</TableCell>
                                 <TableCell>{row.birthDateLabel}</TableCell>
+                                <TableCell>{row.classroomLabel ?? "—"}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>

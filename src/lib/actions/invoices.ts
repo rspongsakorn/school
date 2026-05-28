@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { ActionState } from "@/lib/actions/academic-years";
 import { requireAdminAction } from "@/lib/auth/require-admin";
 import { computeInvoiceTotal } from "@/lib/finance/amounts";
+import { pickFeeAmount } from "@/lib/finance/pick-fee-amount";
 import { canDeleteInvoice } from "@/lib/finance/invoice-delete-eligibility";
 import { getInvoiceDeleteContext, listStudentIdsWithInvoice } from "@/lib/data/invoices";
 import { createClient } from "@/lib/supabase/server";
@@ -19,6 +20,7 @@ type GenerateInput = {
   semesterNumber: number;
   feeItemIds: string[];
   studentIds?: string[];
+  reimbursableStudentIds?: string[];
 };
 
 type EnrollmentForInvoice = {
@@ -83,7 +85,9 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
 
   const { data: rateRows } = await supabase
     .from("fee_rates")
-    .select("grade_level_id, fee_item_id, amount, fee_items(name)")
+    .select(
+      "grade_level_id, fee_item_id, amount, amount_reimbursable, fee_items(name, has_reimbursable_variant)",
+    )
     .eq("semester_id", input.semesterId)
     .in("fee_item_id", input.feeItemIds);
 
@@ -91,17 +95,31 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
     grade_level_id: string;
     fee_item_id: string;
     amount: number;
-    fee_items: { name: string } | null;
+    amount_reimbursable: number | null;
+    fee_items: { name: string; has_reimbursable_variant: boolean } | null;
   };
 
   const rates = (rateRows ?? []) as unknown as RateRow[];
-  const rateMap = new Map<string, { amount: number; name: string }>();
+
+  type RateMapEntry = {
+    amount: number;
+    amountReimbursable: number | null;
+    name: string;
+    hasReimbursableVariant: boolean;
+  };
+
+  const rateMap = new Map<string, RateMapEntry>();
   for (const rate of rates) {
     rateMap.set(`${rate.grade_level_id}:${rate.fee_item_id}`, {
       amount: Number(rate.amount),
+      amountReimbursable:
+        rate.amount_reimbursable != null ? Number(rate.amount_reimbursable) : null,
       name: rate.fee_items?.name ?? "",
+      hasReimbursableVariant: rate.fee_items?.has_reimbursable_variant ?? false,
     });
   }
+
+  const reimbursableSet = new Set(input.reimbursableStudentIds ?? []);
 
   const invoiceName = `ภาคเรียนที่ ${input.semesterNumber}/${input.academicYearName}`;
   let created = 0;
@@ -113,14 +131,28 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
       continue;
     }
 
-    const lines: { fee_item_id: string; description: string; amount: number }[] = [];
+    const isReimbursable = reimbursableSet.has(enrollment.studentId);
+    const lines: {
+      fee_item_id: string;
+      description: string;
+      amount: number;
+      variant: "standard" | "reimbursable";
+    }[] = [];
+
     for (const feeItemId of input.feeItemIds) {
       const rate = rateMap.get(`${enrollment.gradeLevelId}:${feeItemId}`);
       if (!rate) continue;
+      const picked = pickFeeAmount({
+        isReimbursable,
+        hasReimbursableVariant: rate.hasReimbursableVariant,
+        amount: rate.amount,
+        amountReimbursable: rate.amountReimbursable,
+      });
       lines.push({
         fee_item_id: feeItemId,
         description: rate.name,
-        amount: rate.amount,
+        amount: picked.amount,
+        variant: picked.variant,
       });
     }
 
@@ -143,6 +175,7 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
         total_amount: totalAmount,
         paid_amount: 0,
         status: "unpaid",
+        is_reimbursable: isReimbursable,
       })
       .select("id")
       .single();
@@ -157,6 +190,7 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
         fee_item_id: line.fee_item_id,
         description: line.description,
         amount: line.amount,
+        variant: line.variant,
       })),
     );
 
@@ -288,6 +322,126 @@ export async function deleteInvoices(invoiceIds: string[]): Promise<DeleteInvoic
 
   revalidateFinancePaths();
   return { ok: true, deleted: deletableIds.length, skipped };
+}
+
+export async function updateInvoiceReimbursable(
+  invoiceId: string,
+  isReimbursable: boolean,
+): Promise<ActionState> {
+  const auth = await requireAdminAction();
+  if (!auth.ok) return auth;
+
+  const supabase = await createClient();
+
+  const { data: invoice } = await supabase
+    .from("student_invoices")
+    .select("id, semester_id, paid_amount, discount_type, discount_value, student_id")
+    .eq("id", invoiceId)
+    .maybeSingle();
+
+  if (!invoice) return { ok: false, error: "ไม่พบใบแจ้งชำระ" };
+  if (Number(invoice.paid_amount) > 0) {
+    return { ok: false, error: "ไม่สามารถเปลี่ยนประเภทราคาหลังมีการชำระแล้ว" };
+  }
+
+  // Lookup grade for the student in this semester
+  const { data: enrollment } = await supabase
+    .from("student_enrollments")
+    .select("classroom_id, classrooms!inner(grade_level_id)")
+    .eq("student_id", invoice.student_id)
+    .eq("semester_id", invoice.semester_id)
+    .eq("status", "enrolled")
+    .maybeSingle();
+
+  type EnrollmentRow = {
+    classroom_id: string;
+    classrooms: { grade_level_id: string };
+  };
+  const gradeLevelId =
+    (enrollment as unknown as EnrollmentRow | null)?.classrooms.grade_level_id;
+  if (!gradeLevelId) {
+    return { ok: false, error: "ไม่พบชั้นเรียนของนักเรียน" };
+  }
+
+  // Load existing lines (need fee_item_id to look up new amount)
+  const { data: existingLines } = await supabase
+    .from("invoice_lines")
+    .select("id, fee_item_id, description")
+    .eq("invoice_id", invoiceId);
+
+  if (!existingLines || existingLines.length === 0) {
+    return { ok: false, error: "ใบแจ้งชำระไม่มีรายการ" };
+  }
+
+  const feeItemIds = existingLines.map((l) => l.fee_item_id);
+
+  const { data: rateRows } = await supabase
+    .from("fee_rates")
+    .select(
+      "fee_item_id, amount, amount_reimbursable, fee_items(has_reimbursable_variant)",
+    )
+    .eq("semester_id", invoice.semester_id)
+    .eq("grade_level_id", gradeLevelId)
+    .in("fee_item_id", feeItemIds);
+
+  type RateRow = {
+    fee_item_id: string;
+    amount: number;
+    amount_reimbursable: number | null;
+    fee_items: { has_reimbursable_variant: boolean } | null;
+  };
+
+  const rateMap = new Map<string, RateRow>();
+  for (const row of (rateRows ?? []) as unknown as RateRow[]) {
+    rateMap.set(row.fee_item_id, row);
+  }
+
+  let subtotal = 0;
+  for (const line of existingLines) {
+    const rate = rateMap.get(line.fee_item_id);
+    if (!rate) {
+      return { ok: false, error: "ไม่พบอัตราค่าธรรมเนียมของบางรายการ" };
+    }
+    const picked = pickFeeAmount({
+      isReimbursable,
+      hasReimbursableVariant: rate.fee_items?.has_reimbursable_variant ?? false,
+      amount: Number(rate.amount),
+      amountReimbursable:
+        rate.amount_reimbursable != null ? Number(rate.amount_reimbursable) : null,
+    });
+    subtotal += picked.amount;
+
+    const { error: lineError } = await supabase
+      .from("invoice_lines")
+      .update({ amount: picked.amount, variant: picked.variant })
+      .eq("id", line.id);
+    if (lineError) {
+      return { ok: false, error: "ไม่สามารถปรับรายการในใบแจ้งชำระได้" };
+    }
+  }
+
+  const totalAmount = computeInvoiceTotal(
+    subtotal,
+    invoice.discount_type as "percent" | "fixed" | null,
+    invoice.discount_value != null ? Number(invoice.discount_value) : null,
+  );
+
+  const { error: invoiceError } = await supabase
+    .from("student_invoices")
+    .update({
+      is_reimbursable: isReimbursable,
+      subtotal,
+      total_amount: totalAmount,
+      status: "unpaid",
+    })
+    .eq("id", invoiceId);
+
+  if (invoiceError) {
+    return { ok: false, error: "ไม่สามารถบันทึกการเปลี่ยนแปลงได้" };
+  }
+
+  revalidateFinancePaths();
+  return { ok: true };
 }
 
 function revalidateFinancePaths() {

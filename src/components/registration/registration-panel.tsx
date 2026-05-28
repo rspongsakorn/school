@@ -145,6 +145,12 @@ export function RegistrationPanel() {
     void queryClient.invalidateQueries({ queryKey: ["enrollment-candidates", semesterId] });
     void queryClient.invalidateQueries({ queryKey: ["classrooms-by-semester", semesterId] });
     void queryClient.invalidateQueries({ queryKey: ["semesters-with-grade-levels", academicYearId] });
+    void queryClient.invalidateQueries({ queryKey: ["students"] });
+  }
+
+  function invalidateStudentsList() {
+    // Students panel shows enrolled grade — refresh after any enrollment change
+    void queryClient.invalidateQueries({ queryKey: ["students"] });
   }
 
   async function handleRemoveEnrollment() {
@@ -164,6 +170,7 @@ export function RegistrationPanel() {
     void queryClient.invalidateQueries({ queryKey: ["classroom-roster", selectedClassroomId] });
     void queryClient.invalidateQueries({ queryKey: ["enrollment-candidates", semesterId] });
     void queryClient.invalidateQueries({ queryKey: ["classrooms-by-grade", selectedGradeId] });
+    invalidateStudentsList();
   }
 
   async function handleDelete() {
@@ -187,9 +194,8 @@ export function RegistrationPanel() {
       router.push(buildUrl({ grade: null, classroom: null }));
     } else if (deleteTarget.type === "classroom" && deleteTarget.id === selectedClassroomId) {
       router.push(buildUrl({ classroom: null }));
-    } else {
-      invalidateAll();
     }
+    invalidateAll();
   }
 
   function buildUrl(updates: { grade?: string | null; classroom?: string | null }) {
@@ -626,6 +632,7 @@ export function RegistrationPanel() {
                 void queryClient.invalidateQueries({ queryKey: ["classroom-roster", selectedClassroomId] });
                 void queryClient.invalidateQueries({ queryKey: ["enrollment-candidates", semesterId] });
                 void queryClient.invalidateQueries({ queryKey: ["classrooms-by-grade", selectedGradeId] });
+                invalidateStudentsList();
               }}
             />
           )}
@@ -641,6 +648,7 @@ export function RegistrationPanel() {
               onSuccess={() => {
                 void queryClient.invalidateQueries({ queryKey: ["classroom-roster", selectedClassroomId] });
                 void queryClient.invalidateQueries({ queryKey: ["classrooms-by-grade", selectedGradeId] });
+                invalidateStudentsList();
               }}
             />
           )}
@@ -653,6 +661,7 @@ export function RegistrationPanel() {
               studentName={statusTarget.name}
               onSuccess={() => {
                 void queryClient.invalidateQueries({ queryKey: ["classroom-roster", selectedClassroomId] });
+                invalidateStudentsList();
               }}
             />
           )}

@@ -81,8 +81,13 @@ function NavSection({
   );
 }
 
+const teacherNav = [
+  { href: "/reports/outstanding", label: "รายงานค้างชำระ", icon: ChartColumn },
+];
+
 function SidebarContent() {
   const { profile } = useAuth();
+  const role = profile?.role;
 
   return (
     <>
@@ -105,10 +110,16 @@ function SidebarContent() {
         </div>
       </div>
       <nav className="flex-1 overflow-y-auto px-3 py-4">
-        <NavSection title="ข้อมูลพื้นฐาน" items={basicNav} />
-        <NavSection title="การเงิน" items={financeNav} />
-        {profile?.role === "admin" && (
-          <NavSection title="ระบบ" items={systemNav} />
+        {role === "teacher" ? (
+          <NavSection title="รายงาน" items={teacherNav} />
+        ) : (
+          <>
+            <NavSection title="ข้อมูลพื้นฐาน" items={basicNav} />
+            <NavSection title="การเงิน" items={financeNav} />
+            {role === "admin" && (
+              <NavSection title="ระบบ" items={systemNav} />
+            )}
+          </>
         )}
       </nav>
     </>

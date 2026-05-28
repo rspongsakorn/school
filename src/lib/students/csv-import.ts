@@ -16,6 +16,7 @@ export type CsvStudentInputRow = {
   first_name?: string;
   last_name?: string;
   birthdate?: string;
+  classroom?: string;
 };
 
 export type ImportStudentRow = {
@@ -25,6 +26,7 @@ export type ImportStudentRow = {
   gender: StudentGender;
   dateOfBirth: string;
   idCard: string | null;
+  classroom: { gradeName: string; classroomNumber: string } | null;
 };
 
 export type ImportRowError = {
@@ -103,6 +105,7 @@ export function csvRowsToObjects(header: string[], dataRows: string[][]): CsvStu
       else if (key === "first_name") row.first_name = (cells[colIndex] ?? "").trim();
       else if (key === "last_name") row.last_name = (cells[colIndex] ?? "").trim();
       else if (key === "birthdate") row.birthdate = (cells[colIndex] ?? "").trim();
+      else if (key === "classroom") row.classroom = (cells[colIndex] ?? "").trim();
     });
     return row;
   });
@@ -155,6 +158,7 @@ export function validateAndBuildImportRows(
     const lastName = row.last_name?.trim() ?? "";
     const genderLabel = row.gender?.trim() ?? "";
     const birthdate = row.birthdate?.trim() ?? "";
+    const classroomRaw = row.classroom ?? "";
 
     const pushError = (message: string) => {
       errors.push({
@@ -191,6 +195,18 @@ export function validateAndBuildImportRows(
       continue;
     }
 
+    const classroomParsed = parseClassroomCell(classroomRaw);
+    if (!classroomParsed.ok) {
+      pushError(`ห้องเรียน: ${classroomParsed.error}`);
+      continue;
+    }
+    const classroom = classroomParsed.empty
+      ? null
+      : {
+          gradeName: classroomParsed.gradeName,
+          classroomNumber: classroomParsed.classroomNumber,
+        };
+
     seenInFile.add(code);
     ready.push({
       studentCode: code,
@@ -199,6 +215,7 @@ export function validateAndBuildImportRows(
       gender,
       dateOfBirth,
       idCard: row.id_card?.trim() || null,
+      classroom,
     });
   }
 
@@ -214,5 +231,38 @@ export function importRowToCsvInput(row: ImportStudentRow, rowNumber: number): C
     gender: row.gender === "male" ? "เด็กชาย" : "เด็กหญิง",
     birthdate: formatThaiBirthdateShort(row.dateOfBirth),
     id_card: row.idCard ?? "",
+    classroom: row.classroom
+      ? `${row.classroom.gradeName}/${row.classroom.classroomNumber}`
+      : "",
   };
+}
+
+export type ParsedClassroom =
+  | { ok: true; empty: true }
+  | { ok: true; empty: false; gradeName: string; classroomNumber: string }
+  | { ok: false; error: string };
+
+export function parseClassroomCell(raw: string): ParsedClassroom {
+  const trimmed = raw.trim();
+  if (!trimmed) return { ok: true, empty: true };
+
+  const slashIndex = trimmed.indexOf("/");
+  if (slashIndex === -1) {
+    return { ok: false, error: "ต้องระบุในรูปแบบ ชั้น/เลขห้อง" };
+  }
+
+  const gradeName = trimmed.slice(0, slashIndex).trim();
+  const classroomNumber = trimmed.slice(slashIndex + 1).trim();
+
+  if (!gradeName) return { ok: false, error: "ขาดชื่อชั้นเรียน" };
+
+  if (!/^\d+$/.test(classroomNumber)) {
+    return { ok: false, error: "เลขห้องต้องเป็นตัวเลข 1–999" };
+  }
+  const num = Number(classroomNumber);
+  if (num < 1 || num > 999) {
+    return { ok: false, error: "เลขห้องต้องเป็นตัวเลข 1–999" };
+  }
+
+  return { ok: true, empty: false, gradeName, classroomNumber };
 }

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field-error";
@@ -142,6 +143,7 @@ function StudentSheetBody({
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [form, setForm] = useState<StudentFormState>(() => buildInitialForm(mode, initial));
   const [errors, setErrors] = useState<StudentFormErrors>({});
   const [submitting, setSubmitting] = useState(false);
@@ -202,6 +204,8 @@ function StudentSheetBody({
 
       toast.success(isEditMode ? "บันทึกข้อมูลนักเรียนแล้ว" : "เพิ่มนักเรียนเรียบร้อยแล้ว");
       onOpenChange(false);
+      void queryClient.invalidateQueries({ queryKey: ["students"] });
+      void queryClient.invalidateQueries({ queryKey: ["enrollment-candidates"] });
       router.refresh();
     } finally {
       setSubmitting(false);
@@ -222,6 +226,10 @@ function StudentSheetBody({
       toast.success("ลบนักเรียนเรียบร้อยแล้ว");
       setDeleteOpen(false);
       onOpenChange(false);
+      void queryClient.invalidateQueries({ queryKey: ["students"] });
+      void queryClient.invalidateQueries({ queryKey: ["enrollment-candidates"] });
+      void queryClient.invalidateQueries({ queryKey: ["classroom-roster"] });
+      void queryClient.invalidateQueries({ queryKey: ["classrooms-by-grade"] });
       router.refresh();
     } finally {
       setSubmitting(false);
