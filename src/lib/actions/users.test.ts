@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isLastAdmin } from "./users";
+import { isLastAdmin } from "./users-helpers";
 
 const p = (id: string, role: string, is_active: boolean) => ({ id, role, is_active });
 

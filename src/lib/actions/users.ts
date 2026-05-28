@@ -3,19 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { ActionState } from "@/lib/actions/academic-years";
 import { requireAdminAction } from "@/lib/auth/require-admin";
-
-/**
- * Pure helper — returns true if `excludeId` is the only active admin in the list.
- * Exported for unit testing.
- */
-export function isLastAdmin(
-  profiles: { id: string; role: string; is_active: boolean }[],
-  excludeId: string,
-): boolean {
-  return (
-    profiles.filter((p) => p.role === "admin" && p.is_active && p.id !== excludeId).length === 0
-  );
-}
+import { isLastAdmin } from "@/lib/actions/users-helpers";
 
 function revalidate() {
   revalidatePath("/admin/users");
