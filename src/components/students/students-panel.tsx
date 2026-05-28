@@ -180,6 +180,9 @@ export function StudentsPanel() {
       toast.success(`ลบนักเรียนแล้ว ${result.deleted} คน`);
     }
     void queryClient.invalidateQueries({ queryKey: ["students"] });
+    void queryClient.invalidateQueries({ queryKey: ["enrollment-candidates"] });
+    void queryClient.invalidateQueries({ queryKey: ["classroom-roster"] });
+    void queryClient.invalidateQueries({ queryKey: ["classrooms-by-grade"] });
     router.refresh();
   }
 

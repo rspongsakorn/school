@@ -205,6 +205,7 @@ function StudentSheetBody({
       toast.success(isEditMode ? "บันทึกข้อมูลนักเรียนแล้ว" : "เพิ่มนักเรียนเรียบร้อยแล้ว");
       onOpenChange(false);
       void queryClient.invalidateQueries({ queryKey: ["students"] });
+      void queryClient.invalidateQueries({ queryKey: ["enrollment-candidates"] });
       router.refresh();
     } finally {
       setSubmitting(false);
@@ -226,6 +227,9 @@ function StudentSheetBody({
       setDeleteOpen(false);
       onOpenChange(false);
       void queryClient.invalidateQueries({ queryKey: ["students"] });
+      void queryClient.invalidateQueries({ queryKey: ["enrollment-candidates"] });
+      void queryClient.invalidateQueries({ queryKey: ["classroom-roster"] });
+      void queryClient.invalidateQueries({ queryKey: ["classrooms-by-grade"] });
       router.refresh();
     } finally {
       setSubmitting(false);
