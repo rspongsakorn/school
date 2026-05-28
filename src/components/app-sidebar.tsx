@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -8,7 +9,6 @@ import {
   ClipboardList,
   CreditCard,
   FileText,
-  GraduationCap,
   LayoutDashboard,
   Receipt,
   SlidersHorizontal,
@@ -78,13 +78,18 @@ function NavSection({
 function SidebarContent() {
   return (
     <>
-      <div className="flex items-center gap-3 border-b border-border px-5 py-5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-          <GraduationCap className="h-6 w-6 text-primary-foreground" />
-        </div>
-        <div className="flex flex-col">
-          <span className="text-sm font-semibold text-foreground">โรงเรียนตัวอย่าง</span>
-          <span className="text-xs text-muted-foreground">ประถมศึกษา</span>
+      <div className="flex items-center gap-3 border-b border-border px-5 py-4">
+        <Image
+          src="/logo.png"
+          alt="โรงเรียนบัวใหญ่วิทยา"
+          width={44}
+          height={44}
+          className="shrink-0 rounded-full"
+          priority
+        />
+        <div className="flex min-w-0 flex-col">
+          <span className="truncate text-sm font-semibold text-foreground">โรงเรียนบัวใหญ่วิทยา</span>
+          <span className="text-xs text-muted-foreground">อ.บัวใหญ่ จ.นครราชสีมา</span>
         </div>
       </div>
       <nav className="flex-1 overflow-y-auto px-3 py-4">
