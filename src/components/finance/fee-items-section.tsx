@@ -159,6 +159,15 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
 
     if (result.deletedCount > 0) {
       toast.success(`ลบ ${result.deletedCount} รายการแล้ว`);
+      // Optimistic update: ลบออกจาก localItems ทันที ไม่รอ router.refresh()
+      const blockedIdSet = new Set(result.blocked.map((b) => b.id));
+      const deletedIds = new Set(ids.filter((id) => !blockedIdSet.has(id)));
+      setLocalItems((prev) => prev.filter((item) => !deletedIds.has(item.id)));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        deletedIds.forEach((id) => next.delete(id));
+        return next;
+      });
     }
 
     for (const b of result.blocked) {
@@ -166,7 +175,6 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
     }
 
     setDeleteDialogOpen(false);
-    setSelectedIds(new Set());
     router.refresh();
   }
 
