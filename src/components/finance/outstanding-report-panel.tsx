@@ -173,58 +173,95 @@ export function OutstandingReportPanel() {
             </Select>
           </div>
 
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>รหัส</TableHead>
-                <TableHead>ชื่อ-นามสกุล</TableHead>
-                <TableHead>ชั้น/ห้อง</TableHead>
-                <TableHead className="text-right">ค่าใช้จ่าย</TableHead>
-                <TableHead className="text-right">ส่วนลด</TableHead>
-                <TableHead className="text-right">ต้องชำระ</TableHead>
-                <TableHead className="text-right">ชำระแล้ว</TableHead>
-                <TableHead className="text-right">ค้าง</TableHead>
-                <TableHead>สถานะ</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rowsLoading ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="py-6 text-center text-muted-foreground">
-                    กำลังโหลด...
-                  </TableCell>
-                </TableRow>
-              ) : rows.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="py-6 text-center text-muted-foreground">
-                    ไม่พบรายการค้างชำระ
-                  </TableCell>
-                </TableRow>
-              ) : (
-                rows.map((row) => (
-                  <TableRow key={row.studentId}>
-                    <TableCell className="tabular-nums">{row.studentCode}</TableCell>
-                    <TableCell>{row.studentName}</TableCell>
-                    <TableCell>{row.gradeClassroom}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatBaht(row.subtotal)}</TableCell>
-                    <TableCell className="text-right">{row.discountLabel}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatBaht(row.totalAmount)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatBaht(row.paidAmount)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums font-medium">
-                      {formatBaht(row.outstanding)}
-                    </TableCell>
-                    <TableCell>
+          {/* Mobile stacked cards */}
+          {rowsLoading ? (
+            <div className="sm:hidden h-40 animate-pulse rounded-lg bg-muted" />
+          ) : rows.length === 0 ? (
+            <p className="sm:hidden py-6 text-center text-sm text-muted-foreground">
+              ไม่พบรายการค้างชำระ
+            </p>
+          ) : (
+            <div className="sm:hidden space-y-2">
+              {rows.map((row) => (
+                <div key={row.studentId} className="rounded-lg border border-border px-4 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{row.studentName}</p>
+                      <p className="mt-0.5 text-sm text-muted-foreground">
+                        {row.studentCode} · {row.gradeClassroom}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span className="font-semibold tabular-nums text-amber-700">
+                        ค้าง {formatBaht(row.outstanding)}
+                      </span>
                       <Badge variant="outline">{INVOICE_STATUS_LABELS[row.status]}</Badge>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex gap-4 text-sm text-muted-foreground">
+                    <span>ต้องชำระ <span className="tabular-nums text-foreground">{formatBaht(row.totalAmount)}</span></span>
+                    <span>ชำระแล้ว <span className="tabular-nums text-foreground">{formatBaht(row.paidAmount)}</span></span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Desktop table */}
+          <div className="hidden sm:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>รหัส</TableHead>
+                  <TableHead>ชื่อ-นามสกุล</TableHead>
+                  <TableHead>ชั้น/ห้อง</TableHead>
+                  <TableHead className="text-right">ค่าใช้จ่าย</TableHead>
+                  <TableHead className="text-right">ส่วนลด</TableHead>
+                  <TableHead className="text-right">ต้องชำระ</TableHead>
+                  <TableHead className="text-right">ชำระแล้ว</TableHead>
+                  <TableHead className="text-right">ค้าง</TableHead>
+                  <TableHead>สถานะ</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rowsLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="py-6 text-center text-muted-foreground">
+                      กำลังโหลด...
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="py-6 text-center text-muted-foreground">
+                      ไม่พบรายการค้างชำระ
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  rows.map((row) => (
+                    <TableRow key={row.studentId}>
+                      <TableCell className="tabular-nums">{row.studentCode}</TableCell>
+                      <TableCell>{row.studentName}</TableCell>
+                      <TableCell>{row.gradeClassroom}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatBaht(row.subtotal)}</TableCell>
+                      <TableCell className="text-right">{row.discountLabel}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatBaht(row.totalAmount)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatBaht(row.paidAmount)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums font-medium">
+                        {formatBaht(row.outstanding)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{INVOICE_STATUS_LABELS[row.status]}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       </main>
     </>
