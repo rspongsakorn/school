@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/table";
 import { AppHeader } from "@/components/app-header";
 import { InvoiceDiscountDialog } from "@/components/finance/invoice-discount-dialog";
+import { InvoiceReimbursableDialog } from "@/components/finance/invoice-reimbursable-dialog";
 import { InvoiceGenerateDialog } from "@/components/finance/invoice-generate-dialog";
 import { StudentSearchInput } from "@/components/students/student-search-input";
 import { useRequireRole } from "@/components/providers/auth-provider";
@@ -57,6 +58,12 @@ const STATUS_FILTER_ITEMS = [
   { value: "paid", label: "ชำระแล้ว" },
 ];
 
+const REIMBURSABLE_FILTER_ITEMS = [
+  { value: "all", label: "ทุกประเภท" },
+  { value: "reimbursable", label: "เบิกได้" },
+  { value: "standard", label: "เบิกไม่ได้" },
+];
+
 function statusBadgeClass(status: InvoiceListRow["status"]) {
   if (status === "paid") return "bg-emerald-50 text-emerald-700 hover:bg-emerald-50";
   if (status === "partial") return "bg-amber-50 text-amber-700 hover:bg-amber-50";
@@ -75,6 +82,7 @@ export function InvoicesPanel() {
   const statusParam = searchParams.get("status") ?? "all";
   const gradeParam = searchParams.get("grade") ?? "all";
   const classroomParam = searchParams.get("classroom") ?? "all";
+  const reimbursableParam = searchParams.get("reimbursable") ?? "all";
   const pageParam = Math.max(1, Number.parseInt(searchParams.get("page") ?? "1", 10) || 1);
 
   const status: InvoiceStatus | "all" =
@@ -84,6 +92,7 @@ export function InvoicesPanel() {
 
   const [generateOpen, setGenerateOpen] = useState(false);
   const [discountTarget, setDiscountTarget] = useState<InvoiceListRow | null>(null);
+  const [reimbursableTarget, setReimbursableTarget] = useState<InvoiceListRow | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [deleteTargetIds, setDeleteTargetIds] = useState<string[] | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -153,9 +162,19 @@ export function InvoicesPanel() {
     };
   }
 
+  const filteredRows = useMemo(() => {
+    if (reimbursableParam === "reimbursable") {
+      return data.rows.filter((r) => r.isReimbursable);
+    }
+    if (reimbursableParam === "standard") {
+      return data.rows.filter((r) => !r.isReimbursable);
+    }
+    return data.rows;
+  }, [data.rows, reimbursableParam]);
+
   const deletableRows = useMemo(
-    () => data.rows.filter((row) => canDeleteInvoice(deleteContextFor(row))),
-    [data.rows],
+    () => filteredRows.filter((row) => canDeleteInvoice(deleteContextFor(row))),
+    [filteredRows],
   );
 
   const allDeletableSelected =
@@ -163,7 +182,7 @@ export function InvoicesPanel() {
 
   useEffect(() => {
     startTransition(() => setSelectedIds(new Set()));
-  }, [data.page, qParam, status, gradeParam, classroomParam]);
+  }, [data.page, qParam, status, gradeParam, classroomParam, reimbursableParam]);
 
   // Build a grade name lookup map
   const gradeNameById = useMemo(() => {
@@ -195,6 +214,7 @@ export function InvoicesPanel() {
       status: string;
       grade: string;
       classroom: string;
+      reimbursable: string;
       page: number;
     }>) => {
       const query = new URLSearchParams();
@@ -202,12 +222,14 @@ export function InvoicesPanel() {
       const newStatus = next.status ?? statusParam;
       const grade = next.grade ?? gradeParam;
       const classroom = next.classroom ?? classroomParam;
+      const reimbursable = next.reimbursable ?? reimbursableParam;
       const page = next.page ?? pageParam;
 
       if (q) query.set("q", q);
       if (newStatus && newStatus !== "all") query.set("status", newStatus);
       if (grade && grade !== "all") query.set("grade", grade);
       if (classroom && classroom !== "all") query.set("classroom", classroom);
+      if (reimbursable && reimbursable !== "all") query.set("reimbursable", reimbursable);
       query.set("page", String(Math.max(1, page)));
 
       const yearSemester = new URLSearchParams(window.location.search);
@@ -218,7 +240,7 @@ export function InvoicesPanel() {
         router.push(`${pathname}?${query.toString()}`);
       });
     },
-    [qParam, statusParam, gradeParam, classroomParam, pageParam, pathname, router, startTransition],
+    [qParam, statusParam, gradeParam, classroomParam, reimbursableParam, pageParam, pathname, router, startTransition],
   );
 
   function toggleRow(id: string, checked: boolean) {
@@ -304,6 +326,22 @@ export function InvoicesPanel() {
                   </SelectContent>
                 </Select>
                 <Select
+                  value={reimbursableParam}
+                  onValueChange={(v) => pushParams({ reimbursable: v ?? "all", page: 1 })}
+                  items={REIMBURSABLE_FILTER_ITEMS}
+                >
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="ประเภท" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {REIMBURSABLE_FILTER_ITEMS.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
                   value={gradeParam}
                   onValueChange={(v) => pushParams({ grade: v ?? "all", classroom: "all", page: 1 })}
                   items={gradeItems}
@@ -354,13 +392,13 @@ export function InvoicesPanel() {
             </div>
 
             {/* Mobile stacked cards */}
-            {data.rows.length === 0 ? (
+            {filteredRows.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground sm:hidden">
                 ไม่พบใบแจ้งชำระ
               </p>
             ) : (
               <div className="sm:hidden divide-y divide-border rounded-lg border border-border">
-                {data.rows.map((row) => {
+                {filteredRows.map((row) => {
                   const deleteCtx = deleteContextFor(row);
                   const deletable = canDeleteInvoice(deleteCtx);
                   const blockedReason = invoiceDeleteBlockedReason(deleteCtx);
@@ -368,7 +406,12 @@ export function InvoicesPanel() {
                     <div key={row.id} className="space-y-2 px-4 py-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="truncate font-medium">{row.studentName}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="truncate font-medium">{row.studentName}</p>
+                            {row.isReimbursable ? (
+                              <Badge className="bg-sky-50 text-sky-700 hover:bg-sky-50">เบิกได้</Badge>
+                            ) : null}
+                          </div>
                           <p className="mt-0.5 text-sm text-muted-foreground">
                             {row.studentCode} · {row.gradeClassroom}
                           </p>
@@ -394,6 +437,16 @@ export function InvoicesPanel() {
                         ) : null}
                       </div>
                       <div className="flex justify-end gap-2">
+                        {row.paidAmount === 0 ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setReimbursableTarget(row)}
+                          >
+                            {row.isReimbursable ? "เปลี่ยนเป็นเบิกไม่ได้" : "เปลี่ยนเป็นเบิกได้"}
+                          </Button>
+                        ) : null}
                         {row.paidAmount === 0 ? (
                           <Button
                             type="button"
@@ -452,14 +505,14 @@ export function InvoicesPanel() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.rows.length === 0 ? (
+                  {filteredRows.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={9} className="py-6 text-center text-muted-foreground">
                         ไม่พบใบแจ้งชำระ
                       </TableCell>
                     </TableRow>
                   ) : (
-                    data.rows.map((row) => {
+                    filteredRows.map((row) => {
                       const deleteCtx = deleteContextFor(row);
                       const deletable = canDeleteInvoice(deleteCtx);
                       const blockedReason = invoiceDeleteBlockedReason(deleteCtx);
@@ -477,7 +530,14 @@ export function InvoicesPanel() {
                             />
                           </TableCell>
                           <TableCell className="tabular-nums">{row.studentCode}</TableCell>
-                          <TableCell>{row.studentName}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <span>{row.studentName}</span>
+                              {row.isReimbursable ? (
+                                <Badge className="bg-sky-50 text-sky-700 hover:bg-sky-50">เบิกได้</Badge>
+                              ) : null}
+                            </div>
+                          </TableCell>
                           <TableCell>{row.gradeClassroom}</TableCell>
                           <TableCell className="max-w-[180px] truncate">{row.invoiceName}</TableCell>
                           <TableCell className="text-right tabular-nums">
@@ -493,6 +553,16 @@ export function InvoicesPanel() {
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-wrap justify-end gap-2">
+                              {row.paidAmount === 0 ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setReimbursableTarget(row)}
+                                >
+                                  {row.isReimbursable ? "เปลี่ยนเป็นเบิกไม่ได้" : "เปลี่ยนเป็นเบิกได้"}
+                                </Button>
+                              ) : null}
                               {row.paidAmount === 0 ? (
                                 <Button
                                   type="button"
@@ -572,6 +642,12 @@ export function InvoicesPanel() {
               open={Boolean(discountTarget)}
               onOpenChange={(open) => !open && setDiscountTarget(null)}
               invoice={discountTarget}
+            />
+
+            <InvoiceReimbursableDialog
+              open={Boolean(reimbursableTarget)}
+              onOpenChange={(open) => !open && setReimbursableTarget(null)}
+              invoice={reimbursableTarget}
             />
 
             <AlertDialog
