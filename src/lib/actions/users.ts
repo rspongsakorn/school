@@ -48,7 +48,7 @@ export async function createUserAction(input: {
     },
   });
 
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: "ไม่สามารถสร้างบัญชีผู้ใช้ได้: " + error.message };
   revalidate();
   return { ok: true };
 }
@@ -116,7 +116,7 @@ export async function resetPasswordAction(input: {
     password: input.password,
   });
 
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: "ไม่สามารถเปลี่ยนรหัสผ่านได้" };
   return { ok: true };
 }
 
@@ -168,12 +168,25 @@ export async function deleteUserAction(input: {
   const auth = await requireAdminAction();
   if (!auth.ok) return auth;
 
-  // Lazy import to avoid server-only constraint in test environment
   const { createAdminClient } = await import("@/lib/supabase/admin");
   const admin = createAdminClient();
+
+  // Safety: prevent deleting the last active admin
+  const [{ data: currentProfile }, { data: allProfiles }] = await Promise.all([
+    admin.from("profiles").select("role").eq("id", input.userId).maybeSingle(),
+    admin.from("profiles").select("id, role, is_active"),
+  ]);
+
+  if (currentProfile?.role === "admin" && isLastAdmin(allProfiles ?? [], input.userId)) {
+    return {
+      ok: false,
+      error: "ไม่สามารถลบผู้ใช้ได้ เนื่องจากต้องมี admin ที่ใช้งานได้อย่างน้อย 1 คน",
+    };
+  }
+
   const { error } = await admin.auth.admin.deleteUser(input.userId);
 
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: "ไม่สามารถลบบัญชีผู้ใช้ได้" };
   revalidate();
   return { ok: true };
 }
