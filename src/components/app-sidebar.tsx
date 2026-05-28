@@ -101,7 +101,7 @@ export function AppSidebar() {
   return (
     <>
       {/* Desktop: fixed sidebar, hidden on mobile */}
-      <aside className="fixed left-0 top-0 z-40 hidden h-screen w-[260px] flex-col border-r border-border bg-sidebar md:flex">
+      <aside className="fixed left-0 top-0 z-40 hidden h-screen w-[260px] flex-col border-r border-border bg-sidebar lg:flex">
         <SidebarContent />
       </aside>
 

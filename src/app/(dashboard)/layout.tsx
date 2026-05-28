@@ -23,7 +23,7 @@ export default function DashboardLayout({
     <SidebarProvider>
       <div className="min-h-screen bg-background">
         <AppSidebar />
-        <div className="md:ml-[260px]">{children}</div>
+        <div className="lg:ml-[260px]">{children}</div>
       </div>
     </SidebarProvider>
   );
