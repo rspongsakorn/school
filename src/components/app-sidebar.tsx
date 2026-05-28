@@ -11,12 +11,14 @@ import {
   FileText,
   LayoutDashboard,
   Receipt,
+  Settings2,
   SlidersHorizontal,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useSidebarContext } from "@/hooks/use-sidebar";
+import { useAuth } from "@/components/providers/auth-provider";
 
 const basicNav = [
   { href: "/", label: "ภาพรวม", icon: LayoutDashboard },
@@ -32,6 +34,10 @@ const financeNav = [
   { href: "/payments", label: "บันทึกการจ่าย", icon: CreditCard },
   { href: "/reports/outstanding", label: "รายงานค้างชำระ", icon: ChartColumn },
   { href: "/reports/collections", label: "สรุปการเก็บ", icon: ChartColumn },
+];
+
+const systemNav = [
+  { href: "/admin/users", label: "จัดการผู้ใช้", icon: Settings2 },
 ];
 
 function NavSection({
@@ -76,6 +82,8 @@ function NavSection({
 }
 
 function SidebarContent() {
+  const { profile } = useAuth();
+
   return (
     <>
       <div className="flex items-center gap-3 border-b border-sidebar-border px-4 py-4">
@@ -99,6 +107,9 @@ function SidebarContent() {
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         <NavSection title="ข้อมูลพื้นฐาน" items={basicNav} />
         <NavSection title="การเงิน" items={financeNav} />
+        {profile?.role === "admin" && (
+          <NavSection title="ระบบ" items={systemNav} />
+        )}
       </nav>
     </>
   );
