@@ -78,18 +78,22 @@ function NavSection({
 function SidebarContent() {
   return (
     <>
-      <div className="flex items-center gap-3 border-b border-border px-5 py-4">
+      <div className="flex items-center gap-3 border-b border-border px-4 py-4">
         <Image
           src="/logo.png"
           alt="โรงเรียนบัวใหญ่วิทยา"
-          width={44}
-          height={44}
-          className="shrink-0 rounded-full"
+          width={48}
+          height={48}
+          className="shrink-0 rounded-full object-cover"
           priority
         />
-        <div className="flex min-w-0 flex-col">
-          <span className="truncate text-sm font-semibold text-foreground">โรงเรียนบัวใหญ่วิทยา</span>
-          <span className="text-xs text-muted-foreground">อ.บัวใหญ่ จ.นครราชสีมา</span>
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className="truncate text-sm font-semibold leading-tight text-foreground">
+            โรงเรียนบัวใหญ่วิทยา
+          </span>
+          <span className="truncate text-xs leading-tight text-muted-foreground">
+            อ.บัวใหญ่ จ.นครราชสีมา
+          </span>
         </div>
       </div>
       <nav className="flex-1 overflow-y-auto px-3 py-4">
