@@ -7,6 +7,7 @@ export type FeeItemRow = {
   isTuition: boolean;
   isActive: boolean;
   sortOrder: number;
+  hasReimbursableVariant: boolean;
 };
 
 export async function listFeeItems(): Promise<FeeItemRow[]> {
@@ -15,7 +16,9 @@ export async function listFeeItems(): Promise<FeeItemRow[]> {
   // Primary query: with sort_order (requires migration 20260527000000_fee_items_sort_order)
   const { data, error } = await supabase
     .from("fee_items")
-    .select("id, name, description, is_tuition, is_active, sort_order")
+    .select(
+      "id, name, description, is_tuition, is_active, sort_order, has_reimbursable_variant",
+    )
     .order("sort_order", { ascending: true })
     .order("name", { ascending: true });
 
@@ -27,6 +30,7 @@ export async function listFeeItems(): Promise<FeeItemRow[]> {
       isTuition: row.is_tuition,
       isActive: row.is_active,
       sortOrder: row.sort_order,
+      hasReimbursableVariant: row.has_reimbursable_variant,
     }));
   }
 
@@ -45,5 +49,6 @@ export async function listFeeItems(): Promise<FeeItemRow[]> {
     isTuition: row.is_tuition,
     isActive: row.is_active,
     sortOrder: 0,
+    hasReimbursableVariant: false,
   }));
 }
