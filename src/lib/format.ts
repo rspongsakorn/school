@@ -4,6 +4,12 @@ const thaiDateFormatter = new Intl.DateTimeFormat("th-TH", {
   year: "numeric",
 });
 
+const thaiDateFormatterLong = new Intl.DateTimeFormat("th-TH", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
+
 export function formatBaht(amount: number) {
   return `฿${amount.toLocaleString("th-TH")}`;
 }
@@ -11,6 +17,11 @@ export function formatBaht(amount: number) {
 export function formatThaiDate(iso: string | Date) {
   const date = typeof iso === "string" ? new Date(iso) : iso;
   return thaiDateFormatter.format(date);
+}
+
+export function formatThaiDateLong(iso: string | Date) {
+  const date = typeof iso === "string" ? new Date(iso) : iso;
+  return thaiDateFormatterLong.format(date);
 }
 
 export function formatStudentName(firstName: string, lastName: string) {
