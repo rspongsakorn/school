@@ -21,41 +21,57 @@ export function AppHeader({ title, basePath, clearGradeClassroomOnChange = false
   const subtitleSemester = ctx?.semesterNumber ?? 1;
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card px-4 lg:px-6">
-      <div className="flex min-w-0 flex-1 items-center">
-        <button
-          type="button"
-          className="-ml-1 mr-3 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground hover:bg-accent lg:hidden"
-          onClick={open}
-          aria-label="เปิดเมนู"
-          aria-expanded={isOpen}
-        >
-          <Menu className="h-5 w-5" />
-        </button>
-        <div className="min-w-0">
-          <h1 className="truncate text-lg font-semibold text-foreground lg:text-xl">{title}</h1>
-          {subtitleYear ? (
-            <p className="truncate text-xs text-muted-foreground">
-              ภาคเรียนที่ {subtitleSemester} · ปี {subtitleYear}
-            </p>
+    <header className="sticky top-0 z-30 border-b border-border bg-card">
+      {/* Main row */}
+      <div className="flex h-14 items-center justify-between px-4 lg:h-16 lg:px-6">
+        <div className="flex min-w-0 flex-1 items-center">
+          <button
+            type="button"
+            className="-ml-1 mr-3 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground hover:bg-accent lg:hidden"
+            onClick={open}
+            aria-label="เปิดเมนู"
+            aria-expanded={isOpen}
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <div className="min-w-0">
+            <h1 className="truncate text-lg font-semibold text-foreground lg:text-xl">{title}</h1>
+            {subtitleYear ? (
+              <p className="truncate text-xs text-muted-foreground">
+                ภาคเรียนที่ {subtitleSemester} · ปี {subtitleYear}
+              </p>
+            ) : null}
+          </div>
+        </div>
+        <div className="ml-3 flex shrink-0 items-center gap-2 lg:gap-4">
+          {showSelectors && ctx && basePath ? (
+            <div className="hidden sm:block">
+              <YearSemesterSelect
+                years={years}
+                semesters={semesters}
+                selectedYearId={ctx.academicYearId}
+                selectedSemesterNumber={ctx.semesterNumber}
+                basePath={basePath}
+                clearGradeClassroomOnChange={clearGradeClassroomOnChange}
+              />
+            </div>
           ) : null}
+          <UserMenu />
         </div>
       </div>
-      <div className="ml-3 flex shrink-0 items-center gap-2 lg:gap-4">
-        {showSelectors && ctx && basePath ? (
-          <div className="hidden sm:block">
-            <YearSemesterSelect
-              years={years}
-              semesters={semesters}
-              selectedYearId={ctx.academicYearId}
-              selectedSemesterNumber={ctx.semesterNumber}
-              basePath={basePath}
-              clearGradeClassroomOnChange={clearGradeClassroomOnChange}
-            />
-          </div>
-        ) : null}
-        <UserMenu />
-      </div>
+      {/* Mobile selector row — only on pages that have selectors */}
+      {showSelectors && ctx && basePath ? (
+        <div className="flex items-center gap-2 border-t border-border px-4 pb-3 pt-2 sm:hidden">
+          <YearSemesterSelect
+            years={years}
+            semesters={semesters}
+            selectedYearId={ctx.academicYearId}
+            selectedSemesterNumber={ctx.semesterNumber}
+            basePath={basePath}
+            clearGradeClassroomOnChange={clearGradeClassroomOnChange}
+          />
+        </div>
+      ) : null}
     </header>
   );
 }
