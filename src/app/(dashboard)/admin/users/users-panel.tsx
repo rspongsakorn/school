@@ -173,10 +173,12 @@ export function UsersPanel({
   }
 
   async function handleToggleActive(user: UserRow) {
+    setSubmitting(true);
     const result = await toggleActiveAction({
       userId: user.id,
       isActive: !user.isActive,
     });
+    setSubmitting(false);
     if (!result.ok) { toast.error(result.error); return; }
     toast.success(user.isActive ? "ปิดใช้งานแล้ว" : "เปิดใช้งานแล้ว");
     router.refresh();
@@ -267,6 +269,7 @@ export function UsersPanel({
                             size="sm"
                             variant="outline"
                             className="text-destructive"
+                            disabled={submitting}
                             onClick={() => handleToggleActive(u)}
                           >
                             ปิด
@@ -279,6 +282,7 @@ export function UsersPanel({
                               size="sm"
                               variant="outline"
                               className="text-emerald-700"
+                              disabled={submitting}
                               onClick={() => handleToggleActive(u)}
                             >
                               เปิด
