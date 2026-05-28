@@ -23,23 +23,38 @@ import { formatThaiBirthDate } from "@/lib/students/dates";
 import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type ImportStudentPreview = {
-  studentCode: string;
-  idCard: string | null;
-  name: string;
-  genderLabel: string;
-  birthDateLabel: string;
+export type ImportNewClassroom = {
+  gradeName: string;
+  number: string;
+  gradeIsNew: boolean;
 };
 
 export type PreviewStudentCsvImportResult =
   | { ok: false; error: string }
   | {
       ok: true;
-      stats: { ready: number; errors: number };
+      stats: {
+        ready: number;
+        errors: number;
+        willEnroll: number;
+        willCreateGrades: number;
+        willCreateClassrooms: number;
+      };
       ready: ImportStudentRow[];
       preview: ImportStudentPreview[];
       errors: ImportRowError[];
+      newGradeLevels: { name: string }[];
+      newClassrooms: ImportNewClassroom[];
     };
+
+export type ImportStudentPreview = {
+  studentCode: string;
+  idCard: string | null;
+  name: string;
+  genderLabel: string;
+  birthDateLabel: string;
+  classroomLabel: string | null;
+};
 
 export type ConfirmStudentCsvImportResult =
   | { ok: false; error: string }
@@ -64,6 +79,7 @@ async function loadExistingStudentCodes(codes: string[]): Promise<Set<string>> {
 
 export async function previewStudentCsvImport(
   rows: CsvStudentInputRow[],
+  semesterId: string | null,
 ): Promise<PreviewStudentCsvImportResult> {
   const auth = await requireAdminAction();
   if (!auth.ok) return auth;
@@ -80,20 +96,91 @@ export async function previewStudentCsvImport(
     const existingSet = await loadExistingStudentCodes(codes);
     const { ready, errors } = validateAndBuildImportRows(rows, existingSet);
 
+    const rowsWithClassroom = ready.filter((r) => r.classroom != null);
+    if (rowsWithClassroom.length > 0 && !semesterId) {
+      return {
+        ok: false,
+        error: "ต้องตั้งภาคเรียนปัจจุบันก่อนใช้คอลัมน์ classroom",
+      };
+    }
+
+    const supabase = await createClient();
+
+    const existingGradeMap = new Map<string, string>(); // name -> id
+    const existingClassroomMap = new Map<string, string>(); // gradeName|number -> id
+
+    if (semesterId) {
+      const { data: gradeRows } = await supabase
+        .from("grade_levels")
+        .select("id, name")
+        .eq("semester_id", semesterId);
+      for (const row of gradeRows ?? []) {
+        existingGradeMap.set(row.name, row.id);
+      }
+
+      if (existingGradeMap.size > 0) {
+        const gradeIds = [...existingGradeMap.values()];
+        const { data: classroomRows } = await supabase
+          .from("classrooms")
+          .select("id, name, grade_level_id")
+          .in("grade_level_id", gradeIds);
+        const gradeIdToName = new Map<string, string>();
+        for (const [name, id] of existingGradeMap) gradeIdToName.set(id, name);
+        for (const row of classroomRows ?? []) {
+          const gradeName = gradeIdToName.get(row.grade_level_id);
+          if (!gradeName) continue;
+          existingClassroomMap.set(`${gradeName}|${row.name}`, row.id);
+        }
+      }
+    }
+
+    const newGradeSet = new Set<string>();
+    const newClassroomMap = new Map<string, ImportNewClassroom>();
+
+    for (const row of rowsWithClassroom) {
+      if (!row.classroom) continue;
+      const { gradeName, classroomNumber } = row.classroom;
+      const gradeIsNew = !existingGradeMap.has(gradeName);
+      if (gradeIsNew) newGradeSet.add(gradeName);
+
+      const key = `${gradeName}|${classroomNumber}`;
+      if (!existingClassroomMap.has(key) && !newClassroomMap.has(key)) {
+        newClassroomMap.set(key, {
+          gradeName,
+          number: classroomNumber,
+          gradeIsNew,
+        });
+      }
+    }
+
+    const newGradeLevels = [...newGradeSet].map((name) => ({ name }));
+    const newClassrooms = [...newClassroomMap.values()];
+
     const preview: ImportStudentPreview[] = ready.map((row) => ({
       studentCode: row.studentCode,
       idCard: row.idCard,
       name: `${row.firstName} ${row.lastName}`,
       genderLabel: STUDENT_GENDER_LABELS[row.gender],
       birthDateLabel: formatThaiBirthDate(row.dateOfBirth),
+      classroomLabel: row.classroom
+        ? `${row.classroom.gradeName}/${row.classroom.classroomNumber}`
+        : null,
     }));
 
     return {
       ok: true,
-      stats: { ready: ready.length, errors: errors.length },
+      stats: {
+        ready: ready.length,
+        errors: errors.length,
+        willEnroll: rowsWithClassroom.length,
+        willCreateGrades: newGradeLevels.length,
+        willCreateClassrooms: newClassrooms.length,
+      },
       ready,
       preview,
       errors,
+      newGradeLevels,
+      newClassrooms,
     };
   } catch {
     return { ok: false, error: "ไม่สามารถตรวจสอบไฟล์ได้" };
