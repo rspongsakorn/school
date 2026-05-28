@@ -187,9 +187,8 @@ export function RegistrationPanel() {
       router.push(buildUrl({ grade: null, classroom: null }));
     } else if (deleteTarget.type === "classroom" && deleteTarget.id === selectedClassroomId) {
       router.push(buildUrl({ classroom: null }));
-    } else {
-      invalidateAll();
     }
+    invalidateAll();
   }
 
   function buildUrl(updates: { grade?: string | null; classroom?: string | null }) {

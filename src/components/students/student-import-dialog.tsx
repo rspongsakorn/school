@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -82,6 +83,7 @@ export function StudentImportDialog({
   semesterLabel,
 }: StudentImportDialogProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [phase, setPhase] = useState<ImportPhase>("setup");
   const [parsing, setParsing] = useState(false);
@@ -186,6 +188,11 @@ export function StudentImportDialog({
     }
 
     onOpenChange(false);
+    void queryClient.invalidateQueries({ queryKey: ["students"] });
+    void queryClient.invalidateQueries({ queryKey: ["grade-levels"] });
+    void queryClient.invalidateQueries({ queryKey: ["classrooms-by-grade"] });
+    void queryClient.invalidateQueries({ queryKey: ["classrooms-by-semester"] });
+    void queryClient.invalidateQueries({ queryKey: ["classroom-roster"] });
     router.refresh();
   }
 

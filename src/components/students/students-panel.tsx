@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -63,6 +63,7 @@ function statusBadgeClass(status: StudentStatus) {
 
 export function StudentsPanel() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const pathname = usePathname();
   const rawSearchParams = useSearchParams();
   const { profile } = useAuth();
@@ -178,6 +179,7 @@ export function StudentsPanel() {
     } else {
       toast.success(`ลบนักเรียนแล้ว ${result.deleted} คน`);
     }
+    void queryClient.invalidateQueries({ queryKey: ["students"] });
     router.refresh();
   }
 
