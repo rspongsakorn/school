@@ -26,6 +26,8 @@ import {
 } from "@/components/ui/table";
 import { formatBaht } from "@/lib/format";
 import { INVOICE_STATUS_LABELS } from "@/lib/finance/constants";
+import { ReportToolbar } from "@/components/finance/report-toolbar";
+import { ReportLetterhead } from "@/components/finance/report-letterhead";
 
 const STATUS_ITEMS = [
   { value: "all", label: "ค้างทั้งหมด" },
@@ -37,6 +39,11 @@ const REIMBURSABLE_ITEMS = [
   { value: "all", label: "ทุกประเภท" },
   { value: "reimbursable", label: "เบิกได้" },
   { value: "standard", label: "เบิกไม่ได้" },
+];
+
+const VIEW_ITEMS = [
+  { value: "list", label: "ตามรายชื่อ" },
+  { value: "byRoom", label: "จัดกลุ่มตามห้อง" },
 ];
 
 export function OutstandingReportPanel() {
@@ -59,6 +66,9 @@ export function OutstandingReportPanel() {
     variantParam === "reimbursable" || variantParam === "standard"
       ? variantParam
       : "all";
+
+  const viewParam: "list" | "byRoom" =
+    searchParams.get("view") === "byRoom" ? "byRoom" : "list";
 
   const teacherProfileId = profile?.role === "teacher" ? profile.id : undefined;
 
@@ -98,7 +108,7 @@ export function OutstandingReportPanel() {
     enabled: !!ctx,
   });
 
-  const params = { grade: gradeParam, classroom: classroomParam, status: statusParam, variant: variantValue };
+  const params = { grade: gradeParam, classroom: classroomParam, status: statusParam, variant: variantValue, view: viewParam };
 
   const pushParams = useCallback(
     (next: Partial<typeof params>) => {
@@ -107,6 +117,7 @@ export function OutstandingReportPanel() {
       const classroom = next.classroom ?? params.classroom;
       const status = next.status ?? params.status;
       const variant = next.variant ?? params.variant;
+      const view = next.view ?? params.view;
 
       if (grade !== "all") query.set("grade", grade);
       else query.delete("grade");
@@ -116,6 +127,8 @@ export function OutstandingReportPanel() {
       else query.delete("status");
       if (variant !== "all") query.set("variant", variant);
       else query.delete("variant");
+      if (view !== "list") query.set("view", view);
+      else query.delete("view");
 
       router.push(`${pathname}?${query.toString()}`);
     },
@@ -134,12 +147,28 @@ export function OutstandingReportPanel() {
       .map((c) => ({ value: c.id, label: `${grades.find((g) => g.id === c.grade_level_id)?.name ?? ""}/${c.name}` })),
   ];
 
+  const groupedByRoom = (() => {
+    const groups = new Map<string, typeof rows>();
+    for (const row of rows) {
+      const key = row.gradeClassroom;
+      const list = groups.get(key) ?? [];
+      list.push(row);
+      groups.set(key, list);
+    }
+    return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0], "th"));
+  })();
+
   return (
     <>
       <AppHeader title="รายงานค้างชำระ" basePath="/reports/outstanding" />
       <main className="p-4 lg:p-6">
+        <ReportLetterhead
+          title="รายงานลูกหนี้ค้างชำระ"
+          yearName={ctx?.academicYearName}
+          semesterNumber={ctx?.semesterNumber}
+        />
         <div className="space-y-4">
-          <div className="flex flex-wrap gap-2">
+          <div className="report-toolbar flex flex-wrap items-center gap-2">
             <Select
               value={params.grade}
               onValueChange={(v) => pushParams({ grade: v ?? "all", classroom: "all" })}
@@ -204,6 +233,23 @@ export function OutstandingReportPanel() {
                 ))}
               </SelectContent>
             </Select>
+            <Select
+              value={viewParam}
+              onValueChange={(v) => pushParams({ view: (v ?? "list") as typeof params.view })}
+              items={VIEW_ITEMS}
+            >
+              <SelectTrigger className="w-[170px]">
+                <SelectValue placeholder="มุมมอง" />
+              </SelectTrigger>
+              <SelectContent>
+                {VIEW_ITEMS.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <ReportToolbar />
           </div>
 
           {/* Mobile stacked cards */}
@@ -246,6 +292,57 @@ export function OutstandingReportPanel() {
           )}
 
           {/* Desktop table */}
+          {viewParam === "byRoom" ? (
+            rowsLoading ? (
+              <div className="hidden sm:block h-40 animate-pulse rounded-lg bg-muted" />
+            ) : rows.length === 0 ? (
+              <p className="hidden sm:block py-6 text-center text-sm text-muted-foreground">
+                ไม่พบรายการค้างชำระ
+              </p>
+            ) : (
+              <div className="hidden sm:block space-y-6">
+                {groupedByRoom.map(([room, roomRows]) => {
+                  const roomOutstanding = roomRows.reduce((s, r) => s + r.outstanding, 0);
+                  return (
+                    <div key={room} className="report-room-group">
+                      <div className="mb-2 flex items-center justify-between">
+                        <h3 className="font-semibold">{room}</h3>
+                        <span className="text-sm text-muted-foreground tabular-nums">
+                          ค้างรวม {formatBaht(roomOutstanding)}
+                        </span>
+                      </div>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>รหัส</TableHead>
+                            <TableHead>ชื่อ-นามสกุล</TableHead>
+                            <TableHead className="text-right">ต้องชำระ</TableHead>
+                            <TableHead className="text-right">ชำระแล้ว</TableHead>
+                            <TableHead className="text-right">ค้าง</TableHead>
+                            <TableHead>สถานะ</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {roomRows.map((row) => (
+                            <TableRow key={row.studentId}>
+                              <TableCell className="tabular-nums">{row.studentCode}</TableCell>
+                              <TableCell>{row.studentName}</TableCell>
+                              <TableCell className="text-right tabular-nums">{formatBaht(row.totalAmount)}</TableCell>
+                              <TableCell className="text-right tabular-nums">{formatBaht(row.paidAmount)}</TableCell>
+                              <TableCell className="text-right tabular-nums font-medium">{formatBaht(row.outstanding)}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{INVOICE_STATUS_LABELS[row.status]}</Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          ) : (
           <div className="hidden sm:block">
             <Table>
               <TableHeader>
@@ -307,6 +404,7 @@ export function OutstandingReportPanel() {
               </TableBody>
             </Table>
           </div>
+          )}
         </div>
       </main>
     </>

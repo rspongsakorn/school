@@ -32,8 +32,10 @@ const financeNav = [
   { href: "/receipt-types", label: "ประเภทใบเสร็จ", icon: Receipt },
   { href: "/invoices", label: "ใบแจ้งชำระ", icon: FileText },
   { href: "/payments", label: "บันทึกการจ่าย", icon: CreditCard },
+  { href: "/reports/daily", label: "รายรับรายวัน", icon: ChartColumn },
   { href: "/reports/outstanding", label: "รายงานค้างชำระ", icon: ChartColumn },
-  { href: "/reports/collections", label: "สรุปการเก็บ", icon: ChartColumn },
+  { href: "/reports/collections", label: "สถิติการเก็บ", icon: ChartColumn },
+  { href: "/reports/students", label: "รายบุคคล", icon: Users },
 ];
 
 const systemNav = [
@@ -83,6 +85,8 @@ function NavSection({
 
 const teacherNav = [
   { href: "/reports/outstanding", label: "รายงานค้างชำระ", icon: ChartColumn },
+  { href: "/reports/collections", label: "สถิติการเก็บ", icon: ChartColumn },
+  { href: "/reports/students", label: "รายบุคคล", icon: Users },
 ];
 
 function SidebarContent() {

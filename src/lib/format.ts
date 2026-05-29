@@ -25,6 +25,17 @@ export function formatThaiDateLong(iso: string | Date) {
   return thaiDateFormatterLong.format(date);
 }
 
+const thaiTimeFormatter = new Intl.DateTimeFormat("th-TH", {
+  timeZone: "Asia/Bangkok",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+export function formatThaiTime(iso: string | Date) {
+  const date = typeof iso === "string" ? new Date(iso) : iso;
+  return thaiTimeFormatter.format(date);
+}
+
 export function formatStudentName(firstName: string, lastName: string) {
   return `${firstName} ${lastName}`.trim();
 }
