@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import { formatClassroom, formatStudentName, formatThaiTime } from "@/lib/format";
+import { formatClassroom, formatStudentName, formatThaiTime, formatThaiDate } from "@/lib/format";
 import { bangkokDateKey } from "@/lib/reports/date";
 import { groupDailyRevenue, type DailyRevenueRow } from "@/lib/reports/daily";
 
@@ -537,4 +537,95 @@ export async function fetchDailyRevenue(params: {
   }
 
   return { summary, receiptsByDate };
+}
+
+export type StatementLine = { description: string; amount: number };
+export type StatementPayment = {
+  paidAt: string;
+  dateLabel: string;
+  receiptNumber: string;
+  method: "cash" | "transfer";
+  amount: number;
+  status: "active" | "voided";
+};
+export type StudentStatement = {
+  studentCode: string;
+  studentName: string;
+  gradeClassroom: string;
+  lines: StatementLine[];
+  payments: StatementPayment[];
+  totalDue: number;
+  totalPaid: number;
+  outstanding: number;
+};
+
+export async function fetchStudentStatement(
+  studentId: string,
+  semesterId: string,
+  academicYearId: string,
+): Promise<StudentStatement | null> {
+  const supabase = createClient();
+  const gradeByStudent = await getStudentGradeMap(semesterId);
+
+  const { data: student } = await supabase
+    .from("students")
+    .select("student_code, first_name, last_name")
+    .eq("id", studentId)
+    .single();
+  if (!student) return null;
+
+  const { data: invoices } = await supabase
+    .from("student_invoices")
+    .select("id, total_amount, paid_amount, invoice_lines ( description, amount )")
+    .eq("student_id", studentId)
+    .eq("academic_year_id", academicYearId)
+    .eq("semester_id", semesterId);
+
+  type InvoiceRow = {
+    id: string;
+    total_amount: number;
+    paid_amount: number;
+    invoice_lines: { description: string; amount: number }[];
+  };
+  const invoiceRows = (invoices ?? []) as unknown as InvoiceRow[];
+
+  const lines: StatementLine[] = invoiceRows.flatMap((inv) =>
+    inv.invoice_lines.map((l) => ({ description: l.description, amount: Number(l.amount) })),
+  );
+  const totalDue = invoiceRows.reduce((s, i) => s + Number(i.total_amount), 0);
+  const totalPaid = invoiceRows.reduce((s, i) => s + Number(i.paid_amount), 0);
+
+  const { data: payments } = await supabase
+    .from("payments")
+    .select("receipt_number, payment_method, amount, paid_at, status")
+    .eq("student_id", studentId)
+    .eq("academic_year_id", academicYearId)
+    .order("paid_at", { ascending: true });
+
+  type PayRow = {
+    receipt_number: string;
+    payment_method: "cash" | "transfer";
+    amount: number;
+    paid_at: string;
+    status: "active" | "voided";
+  };
+  const paymentRows = ((payments ?? []) as unknown as PayRow[]).map((p) => ({
+    paidAt: p.paid_at,
+    dateLabel: formatThaiDate(p.paid_at),
+    receiptNumber: p.receipt_number,
+    method: p.payment_method,
+    amount: Number(p.amount),
+    status: p.status,
+  }));
+
+  return {
+    studentCode: student.student_code,
+    studentName: formatStudentName(student.first_name, student.last_name),
+    gradeClassroom: gradeByStudent.get(studentId) ?? "—",
+    lines,
+    payments: paymentRows,
+    totalDue: round2(totalDue),
+    totalPaid: round2(totalPaid),
+    outstanding: round2(totalDue - totalPaid),
+  };
 }
