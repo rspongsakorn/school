@@ -590,7 +590,7 @@ export async function fetchStudentStatement(
   const invoiceRows = (invoices ?? []) as unknown as InvoiceRow[];
 
   const lines: StatementLine[] = invoiceRows.flatMap((inv) =>
-    inv.invoice_lines.map((l) => ({ description: l.description, amount: Number(l.amount) })),
+    (inv.invoice_lines ?? []).map((l) => ({ description: l.description, amount: Number(l.amount) })),
   );
   const totalDue = invoiceRows.reduce((s, i) => s + Number(i.total_amount), 0);
   const totalPaid = invoiceRows.reduce((s, i) => s + Number(i.paid_amount), 0);
@@ -626,6 +626,6 @@ export async function fetchStudentStatement(
     payments: paymentRows,
     totalDue: round2(totalDue),
     totalPaid: round2(totalPaid),
-    outstanding: round2(totalDue - totalPaid),
+    outstanding: Math.max(0, round2(totalDue - totalPaid)),
   };
 }
