@@ -253,6 +253,8 @@ export function PaymentsPanel() {
     setNote("");
     setTransferRef("");
     void queryClient.invalidateQueries({ queryKey: ["payments"] });
+    void queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    void queryClient.invalidateQueries({ queryKey: ["invoice-candidates"] });
     router.refresh();
   }
 
@@ -271,6 +273,8 @@ export function PaymentsPanel() {
 
     toast.success("ยกเลิกใบเสร็จแล้ว");
     void queryClient.invalidateQueries({ queryKey: ["payments"] });
+    void queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    void queryClient.invalidateQueries({ queryKey: ["invoice-candidates"] });
     router.refresh();
   }
 
