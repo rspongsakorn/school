@@ -662,3 +662,58 @@ export async function deleteStudents(studentIds: string[]): Promise<DeleteStuden
   revalidatePath("/reports/collections");
   return { ok: true, deleted: deletableIds.length, skipped };
 }
+
+export async function deleteAllStudents(): Promise<DeleteStudentsResult> {
+  const auth = await requireAdminAction();
+  if (!auth.ok) return auth;
+
+  const supabase = await createClient();
+
+  const { data: allStudents, error: fetchError } = await supabase
+    .from("students")
+    .select("id");
+
+  if (fetchError) return { ok: false, error: "ไม่สามารถดึงข้อมูลนักเรียนได้" };
+
+  const allIds = (allStudents ?? []).map((s) => s.id);
+
+  if (allIds.length === 0) {
+    return { ok: true, deleted: 0, skipped: 0 };
+  }
+
+  const [activeEnrollments, activePayments] = await Promise.all([
+    supabase
+      .from("student_enrollments")
+      .select("student_id")
+      .in("student_id", allIds)
+      .eq("status", "enrolled"),
+    supabase
+      .from("payments")
+      .select("student_id")
+      .in("student_id", allIds)
+      .eq("status", "active"),
+  ]);
+
+  const blockedIds = new Set<string>();
+  for (const row of activeEnrollments.data ?? []) blockedIds.add(row.student_id);
+  for (const row of activePayments.data ?? []) blockedIds.add(row.student_id);
+
+  const deletableIds = allIds.filter((id) => !blockedIds.has(id));
+  const skipped = allIds.length - deletableIds.length;
+
+  for (const studentId of deletableIds) {
+    const cleanup = await deleteStudentDependents(supabase, studentId);
+    if (!cleanup.ok) return cleanup;
+
+    const { error } = await supabase.from("students").delete().eq("id", studentId);
+    if (error) return { ok: false, error: "ไม่สามารถลบนักเรียนได้" };
+  }
+
+  revalidatePath("/students");
+  revalidatePath("/registration");
+  revalidatePath("/invoices");
+  revalidatePath("/payments");
+  revalidatePath("/reports/outstanding");
+  revalidatePath("/reports/collections");
+  return { ok: true, deleted: deletableIds.length, skipped };
+}
