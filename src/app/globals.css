@@ -128,3 +128,23 @@
     @apply font-sans;
   }
 }
+
+@media print {
+  aside,
+  header.sticky,
+  .report-toolbar {
+    display: none !important;
+  }
+  .report-letterhead {
+    display: block !important;
+  }
+  main {
+    padding: 0 !important;
+  }
+  .report-room-group {
+    break-before: page;
+  }
+  .report-room-group:first-of-type {
+    break-before: auto;
+  }
+}
