@@ -1,0 +1,509 @@
+<h2>Preview: หน้า Dashboard ในสไตล์ใหม่</h2>
+<p class="subtitle">แทนข้อมูล "Investor" ด้วย School metrics — sidebar แบบ gradient, card โค้งมน, สีพาสเทล</p>
+
+<style>
+  .preview-frame {
+    background: #eef2f7;
+    padding: 32px 24px;
+    border-radius: 20px;
+    position: relative;
+    overflow: hidden;
+    font-family: 'Inter', 'Sarabun', system-ui, sans-serif;
+  }
+  .preview-frame::before, .preview-frame::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(8px);
+    pointer-events: none;
+  }
+  .preview-frame::before {
+    top: -60px; left: -40px;
+    width: 160px; height: 100px;
+    background: linear-gradient(135deg, #9ce5d2, #b5e3b4);
+    opacity: 0.6;
+  }
+  .preview-frame::after {
+    bottom: -60px; right: -40px;
+    width: 200px; height: 140px;
+    background: linear-gradient(135deg, #ffb59c, #ff9d8a);
+    opacity: 0.45;
+  }
+  .app-shell {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 20px;
+    background: transparent;
+  }
+  .sb {
+    background: linear-gradient(180deg, #5aa8e6 0%, #59c9a8 100%);
+    border-radius: 18px;
+    padding: 22px 14px;
+    color: white;
+    box-shadow: 0 10px 30px rgba(89, 168, 230, 0.25);
+    min-height: 580px;
+    position: relative;
+    overflow: hidden;
+  }
+  .sb-brand {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 700; font-size: 14px;
+    padding: 0 6px 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+    margin-bottom: 18px;
+  }
+  .sb-brand .logo {
+    width: 32px; height: 32px;
+    background: white;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .sb-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 12px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.85);
+    margin-bottom: 4px;
+    cursor: default;
+    position: relative;
+  }
+  .sb-item.active {
+    background: white;
+    color: #2a8aac;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+    font-weight: 600;
+  }
+  .sb-item .ic { width: 18px; height: 18px; display: inline-block; flex-shrink: 0; }
+  .sb-item .badge {
+    margin-left: auto;
+    background: #ffac8a;
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 10px;
+  }
+  .main {
+    display: flex; flex-direction: column; gap: 18px;
+    padding-right: 8px;
+  }
+  .topbar {
+    display: flex; align-items: center; gap: 20px;
+    background: white;
+    border-radius: 14px;
+    padding: 10px 16px;
+    box-shadow: 0 2px 12px rgba(40,60,90,0.06);
+  }
+  .search {
+    flex: 1;
+    color: #98a3b3; font-size: 13px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .top-actions { display: flex; align-items: center; gap: 14px; color: #6b7a8c; }
+  .top-actions .dot {
+    width: 28px; height: 28px;
+    background: #f3f6fa;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .top-actions .dot .n {
+    position: absolute; top: -4px; right: -4px;
+    background: #ffac8a; color: white;
+    font-size: 9px; font-weight: 700;
+    padding: 1px 5px; border-radius: 8px;
+  }
+  .me { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #334;}
+  .me .av { width: 32px; height: 32px; border-radius: 50%; background: #ffd9c8; }
+
+  .summary-title {
+    font-size: 14px; font-weight: 700; color: #1a2940;
+    margin: 4px 0 10px; padding-left: 4px;
+  }
+
+  .stats {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+  }
+  .stat {
+    background: white;
+    border-radius: 14px;
+    padding: 14px 16px;
+    box-shadow: 0 2px 14px rgba(40,60,90,0.05);
+    display: flex; flex-direction: column; gap: 4px;
+    position: relative;
+  }
+  .stat .label { font-size: 11px; color: #98a3b3; }
+  .stat .num { font-size: 24px; font-weight: 700; color: #1a2940; }
+  .stat .glyph {
+    position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+    width: 34px; height: 34px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+
+  .cards-row {
+    display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px;
+  }
+  .card {
+    background: white;
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: 0 2px 14px rgba(40,60,90,0.05);
+  }
+  .card-title { font-size: 13px; font-weight: 700; color: #1a2940; margin-bottom: 12px; }
+
+  .donut-wrap {
+    display: flex; align-items: center; gap: 18px;
+  }
+  .donut {
+    width: 110px; height: 110px; border-radius: 50%;
+    background: conic-gradient(
+      #59c9a8 0deg 154deg,
+      #ffac8a 154deg 252deg,
+      #f7d76e 252deg 324deg,
+      #5aa8e6 324deg 360deg
+    );
+    position: relative; display: flex; align-items: center; justify-content: center;
+  }
+  .donut::after {
+    content: ''; position: absolute; inset: 18px; background: white; border-radius: 50%;
+  }
+  .donut .center {
+    position: relative; z-index: 1; text-align: center;
+  }
+  .donut .center .pct { font-size: 18px; font-weight: 800; color: #1a2940; }
+  .donut .center .lbl { font-size: 9px; color: #98a3b3; }
+  .legend { font-size: 11px; color: #334; line-height: 1.7; }
+  .legend .row { display: flex; align-items: center; gap: 8px; }
+  .legend .sw { width: 8px; height: 8px; border-radius: 50%; }
+
+  .map {
+    height: 130px;
+    background: #f9fbfd url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 100'%3E%3Cpath d='M30 50 Q60 30 100 45 T180 55' fill='none' stroke='%23dde4eb' stroke-width='0.5'/%3E%3Cpath d='M20 60 L40 55 L55 65 L70 60 L90 70 L110 65 L130 70 L150 65 L175 70' fill='none' stroke='%23dde4eb' stroke-width='0.5'/%3E%3C/svg%3E") center/cover no-repeat;
+    border-radius: 10px;
+    position: relative;
+  }
+  .map .pin { position: absolute; width: 14px; height: 14px; border-radius: 50%; opacity: 0.55; }
+
+  .table-card {
+    background: white;
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: 0 2px 14px rgba(40,60,90,0.05);
+  }
+  .table-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .table-actions { display: flex; align-items: center; gap: 12px; font-size: 12px; color: #6b7a8c; }
+  .pill-btn {
+    background: linear-gradient(135deg, #ffac8a, #ff9077);
+    color: white;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 11px; font-weight: 700;
+    box-shadow: 0 4px 12px rgba(255, 130, 100, 0.3);
+  }
+  .row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 6px;
+    border-bottom: 1px solid #eef2f7;
+  }
+  .row:last-child { border-bottom: 0; }
+  .row .av { width: 32px; height: 32px; border-radius: 50%; }
+  .row .info { flex: 1; }
+  .row .name { font-size: 13px; font-weight: 600; color: #1a2940; }
+  .row .sub { font-size: 11px; color: #98a3b3; }
+  .row .tag {
+    background: #f3f6fa; color: #6b7a8c;
+    padding: 4px 11px; border-radius: 12px;
+    font-size: 11px; font-weight: 500;
+  }
+
+  .right-col {
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .net-stats {
+    background: white;
+    border-radius: 14px;
+    padding: 16px;
+    box-shadow: 0 2px 14px rgba(40,60,90,0.05);
+  }
+  .net-title { font-size: 13px; font-weight: 700; color: #1a2940; margin-bottom: 12px; }
+  .net-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center; }
+  .net-grid .num { font-size: 18px; font-weight: 700; color: #1a2940; }
+  .net-grid .lbl { font-size: 10px; color: #98a3b3; margin-top: 2px; }
+
+  .pen-card {
+    background: white;
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: 0 2px 14px rgba(40,60,90,0.05);
+    text-align: center;
+  }
+  .pen-card .circle {
+    width: 44px; height: 44px;
+    margin: 0 auto 10px;
+    background: linear-gradient(135deg, #ffd9c8, #ffac8a);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .pen-card h4 { font-size: 13px; font-weight: 700; margin: 4px 0 6px; color: #1a2940; }
+  .pen-card p { font-size: 11px; color: #98a3b3; margin-bottom: 12px; line-height: 1.5; }
+  .pen-input {
+    background: #f9fbfd;
+    border: 1px solid #eef2f7;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 11px;
+    color: #98a3b3;
+    margin-bottom: 10px;
+  }
+
+  .layout-grid {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 14px;
+    align-items: flex-start;
+  }
+</style>
+
+<div class="preview-frame">
+  <div class="app-shell">
+    <!-- Gradient Sidebar -->
+    <div class="sb">
+      <div class="sb-brand">
+        <div class="logo">🏫</div>
+        <div>บัวใหญ่<br><span style="font-weight:400; font-size:10px; opacity:0.8">วิทยา</span></div>
+      </div>
+      <div class="sb-item active">📊 ภาพรวม</div>
+      <div class="sb-item">📅 ปีการศึกษา</div>
+      <div class="sb-item">👥 นักเรียน</div>
+      <div class="sb-item">📋 ลงทะเบียน</div>
+      <div class="sb-item">💰 ค่าธรรมเนียม</div>
+      <div class="sb-item">📄 ใบแจ้งชำระ</div>
+      <div class="sb-item">💳 บันทึกการจ่าย</div>
+      <div class="sb-item">📈 รายงานค้างชำระ <span class="badge">42</span></div>
+    </div>
+
+    <!-- Main column -->
+    <div class="main">
+      <!-- Topbar -->
+      <div class="topbar">
+        <div class="search">🔍 ค้นหานักเรียน / รหัส...</div>
+        <div class="top-actions">
+          <div class="dot">📅</div>
+          <div class="dot">⚙️</div>
+          <div class="dot">🔔 <span class="n">7</span></div>
+        </div>
+        <div class="me">
+          ผู้ดูแลระบบ
+          <div class="av"></div>
+        </div>
+      </div>
+
+      <div class="summary-title">สรุปข้อมูลภาพรวม</div>
+
+      <!-- Stat cards -->
+      <div class="stats">
+        <div class="stat">
+          <div class="label">นักเรียนทั้งหมด</div>
+          <div class="num">685</div>
+          <div class="glyph" style="background:#e9f6ff;">👥</div>
+        </div>
+        <div class="stat">
+          <div class="label">ห้องเรียน</div>
+          <div class="num">24</div>
+          <div class="glyph" style="background:#e8f7f2;">🏫</div>
+        </div>
+        <div class="stat">
+          <div class="label">ใบแจ้งชำระ</div>
+          <div class="num">512</div>
+          <div class="glyph" style="background:#fff4ec;">📄</div>
+        </div>
+        <div class="stat">
+          <div class="label">ค้างชำระ</div>
+          <div class="num">42</div>
+          <div class="glyph" style="background:#fef6e0;">⚠️</div>
+        </div>
+      </div>
+
+      <div class="layout-grid">
+        <div style="display:flex; flex-direction:column; gap:14px;">
+
+          <!-- Charts row -->
+          <div class="cards-row">
+            <div class="card">
+              <div class="card-title">สัดส่วนการเก็บเงินตามประเภท</div>
+              <div class="donut-wrap">
+                <div class="donut">
+                  <div class="center">
+                    <div class="pct">68%</div>
+                    <div class="lbl">เก็บแล้ว</div>
+                  </div>
+                </div>
+                <div class="legend">
+                  <div class="row" style="border:0; padding:2px 0;"><div class="sw" style="background:#59c9a8"></div> ค่าเทอม</div>
+                  <div class="row" style="border:0; padding:2px 0;"><div class="sw" style="background:#ffac8a"></div> ค่าหนังสือ</div>
+                  <div class="row" style="border:0; padding:2px 0;"><div class="sw" style="background:#f7d76e"></div> ค่าอาหาร</div>
+                  <div class="row" style="border:0; padding:2px 0;"><div class="sw" style="background:#5aa8e6"></div> อื่นๆ</div>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-title">สถานะการชำระ</div>
+              <div class="map">
+                <div class="pin" style="background:#59c9a8; left:20%; top:30%; width:24px; height:24px;"></div>
+                <div class="pin" style="background:#ffac8a; left:55%; top:50%; width:18px; height:18px;"></div>
+                <div class="pin" style="background:#f7d76e; left:75%; top:35%; width:14px; height:14px;"></div>
+              </div>
+              <div style="display:flex; justify-content:space-between; font-size:11px; margin-top:8px;">
+                <span><span style="color:#59c9a8">●</span> ม.ต้น 72%</span>
+                <span><span style="color:#ffac8a">●</span> ม.ปลาย 64%</span>
+                <span><span style="color:#f7d76e">●</span> ประถม 58%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent payments / overdue list -->
+          <div class="table-card">
+            <div class="table-head">
+              <div style="font-size:13px; font-weight:700; color:#1a2940;">รายชื่อค้างชำระ (42 คน)</div>
+              <div class="table-actions">
+                <span>🔍 ค้นหา</span>
+                <span>⚙️ กรอง</span>
+                <div class="pill-btn">ดูทั้งหมด</div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="av" style="background:#ffd9c8;"></div>
+              <div class="info">
+                <div class="name">ด.ญ. กัญญารัตน์ สุวรรณ</div>
+                <div class="sub">ม.2/1 · เลขที่ 12390</div>
+              </div>
+              <div class="tag">฿4,500</div>
+            </div>
+            <div class="row">
+              <div class="av" style="background:#c8e8ff;"></div>
+              <div class="info">
+                <div class="name">ด.ช. สมชาย จันทร์เพ็ง</div>
+                <div class="sub">ม.1/3 · เลขที่ 12455</div>
+              </div>
+              <div class="tag">฿3,200</div>
+            </div>
+            <div class="row">
+              <div class="av" style="background:#d4f0e2;"></div>
+              <div class="info">
+                <div class="name">น.ส. ปิยะดา ภูมิวงศ์</div>
+                <div class="sub">ม.6/2 · เลขที่ 11890</div>
+              </div>
+              <div class="tag">฿6,800</div>
+            </div>
+            <div class="row">
+              <div class="av" style="background:#ffe9c4;"></div>
+              <div class="info">
+                <div class="name">ด.ช. ภาคิน ทองมา</div>
+                <div class="sub">ป.6/1 · เลขที่ 13120</div>
+              </div>
+              <div class="tag">฿2,400</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right column -->
+        <div class="right-col">
+          <div class="net-stats">
+            <div class="net-title">ภาพรวมเทอมนี้</div>
+            <div class="net-grid">
+              <div>
+                <div class="num">685</div>
+                <div class="lbl">นักเรียน</div>
+              </div>
+              <div>
+                <div class="num">512</div>
+                <div class="lbl">ออกใบแล้ว</div>
+              </div>
+              <div>
+                <div class="num">643</div>
+                <div class="lbl">ลงทะเบียน</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">การชำระล่าสุด</div>
+            <div class="row" style="padding:8px 0;">
+              <div class="av" style="width:28px; height:28px; background:#d4f0e2;"></div>
+              <div class="info" style="font-size:11px;">
+                <div style="font-weight:600; color:#1a2940;">ด.ญ. ขนิษฐา</div>
+                <div style="color:#98a3b3;">วันนี้ 14:32</div>
+              </div>
+              <div style="font-weight:700; color:#59c9a8; font-size:12px;">฿5,200</div>
+            </div>
+            <div class="row" style="padding:8px 0;">
+              <div class="av" style="width:28px; height:28px; background:#ffd9c8;"></div>
+              <div class="info" style="font-size:11px;">
+                <div style="font-weight:600; color:#1a2940;">ด.ช. ธีรภัทร</div>
+                <div style="color:#98a3b3;">วันนี้ 11:08</div>
+              </div>
+              <div style="font-weight:700; color:#59c9a8; font-size:12px;">฿3,800</div>
+            </div>
+            <div class="row" style="padding:8px 0;">
+              <div class="av" style="width:28px; height:28px; background:#c8e8ff;"></div>
+              <div class="info" style="font-size:11px;">
+                <div style="font-weight:600; color:#1a2940;">น.ส. รวิษฎา</div>
+                <div style="color:#98a3b3;">เมื่อวาน</div>
+              </div>
+              <div style="font-weight:700; color:#59c9a8; font-size:12px;">฿8,500</div>
+            </div>
+            <div style="text-align:center; padding-top:8px;">
+              <span style="color:#ffac8a; font-size:11px; font-weight:600;">ดูทั้งหมด</span>
+            </div>
+          </div>
+
+          <div class="pen-card">
+            <div class="circle">📧</div>
+            <h4>เพิ่มผู้ใช้</h4>
+            <p>เชิญเจ้าหน้าที่หรือครูเข้าใช้ระบบโดยใส่อีเมล</p>
+            <div class="pen-input">enter email...</div>
+            <div class="pill-btn" style="display:inline-block;">ส่งคำเชิญ</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3 style="margin-top:32px;">รู้สึกยังไงกับสไตล์นี้?</h3>
+<p class="subtitle">เลือกตัวเลือกที่ใกล้ความรู้สึกของคุณที่สุด — เลือกแล้วเราค่อยตกลงรายละเอียดสีจริง</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>โอเคแบบนี้เลย</h3>
+      <p>สีพาสเทล + sidebar gradient ฟ้า-เขียวอ่อน ตามรูปอ้างอิงเลย</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>สไตล์โอเค แต่ขอใช้สีโรงเรียน</h3>
+      <p>เปลี่ยน gradient sidebar เป็นโทนเขียวโรงเรียน (เขียวเข้ม) แทนฟ้า-เขียวอ่อน</p>
+    </div>
+  </div>
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>เด็กเกินไป / ใหญ่เกินไป</h3>
+      <p>อยากดู option ที่ดู corporate / clean กว่านี้ (น้อย gradient, มี edge เยอะ)</p>
+    </div>
+  </div>
+</div>

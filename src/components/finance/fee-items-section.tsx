@@ -416,6 +416,7 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
               <Button
                 type="button"
                 variant="outline"
+                disabled={submitting}
                 onClick={() => setDialogOpen(false)}
               >
                 ยกเลิก
@@ -443,6 +444,7 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
             <Button
               type="button"
               variant="outline"
+              disabled={deleting}
               onClick={() => setDeleteDialogOpen(false)}
             >
               ยกเลิก

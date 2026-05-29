@@ -1,0 +1,87 @@
+<h2>Tablet Layout — Sidebar ควรเป็นแบบไหน?</h2>
+<p class="subtitle">Tablet (768px–1024px) มีพื้นที่มากกว่า mobile ควรใช้ประโยชน์จากพื้นที่นี้อย่างไร?</p>
+
+<div class="cards">
+  <div class="card" data-choice="icon-only" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f8f9fa;padding:12px;border-radius:6px;min-height:190px">
+      <div style="display:flex;gap:6px;height:165px">
+        <!-- Icon-only sidebar -->
+        <div style="width:42px;background:#1e293b;border-radius:6px;padding:8px 6px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:8px">
+          <div style="font-size:14px">🎓</div>
+          <div style="font-size:14px;background:#3b82f6;border-radius:4px;padding:2px 4px">📊</div>
+          <div style="font-size:14px;opacity:0.5">📅</div>
+          <div style="font-size:14px;opacity:0.5">👥</div>
+          <div style="font-size:14px;opacity:0.5">📋</div>
+          <div style="font-size:14px;opacity:0.5">💰</div>
+        </div>
+        <!-- Content -->
+        <div style="flex:1;background:#f1f5f9;border-radius:6px;padding:10px;font-size:9px;color:#64748b">
+          <div style="height:8px;background:#e2e8f0;border-radius:4px;margin-bottom:6px"></div>
+          <div style="height:8px;background:#e2e8f0;border-radius:4px;width:70%;margin-bottom:6px"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px">
+            <div style="height:40px;background:#e2e8f0;border-radius:4px"></div>
+            <div style="height:40px;background:#e2e8f0;border-radius:4px"></div>
+          </div>
+          <div style="height:50px;background:#e2e8f0;border-radius:4px"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Mini Sidebar (icon เท่านั้น)</h3>
+      <p>Sidebar พับเหลือแค่ icon ~48px เมื่อ hover หรือ tap จะ expand แสดง label ชั่วคราว ประหยัดพื้นที่</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="full-sidebar" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f8f9fa;padding:12px;border-radius:6px;min-height:190px">
+      <div style="display:flex;gap:6px;height:165px">
+        <!-- Full sidebar -->
+        <div style="width:130px;background:#1e293b;border-radius:6px;padding:8px;flex-shrink:0;font-size:8px;color:#fff">
+          <div style="font-size:8px;font-weight:700;margin-bottom:8px;border-bottom:1px solid #334155;padding-bottom:6px">🎓 โรงเรียนตัวอย่าง</div>
+          <div style="color:#94a3b8;font-size:7px;margin-bottom:4px">ข้อมูลพื้นฐาน</div>
+          <div style="background:#3b82f6;border-radius:3px;padding:3px 5px;margin-bottom:3px;font-size:7px">📊 ภาพรวม</div>
+          <div style="padding:3px 5px;margin-bottom:3px;color:#94a3b8;font-size:7px">📅 ปีการศึกษา</div>
+          <div style="padding:3px 5px;margin-bottom:3px;color:#94a3b8;font-size:7px">👥 นักเรียน</div>
+          <div style="color:#94a3b8;font-size:7px;margin-top:6px;margin-bottom:4px">การเงิน</div>
+          <div style="padding:3px 5px;margin-bottom:3px;color:#94a3b8;font-size:7px">💰 ค่าธรรมเนียม</div>
+          <div style="padding:3px 5px;color:#94a3b8;font-size:7px">📄 ใบแจ้งชำระ</div>
+        </div>
+        <!-- Content -->
+        <div style="flex:1;background:#f1f5f9;border-radius:6px;padding:10px;font-size:9px;color:#64748b">
+          <div style="height:8px;background:#e2e8f0;border-radius:4px;margin-bottom:6px"></div>
+          <div style="height:50px;background:#e2e8f0;border-radius:4px;margin-bottom:6px"></div>
+          <div style="height:50px;background:#e2e8f0;border-radius:4px"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Full Sidebar (เหมือน Desktop)</h3>
+      <p>แสดง sidebar เต็มรูปแบบ 260px เหมือนหน้าจอ desktop เนื้อหาจะแคบลงแต่เห็น navigation ครบ</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="same-as-mobile" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f8f9fa;padding:12px;border-radius:6px;min-height:190px">
+      <div style="height:165px;background:#f1f5f9;border-radius:6px;padding:10px;font-size:9px;color:#64748b;position:relative">
+        <!-- Header with hamburger -->
+        <div style="background:#1e293b;border-radius:5px;padding:6px 10px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="color:#fff;font-size:8px;font-weight:700">🎓 โรงเรียนตัวอย่าง</div>
+          <div style="color:#94a3b8;font-size:12px">☰</div>
+        </div>
+        <div style="height:8px;background:#e2e8f0;border-radius:4px;margin-bottom:6px"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px">
+          <div style="height:35px;background:#e2e8f0;border-radius:4px"></div>
+          <div style="height:35px;background:#e2e8f0;border-radius:4px"></div>
+          <div style="height:35px;background:#e2e8f0;border-radius:4px"></div>
+          <div style="height:35px;background:#e2e8f0;border-radius:4px"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — เหมือน Mobile (Drawer)</h3>
+      <p>Tablet ใช้ pattern เดียวกับ mobile ทั้งหมด — hamburger + drawer เนื้อหาเต็มจอ layout จะเรียบง่าย</p>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px">คลิกเลือกใน browser หรือบอกใน terminal ได้เลยครับ (A = mini icon sidebar, B = full sidebar, C = เหมือน mobile)</p>

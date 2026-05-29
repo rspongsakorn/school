@@ -95,7 +95,7 @@ export function EnrollmentStatusDialog({
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" disabled={submitting} onClick={() => onOpenChange(false)}>
               ยกเลิก
             </Button>
             <Button type="submit" variant="destructive" disabled={submitting}>

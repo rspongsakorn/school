@@ -1,0 +1,104 @@
+<h2>ตารางข้อมูลบน Mobile แสดงยังไง?</h2>
+<p class="subtitle">หน้าอย่าง นักเรียน, ใบแจ้งชำระ, รายงาน มีคอลัมน์เยอะ — บน mobile จะ fit ไม่ลง เลือก approach ที่เหมาะกับการใช้งาน</p>
+
+<div class="cards">
+  <div class="card" data-choice="scroll" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f8f9fa;padding:12px;border-radius:6px;min-height:200px">
+      <div style="overflow:hidden;border-radius:6px;border:1px solid #e2e8f0">
+        <!-- Table header -->
+        <div style="background:#f8fafc;padding:6px 8px;display:flex;gap:6px;border-bottom:1px solid #e2e8f0;font-size:8px;font-weight:600;color:#475569;white-space:nowrap">
+          <div style="min-width:80px">ชื่อ-นามสกุล</div>
+          <div style="min-width:60px">ชั้นเรียน</div>
+          <div style="min-width:70px">ค้างชำระ</div>
+          <div style="min-width:80px;opacity:0.3">วันเกิด →</div>
+        </div>
+        <!-- Rows -->
+        <div style="font-size:8px;color:#475569">
+          <div style="padding:6px 8px;display:flex;gap:6px;border-bottom:1px solid #f1f5f9;white-space:nowrap">
+            <div style="min-width:80px">สมชาย ใจดี</div>
+            <div style="min-width:60px">ป.3/1</div>
+            <div style="min-width:70px;color:#ef4444">฿1,200</div>
+            <div style="min-width:80px;opacity:0.3">12/03/2558</div>
+          </div>
+          <div style="padding:6px 8px;display:flex;gap:6px;white-space:nowrap">
+            <div style="min-width:80px">มาลี รักเรียน</div>
+            <div style="min-width:60px">ป.4/2</div>
+            <div style="min-width:70px;color:#22c55e">ชำระแล้ว</div>
+            <div style="min-width:80px;opacity:0.3">05/07/2557</div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:6px;font-size:8px;color:#94a3b8;text-align:center">← scroll ซ้าย-ขวาเพื่อดูคอลัมน์เพิ่ม →</div>
+    </div>
+    <div class="card-body">
+      <h3>A — Horizontal Scroll</h3>
+      <p>ตารางเลื่อนซ้าย-ขวาได้ โครงสร้างเหมือนเดิมทุกอย่าง implement ง่าย แต่ UX อาจไม่ดีนัก</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="card" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f8f9fa;padding:12px;border-radius:6px;min-height:200px">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <!-- Card row 1 -->
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:8px;font-size:8px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div style="font-weight:600;color:#1e293b">สมชาย ใจดี</div>
+            <div style="background:#fef2f2;color:#ef4444;padding:2px 6px;border-radius:10px;font-size:7px">ค้าง ฿1,200</div>
+          </div>
+          <div style="color:#64748b;display:flex;gap:10px">
+            <span>ป.3/1</span>
+            <span>เลขที่ 12</span>
+            <span>2558</span>
+          </div>
+        </div>
+        <!-- Card row 2 -->
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:8px;font-size:8px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div style="font-weight:600;color:#1e293b">มาลี รักเรียน</div>
+            <div style="background:#f0fdf4;color:#22c55e;padding:2px 6px;border-radius:10px;font-size:7px">ชำระแล้ว</div>
+          </div>
+          <div style="color:#64748b;display:flex;gap:10px">
+            <span>ป.4/2</span>
+            <span>เลขที่ 5</span>
+            <span>2557</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Card Layout</h3>
+      <p>แต่ละแถวกลายเป็น card แสดงเฉพาะข้อมูลสำคัญ อ่านง่าย thumb-friendly แต่ต้องออกแบบ card แต่ละหน้าใหม่</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="hide-cols" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f8f9fa;padding:12px;border-radius:6px;min-height:200px">
+      <div style="overflow:hidden;border-radius:6px;border:1px solid #e2e8f0">
+        <div style="background:#f8fafc;padding:6px 8px;display:flex;gap:6px;border-bottom:1px solid #e2e8f0;font-size:8px;font-weight:600;color:#475569">
+          <div style="flex:1">ชื่อ-นามสกุล</div>
+          <div style="width:50px">ชั้น</div>
+          <div style="width:60px">สถานะ</div>
+        </div>
+        <div style="font-size:8px;color:#475569">
+          <div style="padding:6px 8px;display:flex;gap:6px;border-bottom:1px solid #f1f5f9">
+            <div style="flex:1">สมชาย ใจดี</div>
+            <div style="width:50px">ป.3/1</div>
+            <div style="width:60px;color:#ef4444">ค้างชำระ</div>
+          </div>
+          <div style="padding:6px 8px;display:flex;gap:6px">
+            <div style="flex:1">มาลี รักเรียน</div>
+            <div style="width:50px">ป.4/2</div>
+            <div style="width:60px;color:#22c55e">ชำระแล้ว</div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:6px;font-size:8px;color:#94a3b8;text-align:center">ซ่อนคอลัมน์ที่ไม่จำเป็นบน mobile</div>
+    </div>
+    <div class="card-body">
+      <h3>C — Hide Columns on Mobile</h3>
+      <p>ซ่อนคอลัมน์ที่ไม่สำคัญบน mobile เหลือแค่คอลัมน์หลัก ตารางยังเป็น table ธรรมดา implement ง่าย</p>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px">คลิกเลือกใน browser หรือบอกใน terminal ได้เลยครับ</p>

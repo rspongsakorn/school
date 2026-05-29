@@ -195,7 +195,7 @@ export function ReceiptTypesPanel() {
               ) : null}
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+              <Button type="button" variant="outline" disabled={submitting} onClick={() => setDialogOpen(false)}>
                 ยกเลิก
               </Button>
               <Button type="submit" disabled={submitting}>
