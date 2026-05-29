@@ -539,7 +539,11 @@ export async function fetchDailyRevenue(params: {
   return { summary, receiptsByDate };
 }
 
-export type StatementLine = { description: string; amount: number };
+export type StatementLine = {
+  description: string;
+  amount: number;
+  yearLabel?: string;
+};
 export type StatementPayment = {
   paidAt: string;
   dateLabel: string;
@@ -547,6 +551,7 @@ export type StatementPayment = {
   method: "cash" | "transfer";
   amount: number;
   status: "active" | "voided";
+  yearLabel?: string;
 };
 export type StudentStatement = {
   studentCode: string;
@@ -622,6 +627,116 @@ export async function fetchStudentStatement(
     studentCode: student.student_code,
     studentName: formatStudentName(student.first_name, student.last_name),
     gradeClassroom: gradeByStudent.get(studentId) ?? "—",
+    lines,
+    payments: paymentRows,
+    totalDue: round2(totalDue),
+    totalPaid: round2(totalPaid),
+    outstanding: Math.max(0, round2(totalDue - totalPaid)),
+  };
+}
+
+export async function fetchStudentStatementAllYears(
+  studentId: string,
+): Promise<StudentStatement | null> {
+  const supabase = createClient();
+
+  const { data: student } = await supabase
+    .from("students")
+    .select("student_code, first_name, last_name")
+    .eq("id", studentId)
+    .single();
+  if (!student) return null;
+
+  const { data: invoices } = await supabase
+    .from("student_invoices")
+    .select(
+      `id, total_amount, paid_amount,
+       invoice_lines ( description, amount ),
+       semesters ( number, academic_years ( name ) )`,
+    )
+    .eq("student_id", studentId)
+    .order("created_at", { ascending: true });
+
+  type InvoiceRowAll = {
+    id: string;
+    total_amount: number;
+    paid_amount: number;
+    invoice_lines: { description: string; amount: number }[];
+    semesters: { number: number; academic_years: { name: string } | null } | null;
+  };
+  const invoiceRows = (invoices ?? []) as unknown as InvoiceRowAll[];
+
+  const lines: StatementLine[] = invoiceRows.flatMap((inv) => {
+    const sem = inv.semesters;
+    const yearLabel = sem
+      ? `${sem.academic_years?.name ?? "?"} ภาค ${sem.number}`
+      : undefined;
+    return (inv.invoice_lines ?? []).map((l) => ({
+      description: l.description,
+      amount: Number(l.amount),
+      yearLabel,
+    }));
+  });
+
+  const totalDue = invoiceRows.reduce((s, i) => s + Number(i.total_amount), 0);
+  const totalPaid = invoiceRows.reduce((s, i) => s + Number(i.paid_amount), 0);
+
+  const { data: payments } = await supabase
+    .from("payments")
+    .select(
+      `receipt_number, payment_method, amount, paid_at, status,
+       semesters ( number, academic_years ( name ) )`,
+    )
+    .eq("student_id", studentId)
+    .order("paid_at", { ascending: true });
+
+  type PayRowAll = {
+    receipt_number: string;
+    payment_method: "cash" | "transfer";
+    amount: number;
+    paid_at: string;
+    status: "active" | "voided";
+    semesters: { number: number; academic_years: { name: string } | null } | null;
+  };
+  const paymentRows = ((payments ?? []) as unknown as PayRowAll[]).map((p) => {
+    const sem = p.semesters;
+    return {
+      paidAt: p.paid_at,
+      dateLabel: formatThaiDate(p.paid_at),
+      receiptNumber: p.receipt_number,
+      method: p.payment_method,
+      amount: Number(p.amount),
+      status: p.status,
+      yearLabel: sem
+        ? `${sem.academic_years?.name ?? "?"} ภาค ${sem.number}`
+        : undefined,
+    };
+  });
+
+  const { data: enrollment } = await supabase
+    .from("student_enrollments")
+    .select(`classrooms ( name, grade_levels ( name ) )`)
+    .eq("student_id", studentId)
+    .eq("status", "enrolled")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  type EnrollRow = {
+    classrooms: { name: string; grade_levels: { name: string } | null } | null;
+  };
+  const enroll = enrollment as unknown as EnrollRow | null;
+  const gradeClassroom = enroll?.classrooms
+    ? formatClassroom(
+        enroll.classrooms.grade_levels?.name ?? null,
+        enroll.classrooms.name,
+      )
+    : "—";
+
+  return {
+    studentCode: student.student_code,
+    studentName: formatStudentName(student.first_name, student.last_name),
+    gradeClassroom,
     lines,
     payments: paymentRows,
     totalDue: round2(totalDue),
