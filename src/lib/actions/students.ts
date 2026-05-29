@@ -703,16 +703,65 @@ export async function deleteAllStudents(): Promise<DeleteStudentsResult> {
   const deletableIds = allIds.filter((id) => !blockedIds.has(id));
   const skipped = allIds.length - deletableIds.length;
 
-  for (const studentId of deletableIds) {
-    const cleanup = await deleteStudentDependents(supabase, studentId);
-    if (!cleanup.ok) return cleanup;
+  // Batch cleanup — mirror deleteStudentDependents but for all deletableIds at once
+  // (avoids O(N) sequential round-trips that make deleteAllStudents hang)
 
-    const { error } = await supabase.from("students").delete().eq("id", studentId);
-    if (error) return { ok: false, error: "ไม่สามารถลบนักเรียนได้" };
+  // 1. Voided payments + their dependents
+  const { data: voidedPayments } = await supabase
+    .from("payments")
+    .select("id")
+    .in("student_id", deletableIds)
+    .eq("status", "voided");
+
+  const voidedPaymentIds = (voidedPayments ?? []).map((row) => row.id);
+
+  if (voidedPaymentIds.length > 0) {
+    const { error: allocError } = await supabase
+      .from("payment_allocations")
+      .delete()
+      .in("payment_id", voidedPaymentIds);
+    if (allocError) return { ok: false, error: "ไม่สามารถลบนักเรียนได้" };
+
+    const { error: voidError } = await supabase
+      .from("payment_voids")
+      .delete()
+      .in("payment_id", voidedPaymentIds);
+    if (voidError) return { ok: false, error: "ไม่สามารถลบนักเรียนได้" };
+
+    const { error: receiptError } = await supabase
+      .from("receipts")
+      .delete()
+      .in("payment_id", voidedPaymentIds);
+    if (receiptError) return { ok: false, error: "ไม่สามารถลบนักเรียนได้" };
+
+    const { error: paymentError } = await supabase
+      .from("payments")
+      .delete()
+      .in("id", voidedPaymentIds);
+    if (paymentError) return { ok: false, error: "ไม่สามารถลบนักเรียนได้" };
   }
 
-  // Partial success: skip students with active enrollments or payments (same condition as deleteStudents)
-  // Unlike deleteStudents, we do NOT fail when deletableIds is empty — caller handles the skipped count
+  // 2. Student invoices (invoice_lines cascade via ON DELETE CASCADE)
+  const { error: invoiceError } = await supabase
+    .from("student_invoices")
+    .delete()
+    .in("student_id", deletableIds);
+  if (invoiceError) return { ok: false, error: "ไม่สามารถลบใบแจ้งชำระของนักเรียนได้" };
+
+  // 3. Enrollments
+  const { error: enrollmentError } = await supabase
+    .from("student_enrollments")
+    .delete()
+    .in("student_id", deletableIds);
+  if (enrollmentError) return { ok: false, error: "ไม่สามารถลบการลงทะเบียนของนักเรียนได้" };
+
+  // 4. Students
+  const { error: studentError } = await supabase
+    .from("students")
+    .delete()
+    .in("id", deletableIds);
+  if (studentError) return { ok: false, error: "ไม่สามารถลบนักเรียนได้" };
+
   revalidatePath("/students");
   revalidatePath("/registration");
   revalidatePath("/invoices");
