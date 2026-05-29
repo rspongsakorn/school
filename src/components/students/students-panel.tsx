@@ -205,6 +205,7 @@ export function StudentsPanel() {
 
     if (!result.ok) {
       toast.error(result.error);
+      setDeleteAllConfirmText("");
       return;
     }
 
