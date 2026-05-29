@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,7 @@ export function PaymentsPanel() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const { ctx, isLoading: ctxLoading } = useSemesterContext();
 
   const gradeParam = searchParams.get("grade") ?? "all";
@@ -251,6 +252,7 @@ export function PaymentsPanel() {
     setAmount("");
     setNote("");
     setTransferRef("");
+    void queryClient.invalidateQueries({ queryKey: ["payments"] });
     router.refresh();
   }
 
@@ -268,6 +270,7 @@ export function PaymentsPanel() {
     }
 
     toast.success("ยกเลิกใบเสร็จแล้ว");
+    void queryClient.invalidateQueries({ queryKey: ["payments"] });
     router.refresh();
   }
 
