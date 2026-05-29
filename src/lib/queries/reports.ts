@@ -76,6 +76,7 @@ export async function fetchOutstandingReport(params: {
   status?: "unpaid" | "partial" | "paid" | "all";
   variant?: "standard" | "reimbursable" | "all";
   teacherProfileId?: string;
+  includeAllStatuses?: boolean;
 }): Promise<OutstandingReportRow[]> {
   const supabase = createClient();
   const gradeByStudent = await getStudentGradeMap(params.semesterId);
@@ -146,7 +147,7 @@ export async function fetchOutstandingReport(params: {
 
   if (params.status && params.status !== "all") {
     query = query.eq("status", params.status);
-  } else {
+  } else if (!params.includeAllStatuses) {
     query = query.in("status", ["unpaid", "partial"]);
   }
 
@@ -286,6 +287,58 @@ export async function fetchCollectionsByGrade(
 
 function round2(n: number) {
   return Math.round(n * 100) / 100;
+}
+
+export type StudentRosterRow = {
+  studentId: string;
+  studentCode: string;
+  studentName: string;
+  gradeClassroom: string;
+  totalAmount: number;
+  paidAmount: number;
+  outstanding: number;
+  status: "unpaid" | "partial" | "paid";
+};
+
+export async function fetchStudentRoster(params: {
+  semesterId: string;
+  academicYearId: string;
+  gradeLevelId?: string;
+  classroomId?: string;
+  status?: "unpaid" | "partial" | "paid" | "all";
+  query?: string;
+  teacherProfileId?: string;
+}): Promise<StudentRosterRow[]> {
+  const rows = await fetchOutstandingReport({
+    semesterId: params.semesterId,
+    academicYearId: params.academicYearId,
+    gradeLevelId: params.gradeLevelId,
+    classroomId: params.classroomId,
+    status: params.status,
+    variant: "all",
+    includeAllStatuses: true,
+    teacherProfileId: params.teacherProfileId,
+  });
+
+  const q = params.query?.trim().toLowerCase();
+  const filtered = q
+    ? rows.filter(
+        (r) =>
+          r.studentName.toLowerCase().includes(q) ||
+          r.studentCode.toLowerCase().includes(q),
+      )
+    : rows;
+
+  return filtered.map((r) => ({
+    studentId: r.studentId,
+    studentCode: r.studentCode,
+    studentName: r.studentName,
+    gradeClassroom: r.gradeClassroom,
+    totalAmount: r.totalAmount,
+    paidAmount: r.paidAmount,
+    outstanding: r.outstanding,
+    status: r.status,
+  }));
 }
 
 export type CollectionsSummary = {
