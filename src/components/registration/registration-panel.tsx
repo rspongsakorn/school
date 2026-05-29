@@ -1,8 +1,7 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useTransition } from "react";
-import { ArrowRightLeft, Copy, Pencil, Plus, Trash2, UserX } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { ArrowRightLeft, Copy, Loader2, Pencil, Plus, Trash2, UserX } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -65,8 +64,6 @@ export function RegistrationPanel() {
 
   const { profile } = useAuth();
   const { ctx } = useSemesterContext();
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
 
   const isAdmin = profile?.role === "admin";
@@ -92,29 +89,43 @@ export function RegistrationPanel() {
   const semesterNumber = ctx?.semesterNumber ?? 1;
   const academicYearId = ctx?.academicYearId ?? null;
 
+  const [selectedGradeId, setSelectedGradeId] = useState<string | null>(null);
+  const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
+
+  const prevSemesterIdRef = useRef(semesterId);
+  useEffect(() => {
+    if (semesterId !== prevSemesterIdRef.current) {
+      prevSemesterIdRef.current = semesterId;
+      setSelectedGradeId(null);
+      setSelectedClassroomId(null);
+    }
+  }, [semesterId]);
+
   const { data: grades = [] } = useQuery({
     queryKey: ["grade-levels", semesterId],
     queryFn: () => fetchGradeLevels(semesterId!),
     enabled: Boolean(semesterId),
   });
 
-  const gradeParam = searchParams.get("grade");
-  const selectedGradeId = gradeParam && grades.some((g) => g.id === gradeParam)
-    ? gradeParam
-    : grades[0]?.id ?? null;
+  useEffect(() => {
+    if (!selectedGradeId && grades.length > 0) {
+      setSelectedGradeId(grades[0].id);
+    }
+  }, [grades, selectedGradeId]);
 
-  const { data: classrooms = [] } = useQuery({
+  const { data: classrooms = [], isLoading: classroomsLoading } = useQuery({
     queryKey: ["classrooms-by-grade", selectedGradeId],
     queryFn: () => fetchClassroomsByGradeWithCount(selectedGradeId!),
     enabled: Boolean(selectedGradeId),
   });
 
-  const classroomParam = searchParams.get("classroom");
-  const selectedClassroomId = classroomParam && classrooms.some((c) => c.id === classroomParam)
-    ? classroomParam
-    : classrooms[0]?.id ?? null;
+  useEffect(() => {
+    if (!selectedClassroomId && classrooms.length > 0) {
+      setSelectedClassroomId(classrooms[0].id);
+    }
+  }, [classrooms, selectedClassroomId]);
 
-  const { data: roster = [] } = useQuery({
+  const { data: roster = [], isLoading: rosterLoading } = useQuery({
     queryKey: ["classroom-roster", selectedClassroomId],
     queryFn: () => fetchClassroomRoster(selectedClassroomId!),
     enabled: Boolean(selectedClassroomId),
@@ -191,35 +202,21 @@ export function RegistrationPanel() {
     setDeleteTarget(null);
 
     if (deleteTarget.type === "grade" && deleteTarget.id === selectedGradeId) {
-      router.push(buildUrl({ grade: null, classroom: null }));
+      setSelectedGradeId(null);
+      setSelectedClassroomId(null);
     } else if (deleteTarget.type === "classroom" && deleteTarget.id === selectedClassroomId) {
-      router.push(buildUrl({ classroom: null }));
+      setSelectedClassroomId(null);
     }
     invalidateAll();
   }
 
-  function buildUrl(updates: { grade?: string | null; classroom?: string | null }) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (academicYearId) params.set("year", academicYearId);
-    params.set("semester", String(semesterNumber));
-    params.delete("view");
-    if (updates.grade !== undefined) {
-      if (updates.grade) params.set("grade", updates.grade);
-      else params.delete("grade");
-    }
-    if (updates.classroom !== undefined) {
-      if (updates.classroom) params.set("classroom", updates.classroom);
-      else params.delete("classroom");
-    }
-    return `/registration?${params.toString()}`;
-  }
-
   function selectGrade(gradeId: string) {
-    router.push(buildUrl({ grade: gradeId, classroom: null }));
+    setSelectedGradeId(gradeId);
+    setSelectedClassroomId(null);
   }
 
   function selectClassroom(classroomId: string) {
-    router.push(buildUrl({ classroom: classroomId }));
+    setSelectedClassroomId(classroomId);
   }
 
   const selectedClassroom = classrooms.find((c) => c.id === selectedClassroomId);
@@ -253,7 +250,7 @@ export function RegistrationPanel() {
   if (!ctx) {
     return (
       <>
-        <AppHeader title="ลงทะเบียน" basePath="/registration" clearGradeClassroomOnChange={true} />
+        <AppHeader title="ลงทะเบียน" basePath="/registration" />
         <main className="p-4 lg:p-6">
           <p className="text-sm text-muted-foreground">ยังไม่มีปีการศึกษาในระบบ</p>
         </main>
@@ -263,7 +260,7 @@ export function RegistrationPanel() {
 
   return (
     <>
-      <AppHeader title="ลงทะเบียน" basePath="/registration" clearGradeClassroomOnChange={true} />
+      <AppHeader title="ลงทะเบียน" basePath="/registration" />
       <main className="p-4 lg:p-6">
         <div className="space-y-6">
           {isAdmin && grades.length === 0 && copySourceOptions.length > 0 && (
@@ -388,6 +385,11 @@ export function RegistrationPanel() {
               <CardContent className="p-0 pb-2">
                 {!selectedGradeId ? (
                   <p className="px-4 py-2 text-sm text-muted-foreground">เลือกชั้นเรียนก่อน</p>
+                ) : classroomsLoading ? (
+                  <div className="flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>กำลังโหลด...</span>
+                  </div>
                 ) : classrooms.length === 0 ? (
                   <p className="px-4 py-2 text-sm text-muted-foreground">
                     ยังไม่มีห้อง
@@ -467,7 +469,7 @@ export function RegistrationPanel() {
                   <CardTitle className="text-base">
                     {selectedClassroom ? `ห้อง ${selectedClassroom.name}` : "รายชื่อในห้อง"}
                   </CardTitle>
-                  <CardDescription>{roster.length} คน</CardDescription>
+                  {!rosterLoading && <CardDescription>{roster.length} คน</CardDescription>}
                 </div>
                 {isAdmin && selectedClassroomId && (
                   <Button size="sm" onClick={() => setEnrollOpen(true)}>
@@ -479,6 +481,11 @@ export function RegistrationPanel() {
               <CardContent>
                 {!selectedClassroomId ? (
                   <p className="text-sm text-muted-foreground">เลือกห้องเรียนเพื่อดูรายชื่อ</p>
+                ) : rosterLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>กำลังโหลด...</span>
+                  </div>
                 ) : roster.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     ยังไม่มีนักเรียนในห้องนี้

@@ -1,4 +1,4 @@
-import { GraduationCap } from "lucide-react";
+import Image from "next/image";
 import { LoginForm } from "@/components/auth/login-form";
 
 export default async function LoginPage({
@@ -13,14 +13,17 @@ export default async function LoginPage({
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
       <div className="w-full max-w-md space-y-8">
         <div className="flex flex-col items-center gap-3 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary">
-            <GraduationCap className="h-8 w-8 text-primary-foreground" />
-          </div>
+          <Image
+            src="/school-logo.png"
+            alt="โลโก้โรงเรียนบัวใหญ่วิทยา"
+            width={80}
+            height={80}
+            className="rounded-full object-cover"
+            priority
+          />
           <div>
-            <h1 className="text-2xl font-semibold">ระบบจัดการค่าเล่าเรียน</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              โรงเรียนตัวอย่างประถมศึกษา
-            </p>
+            <h1 className="text-2xl font-semibold">โรงเรียนบัวใหญ่วิทยา</h1>
+            <p className="mt-1 text-sm text-muted-foreground">ระบบจัดการค่าเล่าเรียน</p>
           </div>
         </div>
 

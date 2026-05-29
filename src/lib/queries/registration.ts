@@ -82,23 +82,25 @@ export async function fetchClassroomRoster(classroomId: string): Promise<Enrollm
     ? await loadStudentIdsWithInvoiceInSemester(supabase, studentIds, semesterId)
     : new Set<string>();
 
-  return rosterRows.map((row) => {
-    const status = row.status as EnrollmentStatus;
-    const studentId = row.students!.id;
-    return {
-      enrollmentId: row.id,
-      studentId,
-      studentCode: row.students!.student_code,
-      firstName: row.students!.first_name,
-      lastName: row.students!.last_name,
-      name: formatStudentName(row.students!.first_name, row.students!.last_name),
-      status,
-      deletable: canDeleteEnrollment({
+  return rosterRows
+    .map((row) => {
+      const status = row.status as EnrollmentStatus;
+      const studentId = row.students!.id;
+      return {
+        enrollmentId: row.id,
+        studentId,
+        studentCode: row.students!.student_code,
+        firstName: row.students!.first_name,
+        lastName: row.students!.last_name,
+        name: formatStudentName(row.students!.first_name, row.students!.last_name),
         status,
-        hasInvoiceInSemester: studentsWithInvoice.has(studentId),
-      }),
-    };
-  });
+        deletable: canDeleteEnrollment({
+          status,
+          hasInvoiceInSemester: studentsWithInvoice.has(studentId),
+        }),
+      };
+    })
+    .sort((a, b) => a.studentCode.localeCompare(b.studentCode));
 }
 
 async function loadStudentIdsWithInvoiceInSemester(
