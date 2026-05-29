@@ -50,6 +50,7 @@ import { fetchGradeLevels, fetchClassroomsBySemester } from "@/lib/queries/class
 import { fetchFeeItems } from "@/lib/queries/fee-rates";
 import type { InvoiceListRow, InvoiceStatus } from "@/lib/queries/invoices";
 import { cn } from "@/lib/utils";
+import { Skeleton, TableSkeleton } from "@/components/ui/skeleton";
 
 const STATUS_FILTER_ITEMS = [
   { value: "all", label: "ทั้งหมด" },
@@ -300,8 +301,8 @@ export function InvoicesPanel() {
           <p className="text-sm text-muted-foreground">ยังไม่มีปีการศึกษา/ภาคเรียนในระบบ</p>
         ) : isLoading ? (
           <div className="space-y-4">
-            <div className="h-10 animate-pulse rounded-lg bg-muted" />
-            <div className="h-64 animate-pulse rounded-lg bg-muted" />
+            <Skeleton className="h-10 w-full max-w-2xl" />
+            <TableSkeleton rows={8} />
           </div>
         ) : ctx ? (
           <div className={cn("space-y-4 transition-opacity", isNavigating && "pointer-events-none opacity-60")}>

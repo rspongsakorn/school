@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { ReportToolbar } from "@/components/finance/report-toolbar";
 import { ReportLetterhead } from "@/components/finance/report-letterhead";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import { formatBaht } from "@/lib/format";
 import { INVOICE_STATUS_LABELS } from "@/lib/finance/constants";
 
@@ -97,7 +98,7 @@ export function StudentRosterPanel() {
           </div>
 
           {isLoading ? (
-            <div className="h-40 animate-pulse rounded-lg bg-muted" />
+            <TableSkeleton rows={8} />
           ) : rows.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">ไม่พบนักเรียน</p>
           ) : (

@@ -56,6 +56,7 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { useSemesterContext } from "@/hooks/use-semester-context";
 import { fetchStudentsPaginated } from "@/lib/queries/students";
 import { cn } from "@/lib/utils";
+import { TableSkeleton } from "@/components/ui/skeleton";
 
 function parseStatus(value?: string): StudentStatus | "all" {
   if (!value) return "all";
@@ -319,7 +320,7 @@ export function StudentsPanel() {
               </div>
 
               {isLoading && !data ? (
-                <div className="h-40 animate-pulse rounded-lg bg-muted" />
+                <TableSkeleton rows={8} />
               ) : data ? (
                 <>
                   {/* Mobile stacked cards */}

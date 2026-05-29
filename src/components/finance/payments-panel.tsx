@@ -477,7 +477,7 @@ export function PaymentsPanel() {
 
                     <Button
                       type="button"
-                      className="w-full bg-amber-600 hover:bg-amber-700"
+                      className="w-full"
                       onClick={handleRecord}
                       disabled={submitting || outstanding.length === 0}
                     >

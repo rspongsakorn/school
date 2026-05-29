@@ -28,6 +28,7 @@ import { formatBaht } from "@/lib/format";
 import { INVOICE_STATUS_LABELS } from "@/lib/finance/constants";
 import { ReportToolbar } from "@/components/finance/report-toolbar";
 import { ReportLetterhead } from "@/components/finance/report-letterhead";
+import { TableSkeleton } from "@/components/ui/skeleton";
 
 const STATUS_ITEMS = [
   { value: "all", label: "ค้างทั้งหมด" },
@@ -294,7 +295,9 @@ export function OutstandingReportPanel() {
           {/* Desktop table */}
           {viewParam === "byRoom" ? (
             rowsLoading ? (
-              <div className="hidden sm:block h-40 animate-pulse rounded-lg bg-muted" />
+              <div className="hidden sm:block">
+                <TableSkeleton rows={8} />
+              </div>
             ) : rows.length === 0 ? (
               <p className="hidden sm:block py-6 text-center text-sm text-muted-foreground">
                 ไม่พบรายการค้างชำระ
