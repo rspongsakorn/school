@@ -35,7 +35,7 @@ const financeNav = [
   { href: "/reports/daily", label: "รายรับรายวัน", icon: ChartColumn },
   { href: "/reports/outstanding", label: "รายงานค้างชำระ", icon: ChartColumn },
   { href: "/reports/collections", label: "สถิติการเก็บ", icon: ChartColumn },
-  { href: "/reports/students", label: "รายบุคคล", icon: Users },
+  { href: "/reports/students", label: "รายบุคคล", icon: ChartColumn },
 ];
 
 const systemNav = [
@@ -86,7 +86,7 @@ function NavSection({
 const teacherNav = [
   { href: "/reports/outstanding", label: "รายงานค้างชำระ", icon: ChartColumn },
   { href: "/reports/collections", label: "สถิติการเก็บ", icon: ChartColumn },
-  { href: "/reports/students", label: "รายบุคคล", icon: Users },
+  { href: "/reports/students", label: "รายบุคคล", icon: ChartColumn },
 ];
 
 function SidebarContent() {
