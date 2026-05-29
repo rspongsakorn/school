@@ -8,6 +8,7 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { useSemesterContext } from "@/hooks/use-semester-context";
 import { fetchDashboardData } from "@/lib/queries/dashboard";
 import { StatCards } from "@/components/dashboard/stat-cards";
+import { PaymentDonut } from "@/components/dashboard/payment-donut";
 import { RecentPaymentsTable } from "@/components/dashboard/recent-payments-table";
 import { OverdueList } from "@/components/dashboard/overdue-list";
 import { GradeStats } from "@/components/dashboard/grade-stats";
@@ -77,15 +78,18 @@ export function DashboardOverview() {
         ) : dashboard ? (
           <div className="space-y-6">
             <StatCards stats={dashboard.stats} />
-            <RecentPaymentsTable payments={dashboard.recentPayments} />
-            <div className="grid gap-6 lg:grid-cols-2">
-              <OverdueList students={dashboard.overdueStudents} />
-              <GradeStats
-                gradeStats={dashboard.gradeStats}
-                yearName={ctx?.academicYearName}
-                semesterNumber={ctx?.semesterNumber}
-              />
+            <div className="grid gap-6 lg:grid-cols-3">
+              <PaymentDonut stats={dashboard.stats} />
+              <div className="lg:col-span-2">
+                <GradeStats
+                  gradeStats={dashboard.gradeStats}
+                  yearName={ctx?.academicYearName}
+                  semesterNumber={ctx?.semesterNumber}
+                />
+              </div>
             </div>
+            <RecentPaymentsTable payments={dashboard.recentPayments} />
+            <OverdueList students={dashboard.overdueStudents} />
           </div>
         ) : null}
       </main>

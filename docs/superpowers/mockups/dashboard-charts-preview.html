@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ตัวอย่างกราฟ Dashboard — โรงเรียนบัวใหญ่วิทยา</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --primary:#34aa79; --primary-700:#1f7a52;
+    --accent:#f4b400; --amber:#e0a106;
+    --bg:#f4f7f5; --fg:#0d2b1e; --muted:#6b8578;
+    --card:#fff; --border:#d9e6df; --radius:0.8rem;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter','Noto Sans Thai',system-ui,sans-serif;background:var(--bg);color:var(--fg);padding:32px;letter-spacing:-0.005em}
+  .tnum{font-variant-numeric:tabular-nums}
+  h1{font-size:22px;font-weight:700;letter-spacing:-0.02em;margin-bottom:6px}
+  .lead{color:var(--muted);font-size:14px;margin-bottom:26px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:1100px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 1px 2px rgba(13,43,30,.04);padding:20px}
+  .card h2{font-size:15px;font-weight:600;letter-spacing:-0.01em}
+  .card .desc{font-size:12.5px;color:var(--muted);margin-top:2px;margin-bottom:16px}
+  .tag{display:inline-block;font-size:11px;font-weight:700;color:var(--primary-700);background:#e7f5ee;border-radius:999px;padding:3px 9px;margin-bottom:10px}
+  .tag.rec{color:#7a5a00;background:#fdf3d6}
+  .legend{display:flex;gap:18px;margin-top:14px;font-size:13px}
+  .legend span{display:flex;align-items:center;gap:7px;color:#3f5a4f}
+  .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
+  .full{grid-column:1 / -1}
+  /* bar */
+  .bars{display:flex;align-items:flex-end;gap:14px;height:170px;padding-top:10px}
+  .bargroup{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%}
+  .barwrap{flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center}
+  .bar{width:60%;border-radius:7px 7px 0 0;background:linear-gradient(180deg,var(--primary),var(--primary-700));transition:.3s}
+  .barlabel{font-size:12px;color:var(--muted)}
+  .barval{font-size:12px;font-weight:600;color:var(--primary-700)}
+</style>
+</head>
+<body>
+  <h1>ตัวอย่างกราฟสำหรับหน้าภาพรวม</h1>
+  <p class="lead">สีแบรนด์จริง — เขียวเป็นหลัก เหลืองเป็น accent · เลือกได้ว่าจะใส่แบบไหน</p>
+
+  <div class="grid">
+
+    <!-- 1. Donut -->
+    <div class="card">
+      <span class="tag rec">★ แนะนำ</span>
+      <h2>ชำระแล้ว vs ค้างชำระ</h2>
+      <div class="desc">สัดส่วนใบแจ้งชำระทั้งหมด</div>
+      <div style="display:flex;align-items:center;gap:24px">
+        <svg width="150" height="150" viewBox="0 0 150 150">
+          <circle cx="75" cy="75" r="58" fill="none" stroke="#eef2f0" stroke-width="20"/>
+          <!-- paid 78% green -->
+          <circle cx="75" cy="75" r="58" fill="none" stroke="#34aa79" stroke-width="20"
+            stroke-dasharray="284.4 364.4" stroke-linecap="round" transform="rotate(-90 75 75)"/>
+          <!-- outstanding 22% amber, starts after paid -->
+          <circle cx="75" cy="75" r="58" fill="none" stroke="#e0a106" stroke-width="20"
+            stroke-dasharray="80.2 364.4" stroke-dashoffset="-284.4" stroke-linecap="round" transform="rotate(-90 75 75)"/>
+          <text x="75" y="70" text-anchor="middle" font-size="26" font-weight="700" fill="#0d2b1e">78%</text>
+          <text x="75" y="90" text-anchor="middle" font-size="12" fill="#6b8578">ชำระแล้ว</text>
+        </svg>
+        <div style="font-size:14px">
+          <div style="margin-bottom:14px">
+            <div style="display:flex;align-items:center;gap:8px;color:#3f5a4f"><span class="dot" style="background:#34aa79"></span> ชำระแล้ว</div>
+            <div class="tnum" style="font-size:22px;font-weight:700;margin-top:2px">982 <span style="font-size:13px;color:#6b8578;font-weight:500">ใบ</span></div>
+          </div>
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;color:#3f5a4f"><span class="dot" style="background:#e0a106"></span> ค้างชำระ</div>
+            <div class="tnum" style="font-size:22px;font-weight:700;margin-top:2px">266 <span style="font-size:13px;color:#6b8578;font-weight:500">ใบ · ฿412K</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Bar -->
+    <div class="card">
+      <span class="tag">ทางเลือก</span>
+      <h2>อัตราการเก็บตามระดับชั้น</h2>
+      <div class="desc">% ที่ชำระครบ แยกตามชั้น</div>
+      <div class="bars">
+        <div class="bargroup"><span class="barval">92%</span><div class="barwrap"><div class="bar" style="height:92%"></div></div><span class="barlabel">ป.1</span></div>
+        <div class="bargroup"><span class="barval">88%</span><div class="barwrap"><div class="bar" style="height:88%"></div></div><span class="barlabel">ป.2</span></div>
+        <div class="bargroup"><span class="barval">81%</span><div class="barwrap"><div class="bar" style="height:81%"></div></div><span class="barlabel">ป.3</span></div>
+        <div class="bargroup"><span class="barval">76%</span><div class="barwrap"><div class="bar" style="height:76%"></div></div><span class="barlabel">ป.4</span></div>
+        <div class="bargroup"><span class="barval">84%</span><div class="barwrap"><div class="bar" style="height:84%"></div></div><span class="barlabel">ป.5</span></div>
+        <div class="bargroup"><span class="barval">69%</span><div class="barwrap"><div class="bar" style="height:69%"></div></div><span class="barlabel">ป.6</span></div>
+      </div>
+    </div>
+
+    <!-- 3. Area -->
+    <div class="card full">
+      <span class="tag">ทางเลือก</span>
+      <h2>แนวโน้มรายรับ 30 วันล่าสุด</h2>
+      <div class="desc">ยอดเก็บได้รายวัน (บาท)</div>
+      <svg width="100%" height="190" viewBox="0 0 900 190" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#34aa79" stop-opacity="0.30"/>
+            <stop offset="100%" stop-color="#34aa79" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <!-- gridlines -->
+        <line x1="0" y1="40" x2="900" y2="40" stroke="#eef2f0"/>
+        <line x1="0" y1="90" x2="900" y2="90" stroke="#eef2f0"/>
+        <line x1="0" y1="140" x2="900" y2="140" stroke="#eef2f0"/>
+        <!-- area -->
+        <path d="M0,150 C60,120 120,140 180,100 C240,70 300,110 360,80 C420,55 480,95 540,60 C600,30 660,70 720,50 C780,38 840,60 900,45 L900,190 L0,190 Z" fill="url(#g)"/>
+        <!-- line -->
+        <path d="M0,150 C60,120 120,140 180,100 C240,70 300,110 360,80 C420,55 480,95 540,60 C600,30 660,70 720,50 C780,38 840,60 900,45"
+          fill="none" stroke="#34aa79" stroke-width="2.5"/>
+        <!-- accent point (peak) in yellow -->
+        <circle cx="600" cy="30" r="5" fill="#f4b400" stroke="#fff" stroke-width="2"/>
+      </svg>
+      <div class="legend">
+        <span><span class="dot" style="background:#34aa79"></span> รายรับรายวัน</span>
+        <span><span class="dot" style="background:#f4b400;border-radius:50%"></span> วันที่เก็บได้สูงสุด</span>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

@@ -1,5 +1,4 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import type { GradeStatRow } from "@/lib/data/dashboard";
 
 type GradeStatsProps = {
@@ -17,28 +16,32 @@ export function GradeStats({ gradeStats, yearName, semesterNumber }: GradeStatsP
   return (
     <Card className="border-border shadow-sm">
       <CardHeader>
-        <CardTitle>สถิติการชำระตามระดับชั้น</CardTitle>
+        <CardTitle className="text-base">อัตราการชำระตามระดับชั้น</CardTitle>
         <CardDescription>{subtitle}</CardDescription>
       </CardHeader>
       <CardContent>
         {gradeStats.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
+          <p className="py-8 text-center text-sm text-muted-foreground">
             ยังไม่มีระดับชั้นหรือข้อมูลการชำระ
           </p>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="flex items-end gap-3 sm:gap-4" style={{ height: 200 }}>
             {gradeStats.map((item) => (
-              <div key={item.grade} className="space-y-2 rounded-lg border border-border p-4">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{item.grade}</span>
-                  <span className="text-sm font-semibold tabular-nums text-primary">
-                    {item.rate}%
-                  </span>
+              <div
+                key={item.grade}
+                className="flex h-full flex-1 flex-col items-center justify-end gap-2"
+                title={`${item.grade}: ${item.paid}/${item.total} คน (${item.rate}%)`}
+              >
+                <span className="text-xs font-semibold tabular-nums text-primary">
+                  {item.rate}%
+                </span>
+                <div className="flex w-full flex-1 items-end justify-center">
+                  <div
+                    className="w-[70%] rounded-t-md bg-gradient-to-b from-primary to-[#1f7a52] transition-[height] duration-500"
+                    style={{ height: `${Math.max(item.rate, 2)}%` }}
+                  />
                 </div>
-                <Progress value={item.rate} className="h-2" />
-                <p className="text-xs text-muted-foreground tabular-nums">
-                  {item.paid}/{item.total} คน
-                </p>
+                <span className="text-xs text-muted-foreground">{item.grade}</span>
               </div>
             ))}
           </div>
