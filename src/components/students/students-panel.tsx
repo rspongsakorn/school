@@ -209,6 +209,7 @@ export function StudentsPanel() {
     }
 
     setDeleteAllOpen(false);
+    setDeleteAllConfirmText(""); // explicit clear, not relying on onOpenChange timing
     if (result.skipped > 0) {
       toast.success(`ลบแล้ว ${result.deleted} คน (ข้าม ${result.skipped} คนที่ลบไม่ได้)`);
     } else {
@@ -541,6 +542,7 @@ export function StudentsPanel() {
             </DialogHeader>
             <div className="py-2">
               <Input
+                aria-label='พิมพ์ "ลบทั้งหมด" เพื่อยืนยัน'
                 value={deleteAllConfirmText}
                 onChange={(e) => setDeleteAllConfirmText(e.target.value)}
                 placeholder='พิมพ์ "ลบทั้งหมด" เพื่อยืนยัน'
