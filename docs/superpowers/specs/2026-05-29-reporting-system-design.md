@@ -9,7 +9,7 @@
 
 ## 1. Overview
 
-ปัจจุบันมีรายงาน 2 หน้า: `รายงานค้างชำระ` (`/reports/outstanding`) และ `สรุปการเก็บ` (`/reports/collections`) งานนี้เพิ่ม 2 หน้าใหม่และขยาย 2 หน้าเดิม ให้ครบความต้องการ พร้อมความสามารถพิมพ์/ส่งออกทุกหน้า
+ปัจจุบันมีรายงาน 2 หน้า: `รายงานค้างชำระ` (`/reports/outstanding`) และ `สรุปการเก็บ` (`/reports/collections`) งานนี้เพิ่ม 2 หน้าใหม่และขยาย 2 หน้าเดิม ให้ครบความต้องการ พร้อมความสามารถพิมพ์ PDF ทุกหน้า (หัวกระดาษทางการ)
 
 | ข้อ | ความต้องการ | หน้า | สถานะ |
 |-----|-------------|------|-------|
@@ -19,7 +19,7 @@
 | 5 | สถิติ ตามชั้น/ห้อง/ทั้งหมด | `/reports/collections` | **ขยาย** |
 | 5 | สถิติ รายบุคคล (ตาราง + statement) | `/reports/students`, `/reports/students/[studentId]` | **ใหม่** |
 
-**Out of scope:** การ export เป็น `.xlsx` จริง (ใช้ CSV แทน), กราฟ/ชาร์ต, การกำหนดช่วงวันข้ามปีการศึกษา, การ schedule ส่งรายงานอัตโนมัติ
+**Out of scope:** การส่งออกไฟล์ (Excel/CSV) — ใช้พิมพ์ PDF ผ่านเบราว์เซอร์แทน, กราฟ/ชาร์ต, การกำหนดช่วงวันข้ามปีการศึกษา, การ schedule ส่งรายงานอัตโนมัติ
 
 ---
 
@@ -32,7 +32,8 @@
 | รายรับรายวัน | มีทั้งมุมมองสรุปรายวัน (1 แถว/วัน) และกางดูใบเสร็จรายวันได้ |
 | สรุปยอดประจำวัน (ข้อ 2) | ไม่แยกหน้า — ฝังเป็นแถวยอดรวมท้ายตารางของหน้ารายรับรายวัน |
 | รายบุคคล | ทำทั้งตารางสรุปรายคน และ statement รายคน |
-| พิมพ์/ส่งออก | ทั้ง PDF (browser print + print CSS) และ CSV (เปิดใน Excel ได้) |
+| พิมพ์/ส่งออก | พิมพ์ PDF อย่างเดียว (browser print + print CSS) — ไม่มี export ไฟล์ Excel/CSV |
+| หัวกระดาษ | ทุกหน้ารายงานมีหัวกระดาษทางการ (โลโก้ + ชื่อ/ที่อยู่โรงเรียน) แสดงเฉพาะตอนพิมพ์ |
 | สิทธิ์ `รายรับรายวัน` | admin, finance เท่านั้น |
 | สิทธิ์อีก 3 หน้า | admin, finance, teacher (ครูเห็นเฉพาะห้องที่รับผิดชอบ) |
 | Void | นับเฉพาะ `status = active`; รายการ void แสดงแยกแต่ไม่รวมในยอด |
@@ -42,14 +43,17 @@
 
 ## 3. Cross-cutting (ใช้ร่วมกัน)
 
-### 3.1 Export/Print
+### 3.1 Print (PDF)
 
-- **PDF:** ใช้ `window.print()` + print CSS — ซ่อน sidebar/header/toolbar ตอนพิมพ์ ผู้ใช้เลือก "Save as PDF" ได้เอง ไม่ต้องลง dependency
-- **CSV:** helper กลาง `src/lib/reports/export.ts`
-  - ฟังก์ชัน `downloadCsv(filename: string, headers: string[], rows: (string | number)[][])`
-  - ใส่ UTF-8 BOM (`﻿`) นำหน้าเพื่อให้ Excel แสดงภาษาไทยถูก
-  - escape ค่าที่มี `,` `"` หรือ newline ตามมาตรฐาน CSV
-- คอมโพเนนต์ `src/components/finance/report-toolbar.tsx` (`ReportToolbar`): ปุ่ม "พิมพ์" (เรียก `window.print()`) + "ดาวน์โหลด CSV" (รับ callback ที่คืน headers+rows) ใช้ซ้ำทุกหน้า
+- **PDF:** ใช้ `window.print()` + print CSS — ผู้ใช้เลือก "Save as PDF" หรือพิมพ์ออกเครื่องพิมพ์ได้เอง ไม่ต้องลง dependency, ไม่มีการส่งออกไฟล์ Excel/CSV
+- คอมโพเนนต์ `src/components/finance/report-toolbar.tsx` (`ReportToolbar`): ปุ่ม "พิมพ์" เรียก `window.print()` ใช้ซ้ำทุกหน้า
+
+### 3.1.1 หัวกระดาษทางการ (`ReportLetterhead`)
+
+- คอมโพเนนต์ `src/components/finance/report-letterhead.tsx`
+- เนื้อหา: โลโก้ (`public/logo.png`), ชื่อโรงเรียน "โรงเรียนบัวใหญ่วิทยา", ที่อยู่ "อ.บัวใหญ่ จ.นครราชสีมา", ชื่อรายงาน, ปี/เทอม, ช่วงวันที่/ตัวกรองที่ใช้ (ถ้ามี), วันที่พิมพ์
+- **แสดงเฉพาะตอนพิมพ์** (`hidden print:block`) — บนจอใช้ `AppHeader` เดิม
+- วางบนสุดของทุกหน้ารายงาน (daily, outstanding, collections, students roster + statement)
 
 ### 3.2 Timezone helper
 
@@ -58,7 +62,7 @@
 
 ### 3.3 Print CSS
 
-- เพิ่ม print styles (global หรือ utility class) ซ่อน `aside` sidebar, `AppHeader`, และ `ReportToolbar` ตอน `@media print`
+- เพิ่ม print styles (global หรือ utility class) ซ่อน `aside` sidebar, `AppHeader`, และ `ReportToolbar` ตอน `@media print` และแสดง `ReportLetterhead`
 - ตารางขยายเต็มหน้า; โหมดจัดกลุ่มตามห้อง (outstanding) ใส่ `break-before` ให้แต่ละห้องขึ้นหน้าใหม่
 
 ### 3.4 Navigation
@@ -96,7 +100,7 @@
 
 **มือถือ:** การ์ดต่อวัน แตะเพื่อกางใบเสร็จ
 
-**Toolbar:** พิมพ์ + CSV
+**Toolbar:** ปุ่มพิมพ์ + หัวกระดาษทางการตอนพิมพ์
 
 ---
 
@@ -112,7 +116,7 @@
 - ใช้ query เดิม (`fetchOutstandingReport`) — grouping ทำตอน render จาก `gradeClassroom` ที่มีในแต่ละแถวอยู่แล้ว
 - **ไม่แก้ logic ดึงข้อมูลเดิม**
 
-**Toolbar:** พิมพ์ (print CSS ให้แต่ละห้องขึ้นหน้าใหม่) + CSV
+**Toolbar:** ปุ่มพิมพ์ (print CSS ให้แต่ละห้องขึ้นหน้าใหม่) + หัวกระดาษทางการ
 
 ---
 
@@ -130,7 +134,7 @@
 
 ฟังก์ชันใหม่ใช้ logic รวมยอดเดิม เปลี่ยนแค่หน่วยจัดกลุ่ม
 
-**Toolbar:** พิมพ์ + CSV
+**Toolbar:** ปุ่มพิมพ์ + หัวกระดาษทางการ
 
 ---
 
@@ -157,7 +161,7 @@
 - `fetchStudentStatement(studentId, semesterId, academicYearId)`
 - ครูที่เข้าถึง studentId นอกห้องตนเอง → ปฏิเสธ/redirect
 
-**Toolbar:** พิมพ์ (เหมาะเป็นใบแจ้งยอดผู้ปกครอง) + CSV
+**Toolbar:** ปุ่มพิมพ์ (เหมาะเป็นใบแจ้งยอดผู้ปกครอง พร้อมหัวกระดาษทางการ)
 
 ---
 
@@ -170,22 +174,22 @@
 - `src/components/finance/daily-revenue-panel.tsx`
 - `src/components/finance/student-roster-panel.tsx`
 - `src/components/finance/student-statement-panel.tsx`
-- `src/components/finance/report-toolbar.tsx`
-- `src/lib/reports/export.ts`
+- `src/components/finance/report-toolbar.tsx` (ปุ่มพิมพ์)
+- `src/components/finance/report-letterhead.tsx` (หัวกระดาษทางการตอนพิมพ์)
 
 **แก้:**
 - `src/lib/queries/reports.ts` (เพิ่ม fetch ใหม่: daily revenue, collections by classroom, collections summary, student roster, student statement)
 - `src/lib/data/reports.ts` (คู่ขนานถ้าจำเป็น)
-- `src/components/finance/outstanding-report-panel.tsx` (โหมดจัดกลุ่มตามห้อง + toolbar)
-- `src/components/finance/collections-report-panel.tsx` (Select ระดับ + toolbar)
+- `src/components/finance/outstanding-report-panel.tsx` (โหมดจัดกลุ่มตามห้อง + toolbar + letterhead)
+- `src/components/finance/collections-report-panel.tsx` (Select ระดับ + toolbar + letterhead)
 - `src/components/app-sidebar.tsx` (เมนู)
 - `src/lib/format.ts` หรือ `src/lib/reports/` (Bangkok date helper)
-- global CSS (print styles)
+- global CSS (print styles — ซ่อน sidebar/header/toolbar, แสดง letterhead)
 
 ---
 
 ## 9. Testing
 
-- Unit: `downloadCsv` escaping + BOM; Bangkok date-key helper (รวมเคสช่วงดึกข้ามวัน)
+- Unit: Bangkok date-key helper (รวมเคสช่วงดึกข้ามวัน)
 - Unit: ฟังก์ชันจัดกลุ่ม daily revenue (แยกเงินสด/โอน, ตัด void ออกจากยอด)
-- Manual: เดินผ่านแต่ละหน้าในเบราว์เซอร์ (golden path + พิมพ์ + CSV), ตรวจสิทธิ์ครู (เห็นเฉพาะห้องตน, ไม่เห็นรายรับรายวัน)
+- Manual: เดินผ่านแต่ละหน้าในเบราว์เซอร์ (golden path + พิมพ์ดู print preview ว่ามีหัวกระดาษและซ่อน sidebar/toolbar), ตรวจสิทธิ์ครู (เห็นเฉพาะห้องตน, ไม่เห็นรายรับรายวัน)
