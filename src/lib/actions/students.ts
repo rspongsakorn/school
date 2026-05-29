@@ -696,10 +696,6 @@ export async function deleteAllStudents(): Promise<DeleteStudentsResult> {
       .eq("status", "active"),
   ]);
 
-  if (activeEnrollments.error || activePayments.error) {
-    return { ok: false, error: "ไม่สามารถตรวจสอบข้อมูลนักเรียนได้" };
-  }
-
   const blockedIds = new Set<string>();
   for (const row of activeEnrollments.data ?? []) blockedIds.add(row.student_id);
   for (const row of activePayments.data ?? []) blockedIds.add(row.student_id);
