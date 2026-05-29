@@ -100,6 +100,11 @@ export function InvoicesPanel() {
   const [deleting, setDeleting] = useState(false);
   const [isNavigating, startTransition] = useTransition();
 
+  const reimbursable: "reimbursable" | "standard" | "all" =
+    reimbursableParam === "reimbursable" || reimbursableParam === "standard"
+      ? reimbursableParam
+      : "all";
+
   const { data: invoicesData, isLoading: invoicesLoading } = useQuery({
     queryKey: [
       "invoices",
@@ -109,6 +114,7 @@ export function InvoicesPanel() {
       status,
       gradeParam,
       classroomParam,
+      reimbursable,
       pageParam,
     ],
     queryFn: () =>
@@ -119,6 +125,7 @@ export function InvoicesPanel() {
         gradeLevelId: gradeParam && gradeParam !== "all" ? gradeParam : undefined,
         classroomId: classroomParam && classroomParam !== "all" ? classroomParam : undefined,
         status,
+        reimbursable,
         page: pageParam,
       }),
     enabled: Boolean(ctx?.semesterId),
@@ -164,15 +171,7 @@ export function InvoicesPanel() {
     };
   }
 
-  const filteredRows = useMemo(() => {
-    if (reimbursableParam === "reimbursable") {
-      return data.rows.filter((r) => r.isReimbursable);
-    }
-    if (reimbursableParam === "standard") {
-      return data.rows.filter((r) => !r.isReimbursable);
-    }
-    return data.rows;
-  }, [data.rows, reimbursableParam]);
+  const filteredRows = data.rows;
 
   const deletableRows = useMemo(
     () => filteredRows.filter((row) => canDeleteInvoice(deleteContextFor(row))),

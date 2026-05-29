@@ -105,6 +105,7 @@ export async function fetchInvoicesPaginated(params: {
   gradeLevelId?: string;
   classroomId?: string;
   status?: InvoiceStatus | "all";
+  reimbursable?: "reimbursable" | "standard" | "all";
   page?: number;
 }): Promise<PaginatedInvoices> {
   const page = Math.max(1, params.page ?? 1);
@@ -162,6 +163,10 @@ export async function fetchInvoicesPaginated(params: {
 
   if (params.status && params.status !== "all") {
     query = query.eq("status", params.status);
+  }
+
+  if (params.reimbursable && params.reimbursable !== "all") {
+    query = query.eq("is_reimbursable", params.reimbursable === "reimbursable");
   }
 
   if (studentIdsFilter) {

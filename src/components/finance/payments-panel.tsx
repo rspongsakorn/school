@@ -56,6 +56,10 @@ const methodItems = [
   { value: "transfer", label: PAYMENT_METHOD_LABELS.transfer },
 ];
 
+function round2(n: number) {
+  return Math.round(n * 100) / 100;
+}
+
 export function PaymentsPanel() {
   useRequireRole(["admin", "finance"]);
 
@@ -220,6 +224,12 @@ export function PaymentsPanel() {
       return;
     }
 
+    const totalDue = round2(outstanding.reduce((sum, r) => sum + r.outstanding, 0));
+    if (parsedAmount > totalDue) {
+      toast.error(`จำนวนเงินเกินยอดค้างรวม (${formatBaht(totalDue)})`);
+      return;
+    }
+
     setSubmitting(true);
     const result = await recordPayment({
       studentId: selectedStudent.id,
@@ -301,6 +311,10 @@ export function PaymentsPanel() {
       </>
     );
   }
+
+  const totalOutstanding = round2(outstanding.reduce((sum, r) => sum + r.outstanding, 0));
+  const parsedAmount = Number.parseFloat(amount);
+  const amountExceeds = Number.isFinite(parsedAmount) && parsedAmount > totalOutstanding;
 
   return (
     <>
@@ -427,7 +441,17 @@ export function PaymentsPanel() {
 
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="grid gap-2">
-                        <Label htmlFor="pay-amount">จำนวนเงิน (บาท)</Label>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="pay-amount">จำนวนเงิน (บาท)</Label>
+                          <button
+                            type="button"
+                            className="text-xs text-primary hover:underline disabled:opacity-50"
+                            disabled={totalOutstanding <= 0}
+                            onClick={() => setAmount(String(totalOutstanding))}
+                          >
+                            ชำระเต็มจำนวน
+                          </button>
+                        </div>
                         <Input
                           id="pay-amount"
                           type="number"
@@ -436,7 +460,18 @@ export function PaymentsPanel() {
                           value={amount}
                           onChange={(e) => setAmount(e.target.value)}
                           className="tabular-nums"
+                          aria-invalid={amountExceeds}
                         />
+                        <p
+                          className={cn(
+                            "text-xs",
+                            amountExceeds ? "text-destructive" : "text-muted-foreground",
+                          )}
+                        >
+                          {amountExceeds
+                            ? `เกินยอดค้างรวม (${formatBaht(totalOutstanding)})`
+                            : `ยอดค้างรวม ${formatBaht(totalOutstanding)}`}
+                        </p>
                       </div>
                       <div className="grid gap-2">
                         <Label>วิธีชำระ</Label>
@@ -479,7 +514,7 @@ export function PaymentsPanel() {
                       type="button"
                       className="w-full"
                       onClick={handleRecord}
-                      disabled={submitting || outstanding.length === 0}
+                      disabled={submitting || outstanding.length === 0 || amountExceeds}
                     >
                       {submitting ? "กำลังบันทึก..." : "บันทึกและออกใบเสร็จ"}
                     </Button>
