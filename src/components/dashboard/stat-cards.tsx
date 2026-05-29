@@ -1,7 +1,6 @@
 import {
-  ArrowDownRight,
-  ArrowUpRight,
   Banknote,
+  CheckCircle2,
   CircleAlert,
   Users,
 } from "lucide-react";
@@ -14,37 +13,33 @@ export function StatCards({ stats }: { stats: DashboardStats }) {
     {
       title: "นักเรียนที่ลงทะเบียน",
       value: stats.totalStudents.toLocaleString("th-TH"),
-      delta: "—",
-      deltaLabel: "ปีการศึกษาปัจจุบัน",
-      positive: true,
+      caption: "ปีการศึกษาปัจจุบัน",
       icon: Users,
+      iconColor: "text-muted-foreground",
     },
     {
       title: "ยอดเก็บได้",
       value: formatBaht(stats.totalCollected),
-      delta: "—",
-      deltaLabel: "รายการชำระที่ใช้งาน",
-      positive: true,
+      caption: "รายการชำระที่ใช้งาน",
       icon: Banknote,
+      iconColor: "text-emerald-600",
     },
     {
       title: "ชำระแล้ว",
       value: stats.paidCount.toLocaleString("th-TH"),
       suffix: stats.paidCount > 0 ? `(${stats.paidRate}%)` : undefined,
-      delta: "—",
-      deltaLabel: "จากใบแจ้งชำระทั้งหมด",
-      positive: true,
-      icon: CircleAlert,
+      caption: "จากใบแจ้งชำระทั้งหมด",
+      icon: CheckCircle2,
+      iconColor: "text-emerald-600",
     },
     {
       title: "ค้างชำระ",
       value: stats.overdueCount.toLocaleString("th-TH"),
       suffix:
         stats.overdueCount > 0 ? `(${formatBaht(stats.overdueAmount)})` : undefined,
-      delta: "—",
-      deltaLabel: "ใบแจ้งที่ยังไม่ครบ",
-      positive: false,
+      caption: "ใบแจ้งที่ยังไม่ครบ",
       icon: CircleAlert,
+      iconColor: stats.overdueCount > 0 ? "text-amber-600" : "text-muted-foreground",
     },
   ];
 
@@ -52,8 +47,6 @@ export function StatCards({ stats }: { stats: DashboardStats }) {
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {items.map((stat) => {
         const Icon = stat.icon;
-        const DeltaIcon = stat.positive ? ArrowUpRight : ArrowDownRight;
-        const deltaColor = stat.positive ? "text-emerald-700" : "text-amber-700";
 
         return (
           <Card key={stat.title} className="border-border shadow-sm">
@@ -61,7 +54,7 @@ export function StatCards({ stats }: { stats: DashboardStats }) {
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 {stat.title}
               </CardTitle>
-              <Icon className="h-5 w-5 text-muted-foreground" />
+              <Icon className={`h-5 w-5 ${stat.iconColor}`} />
             </CardHeader>
             <CardContent>
               <div className="flex items-baseline gap-2">
@@ -70,11 +63,7 @@ export function StatCards({ stats }: { stats: DashboardStats }) {
                   <span className="text-sm text-muted-foreground">{stat.suffix}</span>
                 ) : null}
               </div>
-              <div className="mt-1 flex items-center gap-1 text-xs">
-                <DeltaIcon className={`h-3 w-3 ${deltaColor}`} />
-                <span className={deltaColor}>{stat.delta}</span>
-                <span className="text-muted-foreground">{stat.deltaLabel}</span>
-              </div>
+              <p className="mt-1 text-xs text-muted-foreground">{stat.caption}</p>
             </CardContent>
           </Card>
         );
