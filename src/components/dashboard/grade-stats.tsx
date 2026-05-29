@@ -41,7 +41,12 @@ export function GradeStats({ gradeStats, yearName, semesterNumber }: GradeStatsP
                     style={{ height: `${Math.max(item.rate, 2)}%` }}
                   />
                 </div>
-                <span className="text-xs text-muted-foreground">{item.grade}</span>
+                <div className="flex flex-col items-center">
+                  <span className="text-xs font-medium text-foreground">{item.grade}</span>
+                  <span className="text-[11px] tabular-nums text-muted-foreground">
+                    {item.paid}/{item.total} คน
+                  </span>
+                </div>
               </div>
             ))}
           </div>
