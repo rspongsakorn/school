@@ -39,6 +39,8 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-accent-foreground: var(--brand-accent-foreground);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -49,7 +51,7 @@
 }
 
 :root {
-  --background: #f5faf7;
+  --background: #f4f7f5;
   --foreground: #0d2b1e;
   --card: #ffffff;
   --card-foreground: #0d2b1e;
@@ -64,23 +66,28 @@
   --accent: #e0f2ea;
   --accent-foreground: #0d2b1e;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: #cce8d9;
-  --input: #cce8d9;
+  --border: #d9e6df;
+  --input: #d9e6df;
   --ring: #34aa79;
+  /* Yellow brand accent (สีรอง) — ใช้เป็นจุดเน้น ไม่ใช่สีหลัก */
+  --brand-accent: #f4b400;
+  --brand-accent-foreground: #3a2d00;
+  /* Charts: เขียวคู่เหลือง เพื่อเอกลักษณ์แบรนด์ */
   --chart-1: #34aa79;
-  --chart-2: #2d9669;
+  --chart-2: #f4b400;
   --chart-3: #1f7a52;
-  --chart-4: #145e3d;
+  --chart-4: #f0c54b;
   --chart-5: #0a3d28;
-  --radius: 0.625rem;
-  --sidebar: #34aa79;
-  --sidebar-foreground: #ffffff;
-  --sidebar-primary: #ffffff;
-  --sidebar-primary-foreground: #34aa79;
-  --sidebar-accent: #2d9669;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #29936a;
-  --sidebar-ring: #ffffff;
+  --radius: 0.8rem;
+  /* Sidebar โทนสว่าง (ข้อ 1) — active = pill เขียวอ่อน + แถบเหลือง */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #44584f;
+  --sidebar-primary: #e7f5ee;
+  --sidebar-primary-foreground: #1f7a52;
+  --sidebar-accent: #f0f5f2;
+  --sidebar-accent-foreground: #1f7a52;
+  --sidebar-border: #e4ebe7;
+  --sidebar-ring: #34aa79;
 }
 
 /* Dark mode palette intentionally omitted — the app ships light-only.

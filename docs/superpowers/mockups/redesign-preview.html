@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ตัวอย่างดีไซน์ใหม่ — โรงเรียนบัวใหญ่วิทยา</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* brand palette (จาก globals.css) */
+    --primary:#34aa79; --primary-600:#2d9669; --primary-700:#1f7a52;
+    --bg:#f6f8f7;            /* เทาอ่อนอมเขียวจางๆ — ข้อ 3: card ขาวลอยบนพื้นเทา */
+    --fg:#0d2b1e;
+    --muted:#6b8578;
+    --card:#ffffff;
+    --border:#e4ebe7;        /* ขอบคมแต่บาง — ข้อ 3 */
+    --border-strong:#d6e0db;
+    --radius:0.85rem;        /* ข้อ 4: นุ่มขึ้นจาก 0.625rem */
+    --sidebar-bg:#ffffff;    /* ข้อ 1: sidebar สว่าง ไม่ใช่เขียวทึบ */
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Inter','Noto Sans Thai',system-ui,sans-serif;
+    background:var(--bg); color:var(--fg);
+    -webkit-font-smoothing:antialiased;
+    display:flex; min-height:100vh;
+    letter-spacing:-0.005em;
+  }
+  .tnum{font-variant-numeric:tabular-nums}
+
+  /* ── Sidebar (ข้อ 1) ── */
+  aside{
+    width:248px; flex-shrink:0; background:var(--sidebar-bg);
+    border-right:1px solid var(--border);
+    padding:14px 12px; display:flex; flex-direction:column; gap:4px;
+  }
+  .brand{display:flex;align-items:center;gap:10px;padding:8px 8px 14px}
+  .brand .logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--primary),var(--primary-700));
+    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:15px;flex-shrink:0}
+  .brand .name{font-weight:600;font-size:14px;line-height:1.2}
+  .brand .sub{font-size:11px;color:var(--muted);line-height:1.2;margin-top:2px}
+  .navlabel{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#9bb0a6;padding:14px 10px 6px}
+  .navitem{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:10px;font-size:14px;font-weight:500;color:#3f5a4f;
+    cursor:pointer;transition:background .15s ease,color .15s ease}
+  .navitem:hover{background:#f0f5f2}
+  .navitem .ic{width:18px;height:18px;opacity:.7}
+  /* active = pill สีแบรนด์อ่อน + ตัวหนังสือเข้ม (ข้อ 1) */
+  .navitem.active{background:#e7f5ee;color:var(--primary-700);font-weight:600}
+  .navitem.active .ic{opacity:1;color:var(--primary-700)}
+
+  /* ── Main ── */
+  main{flex:1;display:flex;flex-direction:column;min-width:0}
+  header{
+    position:sticky;top:0;z-index:10;background:rgba(255,255,255,.85);
+    backdrop-filter:saturate(150%) blur(8px); /* ข้อ 5: header โปร่งเบาๆ */
+    border-bottom:1px solid var(--border);
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 28px;
+  }
+  header .title{font-size:20px;font-weight:600;letter-spacing:-0.02em} /* ข้อ 2 */
+  header .crumb{font-size:12px;color:var(--muted);margin-top:1px}
+  .pill-select{display:flex;gap:8px}
+  .selbox{border:1px solid var(--border-strong);background:#fff;border-radius:9px;padding:7px 12px;font-size:13px;font-weight:500;color:#3f5a4f}
+  .avatar{display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:10px;padding:5px 10px 5px 6px;font-size:13px;font-weight:500}
+  .avatar .dot{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--primary-700));color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600}
+
+  .content{padding:28px;display:flex;flex-direction:column;gap:24px}
+
+  /* ── Stat cards (ข้อ 2,3,4) ── */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+    box-shadow:0 1px 2px rgba(13,43,30,.04); /* ข้อ 3: เงาบางมาก */
+    transition:box-shadow .2s ease,transform .2s ease,border-color .2s ease}
+  .stat{padding:20px}
+  .stat:hover{box-shadow:0 6px 20px rgba(13,43,30,.07);transform:translateY(-1px);border-color:var(--border-strong)} /* ข้อ 5 */
+  .stat .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .stat .label{font-size:13px;font-weight:500;color:var(--muted)}
+  .stat .icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center}
+  .stat .num{font-size:30px;font-weight:700;letter-spacing:-0.03em;line-height:1} /* ข้อ 2: ตัวเลขใหญ่ คม */
+  .stat .cap{font-size:12px;color:var(--muted);margin-top:8px}
+  .ic-green{background:#e7f5ee;color:var(--primary-700)}
+  .ic-amber{background:#fef3e2;color:#b7791f}
+  .ic-gray{background:#eef2f0;color:#6b8578}
+
+  /* ── Table card ── */
+  .sec-h{display:flex;align-items:center;justify-content:space-between;padding:18px 20px 12px}
+  .sec-h h2{font-size:15px;font-weight:600;letter-spacing:-0.01em}
+  .sec-h a{font-size:13px;color:var(--primary-700);font-weight:500;text-decoration:none}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  thead th{text-align:left;font-size:12px;font-weight:600;color:#8a9d93;padding:10px 20px;border-bottom:1px solid var(--border);background:#fafcfb}
+  tbody td{padding:13px 20px;border-bottom:1px solid #f0f4f2}
+  tbody tr{transition:background .12s ease}
+  tbody tr:hover{background:#f7faf8} /* ข้อ 5 */
+  tbody tr:last-child td{border-bottom:none}
+  .right{text-align:right}
+  .badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600}
+  .b-paid{background:#e7f5ee;color:var(--primary-700)}
+  .b-partial{background:#fef3e2;color:#b7791f}
+  .b-unpaid{background:#fdeaea;color:#c0392b}
+
+  .twocol{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+  .listrow{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid #f0f4f2;font-size:13.5px}
+  .listrow:last-child{border-bottom:none}
+  .muted{color:var(--muted);font-size:12.5px}
+
+  .note{max-width:1200px;margin:0 auto;padding:18px 28px 0;font-size:13px;color:var(--muted)}
+  .note b{color:var(--fg)}
+</style>
+</head>
+<body>
+  <aside>
+    <div class="brand">
+      <div class="logo">บว</div>
+      <div>
+        <div class="name">โรงเรียนบัวใหญ่วิทยา</div>
+        <div class="sub">อ.บัวใหญ่ จ.นครราชสีมา</div>
+      </div>
+    </div>
+
+    <div class="navlabel">ข้อมูลพื้นฐาน</div>
+    <div class="navitem active"><span class="ic">▦</span> ภาพรวม</div>
+    <div class="navitem"><span class="ic">▤</span> ปีการศึกษา</div>
+    <div class="navitem"><span class="ic">◍</span> นักเรียน</div>
+    <div class="navitem"><span class="ic">▢</span> ลงทะเบียน</div>
+
+    <div class="navlabel">การเงิน</div>
+    <div class="navitem"><span class="ic">▥</span> ใบแจ้งชำระ</div>
+    <div class="navitem"><span class="ic">▣</span> บันทึกการจ่าย</div>
+    <div class="navitem"><span class="ic">▧</span> รายงานค้างชำระ</div>
+  </aside>
+
+  <main>
+    <header>
+      <div>
+        <div class="title">ภาพรวม</div>
+        <div class="crumb">ภาคเรียนที่ 1 · ปี 2568</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px">
+        <div class="pill-select">
+          <div class="selbox">ปี 2568 ▾</div>
+          <div class="selbox">ภาค 1 ▾</div>
+        </div>
+        <div class="avatar"><span class="dot">ผ</span> ผู้ดูแลระบบ ▾</div>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="stats">
+        <div class="card stat">
+          <div class="top"><span class="label">นักเรียนที่ลงทะเบียน</span><span class="icon ic-gray">◍</span></div>
+          <div class="num tnum">1,248</div>
+          <div class="cap">ปีการศึกษาปัจจุบัน</div>
+        </div>
+        <div class="card stat">
+          <div class="top"><span class="label">ยอดเก็บได้</span><span class="icon ic-green">฿</span></div>
+          <div class="num tnum">฿2.84M</div>
+          <div class="cap">รายการชำระที่ใช้งาน</div>
+        </div>
+        <div class="card stat">
+          <div class="top"><span class="label">ชำระแล้ว</span><span class="icon ic-green">✓</span></div>
+          <div class="num tnum">982 <span style="font-size:15px;color:var(--muted);font-weight:500">(78%)</span></div>
+          <div class="cap">จากใบแจ้งชำระทั้งหมด</div>
+        </div>
+        <div class="card stat">
+          <div class="top"><span class="label">ค้างชำระ</span><span class="icon ic-amber">!</span></div>
+          <div class="num tnum">266 <span style="font-size:15px;color:var(--muted);font-weight:500">(฿412K)</span></div>
+          <div class="cap">ใบแจ้งที่ยังไม่ครบ</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="sec-h"><h2>การชำระล่าสุด</h2><a href="#">ดูทั้งหมด →</a></div>
+        <table>
+          <thead><tr><th>เลขที่</th><th>นักเรียน</th><th>ชั้น/ห้อง</th><th>วิธี</th><th class="right">จำนวน</th><th>สถานะ</th></tr></thead>
+          <tbody>
+            <tr><td class="tnum">68-00982</td><td>เด็กหญิงมาลี ใจดี</td><td>ป.5/2</td><td>เงินสด</td><td class="right tnum">฿4,500</td><td><span class="badge b-paid">ชำระครบ</span></td></tr>
+            <tr><td class="tnum">68-00981</td><td>เด็กชายสมชาย รักเรียน</td><td>ป.6/1</td><td>เงินโอน</td><td class="right tnum">฿3,000</td><td><span class="badge b-partial">บางส่วน</span></td></tr>
+            <tr><td class="tnum">68-00980</td><td>เด็กหญิงสุดา ขยันยิ่ง</td><td>ป.4/3</td><td>เงินสด</td><td class="right tnum">฿5,200</td><td><span class="badge b-paid">ชำระครบ</span></td></tr>
+            <tr><td class="tnum">68-00979</td><td>เด็กชายวิชัย ตั้งใจ</td><td>ป.3/1</td><td>เงินโอน</td><td class="right tnum">฿2,800</td><td><span class="badge b-paid">ชำระครบ</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="twocol">
+        <div class="card">
+          <div class="sec-h"><h2>ค้างชำระสูงสุด</h2></div>
+          <div class="listrow"><div><div>เด็กชายธนา มั่งมี</div><div class="muted">ป.6/2 · 65xxx</div></div><div class="right tnum" style="color:#b7791f;font-weight:600">฿8,400</div></div>
+          <div class="listrow"><div><div>เด็กหญิงพิมพ์ ใจงาม</div><div class="muted">ป.5/1 · 65xxx</div></div><div class="right tnum" style="color:#b7791f;font-weight:600">฿6,900</div></div>
+          <div class="listrow"><div><div>เด็กชายกิตติ เก่งกล้า</div><div class="muted">ป.4/2 · 66xxx</div></div><div class="right tnum" style="color:#b7791f;font-weight:600">฿5,500</div></div>
+        </div>
+        <div class="card">
+          <div class="sec-h"><h2>สถิติรายชั้น</h2></div>
+          <div class="listrow"><div>ป.1</div><div class="muted">เก็บได้ 92%</div></div>
+          <div class="listrow"><div>ป.2</div><div class="muted">เก็บได้ 88%</div></div>
+          <div class="listrow"><div>ป.3</div><div class="muted">เก็บได้ 81%</div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

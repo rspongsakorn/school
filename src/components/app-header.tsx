@@ -35,7 +35,7 @@ export function AppHeader({ title, basePath, clearGradeClassroomOnChange = false
             <Menu className="h-5 w-5" />
           </button>
           <div className="min-w-0">
-            <h1 className="truncate text-lg font-semibold text-foreground lg:text-xl">{title}</h1>
+            <h1 className="truncate text-lg font-semibold tracking-tight text-foreground lg:text-xl">{title}</h1>
             {subtitleYear ? (
               <p className="truncate text-xs text-muted-foreground">
                 ภาคเรียนที่ {subtitleSemester} · ปี {subtitleYear}

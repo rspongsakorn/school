@@ -53,7 +53,7 @@ function NavSection({
 
   return (
     <div className="mb-6">
-      <h3 className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-sidebar-accent-foreground/60">
+      <h3 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
         {title}
       </h3>
       <ul className="space-y-1">
@@ -66,9 +66,9 @@ function NavSection({
               <Link
                 href={item.href}
                 className={cn(
-                  "flex h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
+                  "relative flex h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
                   active
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                    ? "bg-sidebar-primary font-semibold text-sidebar-primary-foreground before:absolute before:left-0 before:top-1/2 before:h-5 before:w-1 before:-translate-y-1/2 before:rounded-r-full before:bg-brand-accent before:content-['']"
                     : "text-sidebar-foreground hover:bg-sidebar-accent",
                 )}
               >
@@ -105,10 +105,10 @@ function SidebarContent() {
           priority
         />
         <div className="flex min-w-0 flex-col gap-0.5">
-          <span className="truncate text-sm font-semibold leading-tight text-sidebar-foreground">
+          <span className="truncate text-sm font-semibold leading-tight tracking-tight text-foreground">
             โรงเรียนบัวใหญ่วิทยา
           </span>
-          <span className="truncate text-xs leading-tight text-sidebar-accent-foreground/60">
+          <span className="truncate text-xs leading-tight text-muted-foreground">
             อ.บัวใหญ่ จ.นครราชสีมา
           </span>
         </div>
