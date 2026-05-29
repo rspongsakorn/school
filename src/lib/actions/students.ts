@@ -677,6 +677,7 @@ export async function deleteAllStudents(): Promise<DeleteStudentsResult> {
 
   const allIds = (allStudents ?? []).map((s) => s.id);
 
+  // No students in the system — success with zero counts (unlike deleteStudents which rejects empty input)
   if (allIds.length === 0) {
     return { ok: true, deleted: 0, skipped: 0 };
   }
@@ -709,6 +710,8 @@ export async function deleteAllStudents(): Promise<DeleteStudentsResult> {
     if (error) return { ok: false, error: "ไม่สามารถลบนักเรียนได้" };
   }
 
+  // Partial success: skip students with active enrollments or payments (same condition as deleteStudents)
+  // Unlike deleteStudents, we do NOT fail when deletableIds is empty — caller handles the skipped count
   revalidatePath("/students");
   revalidatePath("/registration");
   revalidatePath("/invoices");
