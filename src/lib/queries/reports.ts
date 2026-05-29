@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
-import { formatClassroom, formatStudentName } from "@/lib/format";
+import { formatClassroom, formatStudentName, formatThaiTime } from "@/lib/format";
+import { bangkokDateKey } from "@/lib/reports/date";
+import { groupDailyRevenue, type DailyRevenueRow } from "@/lib/reports/daily";
 
 export type OutstandingReportRow = {
   studentId: string;
@@ -284,4 +286,95 @@ export async function fetchCollectionsByGrade(
 
 function round2(n: number) {
   return Math.round(n * 100) / 100;
+}
+
+export type DailyDetailReceipt = {
+  paymentId: string;
+  receiptNumber: string;
+  paidAt: string;
+  timeLabel: string;
+  studentName: string;
+  studentCode: string;
+  paymentMethod: "cash" | "transfer";
+  amount: number;
+  status: "active" | "voided";
+};
+
+export type DailyRevenueResult = {
+  summary: DailyRevenueRow[];
+  receiptsByDate: Record<string, DailyDetailReceipt[]>;
+};
+
+export async function fetchDailyRevenue(params: {
+  academicYearId: string;
+  dateFrom: string; // YYYY-MM-DD (Bangkok day)
+  dateTo: string; // YYYY-MM-DD (Bangkok day)
+  method?: "all" | "cash" | "transfer";
+}): Promise<DailyRevenueResult> {
+  const supabase = createClient();
+
+  const fromIso = `${params.dateFrom}T00:00:00+07:00`;
+  const toIso = `${params.dateTo}T23:59:59.999+07:00`;
+
+  let query = supabase
+    .from("payments")
+    .select(
+      `
+      id,
+      receipt_number,
+      amount,
+      payment_method,
+      paid_at,
+      status,
+      students!inner ( student_code, first_name, last_name )
+    `,
+    )
+    .eq("academic_year_id", params.academicYearId)
+    .gte("paid_at", fromIso)
+    .lte("paid_at", toIso)
+    .order("paid_at", { ascending: false });
+
+  if (params.method && params.method !== "all") {
+    query = query.eq("payment_method", params.method);
+  }
+
+  type Row = {
+    id: string;
+    receipt_number: string;
+    amount: number;
+    payment_method: "cash" | "transfer";
+    paid_at: string;
+    status: "active" | "voided";
+    students: { student_code: string; first_name: string; last_name: string };
+  };
+
+  const { data } = await query;
+  const rows = (data ?? []) as unknown as Row[];
+
+  const summary = groupDailyRevenue(
+    rows.map((r) => ({
+      amount: Number(r.amount),
+      paymentMethod: r.payment_method,
+      paidAt: r.paid_at,
+      status: r.status,
+    })),
+  );
+
+  const receiptsByDate: Record<string, DailyDetailReceipt[]> = {};
+  for (const r of rows) {
+    const key = bangkokDateKey(r.paid_at);
+    (receiptsByDate[key] ??= []).push({
+      paymentId: r.id,
+      receiptNumber: r.receipt_number,
+      paidAt: r.paid_at,
+      timeLabel: formatThaiTime(r.paid_at),
+      studentName: formatStudentName(r.students.first_name, r.students.last_name),
+      studentCode: r.students.student_code,
+      paymentMethod: r.payment_method,
+      amount: Number(r.amount),
+      status: r.status,
+    });
+  }
+
+  return { summary, receiptsByDate };
 }
