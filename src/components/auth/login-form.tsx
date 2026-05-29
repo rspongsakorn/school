@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { signIn, type LoginState } from "@/app/login/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,12 @@ const initialState: LoginState = {};
 
 export function LoginForm() {
   const [state, formAction, pending] = useActionState(signIn, initialState);
+
+  useEffect(() => {
+    if (state.success) {
+      window.location.href = "/";
+    }
+  }, [state.success]);
 
   return (
     <Card className="border-border shadow-sm">
