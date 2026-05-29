@@ -18,6 +18,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -33,7 +42,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { StudentListRow } from "@/lib/data/students";
-import { deleteStudents } from "@/lib/actions/students";
+import { deleteAllStudents, deleteStudents } from "@/lib/actions/students";
 import {
   STUDENT_STATUS_FILTER_OPTIONS,
   type StudentStatus,
@@ -90,6 +99,9 @@ export function StudentsPanel() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [deleteTargetIds, setDeleteTargetIds] = useState<string[] | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false);
+  const [deleteAllConfirmText, setDeleteAllConfirmText] = useState("");
+  const [deletingAll, setDeletingAll] = useState(false);
   const [isNavigating, startTransition] = useTransition();
 
   const deletableRows = useMemo(
@@ -186,6 +198,29 @@ export function StudentsPanel() {
     router.refresh();
   }
 
+  async function handleDeleteAll() {
+    setDeletingAll(true);
+    const result = await deleteAllStudents();
+    setDeletingAll(false);
+
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+
+    setDeleteAllOpen(false);
+    if (result.skipped > 0) {
+      toast.success(`ลบแล้ว ${result.deleted} คน (ข้าม ${result.skipped} คนที่ลบไม่ได้)`);
+    } else {
+      toast.success(`ลบนักเรียนแล้ว ${result.deleted} คน`);
+    }
+    void queryClient.invalidateQueries({ queryKey: ["students"] });
+    void queryClient.invalidateQueries({ queryKey: ["enrollment-candidates"] });
+    void queryClient.invalidateQueries({ queryKey: ["classroom-roster"] });
+    void queryClient.invalidateQueries({ queryKey: ["classrooms-by-grade"] });
+    router.refresh();
+  }
+
   const canPrev = (data?.page ?? 1) > 1;
   const canNext = (data?.page ?? 1) < (data?.totalPages ?? 1);
   const sheetOpen = createOpen || Boolean(selectedStudent);
@@ -263,6 +298,14 @@ export function StudentsPanel() {
                         ลบที่เลือก ({bulkDeleteCount})
                       </Button>
                     ) : null}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="text-destructive"
+                      onClick={() => setDeleteAllOpen(true)}
+                    >
+                      ลบนักเรียนทั้งหมด
+                    </Button>
                     <Button type="button" variant="outline" onClick={() => setImportOpen(true)}>
                       นำเข้า CSV
                     </Button>
@@ -477,6 +520,56 @@ export function StudentsPanel() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+      ) : null}
+
+      {isAdmin ? (
+        <Dialog
+          open={deleteAllOpen}
+          onOpenChange={(open) => {
+            if (!open && !deletingAll) {
+              setDeleteAllOpen(false);
+              setDeleteAllConfirmText("");
+            }
+          }}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>ลบนักเรียนทั้งหมด</DialogTitle>
+              <DialogDescription>
+                การลบไม่สามารถย้อนกลับได้ นักเรียนที่มีประวัติการลงทะเบียนหรือการเงินจะถูกข้าม
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-2">
+              <Input
+                value={deleteAllConfirmText}
+                onChange={(e) => setDeleteAllConfirmText(e.target.value)}
+                placeholder='พิมพ์ "ลบทั้งหมด" เพื่อยืนยัน'
+                disabled={deletingAll}
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={deletingAll}
+                onClick={() => {
+                  setDeleteAllOpen(false);
+                  setDeleteAllConfirmText("");
+                }}
+              >
+                ยกเลิก
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={deleteAllConfirmText !== "ลบทั้งหมด" || deletingAll}
+                onClick={handleDeleteAll}
+              >
+                {deletingAll ? "กำลังลบ..." : "ยืนยันลบ"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       ) : null}
     </>
   );
