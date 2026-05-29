@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatThaiDateLong } from "./format";
+import { formatThaiDateLong, formatThaiTime } from "./format";
 
 describe("formatThaiDateLong", () => {
   it("returns the day number", () => {
@@ -28,5 +28,21 @@ describe("formatThaiDateLong", () => {
     const result = formatThaiDateLong("2026-05-28T23:00:00.000Z");
     expect(result).toContain("29");
     expect(result).toContain("พฤษภาคม");
+  });
+});
+
+describe("formatThaiTime", () => {
+  it("formats an instant as 24-hour HH:MM in Bangkok time", () => {
+    // 2026-05-28T05:00:00Z = 12:00 Bangkok
+    expect(formatThaiTime("2026-05-28T05:00:00Z")).toBe("12:00");
+  });
+
+  it("uses 24-hour clock (not AM/PM) for after-midnight Bangkok time", () => {
+    // 2026-05-28T18:30:00Z = 01:30 Bangkok next day
+    expect(formatThaiTime("2026-05-28T18:30:00Z")).toBe("01:30");
+  });
+
+  it("accepts a Date object", () => {
+    expect(formatThaiTime(new Date("2026-05-28T05:00:00Z"))).toBe("12:00");
   });
 });

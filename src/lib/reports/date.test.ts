@@ -17,4 +17,12 @@ describe("bangkokDateKey", () => {
   it("accepts a Date object", () => {
     expect(bangkokDateKey(new Date("2026-05-28T05:00:00Z"))).toBe("2026-05-28");
   });
+
+  it("rolls over exactly at 17:00 UTC (Bangkok midnight)", () => {
+    expect(bangkokDateKey("2026-05-28T17:00:00Z")).toBe("2026-05-29");
+  });
+
+  it("stays on the same day one second before Bangkok midnight", () => {
+    expect(bangkokDateKey("2026-05-28T16:59:59Z")).toBe("2026-05-28");
+  });
 });
