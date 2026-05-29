@@ -23,6 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>({ profile: null, isLoading: true });
 
   const loadProfile = useCallback(async () => {
+    setState((prev) => ({ ...prev, isLoading: true }));
     const supabase = createClient();
     const {
       data: { user },
@@ -70,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setState({ profile: null, isLoading: false });
         router.push("/login");
       }
-      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") {
         void loadProfile();
       }
     });
