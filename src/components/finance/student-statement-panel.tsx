@@ -22,7 +22,7 @@ export function StudentStatementPanel({ studentId }: { studentId: string }) {
   const { ctx } = useSemesterContext();
   const [mode, setMode] = useState<"semester" | "all">("semester");
 
-  const { data: s, isLoading } = useQuery({
+  const { data: s, isLoading, isFetching } = useQuery({
     queryKey:
       mode === "semester"
         ? ["student-statement", studentId, ctx?.semesterId, ctx?.academicYearId]
@@ -48,7 +48,7 @@ export function StudentStatementPanel({ studentId }: { studentId: string }) {
         />
 
         {/* Mode toggle */}
-        <div className="report-toolbar mb-4 flex items-center justify-between gap-2">
+        <div className="mb-4 flex items-center justify-between gap-2">
           <div className="flex overflow-hidden rounded-lg border border-border text-sm">
             <button
               type="button"
@@ -81,7 +81,7 @@ export function StudentStatementPanel({ studentId }: { studentId: string }) {
         ) : !s ? (
           <p className="py-6 text-center text-sm text-muted-foreground">ไม่พบข้อมูลนักเรียน</p>
         ) : (
-          <div className="space-y-6">
+          <div className={`space-y-6 transition-opacity ${isFetching ? "opacity-60" : ""}`}>
             <div className="rounded-lg border border-border p-4 print:border-black">
               <p className="text-lg font-semibold">{s.studentName}</p>
               <p className="text-sm text-muted-foreground">{s.studentCode} · {s.gradeClassroom}</p>
