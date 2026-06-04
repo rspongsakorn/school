@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { ArrowRightLeft, Copy, Loader2, Pencil, Plus, Trash2, UserX } from "lucide-react";
+import { ArrowRightLeft, Copy, GraduationCap, Loader2, Pencil, Plus, Trash2, UserX } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,6 +44,7 @@ import { ClassroomDialog } from "@/components/registration/classroom-dialog";
 import { EnrollStudentDialog } from "@/components/registration/enroll-student-dialog";
 import { MoveClassroomDialog } from "@/components/registration/move-classroom-dialog";
 import { EnrollmentStatusDialog } from "@/components/registration/enrollment-status-dialog";
+import Link from "next/link";
 import { useAuth, useRequireRole } from "@/components/providers/auth-provider";
 import { useSemesterContext } from "@/hooks/use-semester-context";
 import {
@@ -263,6 +264,16 @@ export function RegistrationPanel() {
       <AppHeader title="ลงทะเบียน" basePath="/registration" />
       <main className="p-4 lg:p-6">
         <div className="space-y-6">
+          {isAdmin && (
+            <div>
+              <Link
+                href="/registration/promote"
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-2")}
+              >
+                <GraduationCap className="h-4 w-4" /> เลื่อนชั้นขึ้นปีการศึกษา
+              </Link>
+            </div>
+          )}
           {isAdmin && grades.length === 0 && copySourceOptions.length > 0 && (
             <div className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3">
               <p className="text-sm text-muted-foreground">
