@@ -104,11 +104,20 @@ export async function executePromotion(
       });
 
     if (rows.length > 0) {
-      const { error } = await supabase.from("student_enrollments").insert(rows);
-      if (error && error.code !== "23505") {
+      const { data: insertedRows, error } = await supabase
+        .from("student_enrollments")
+        .upsert(rows, {
+          onConflict: "student_id,semester_id",
+          ignoreDuplicates: true,
+        })
+        .select("id");
+      if (error) {
         return { ok: false, error: "ไม่สามารถลงทะเบียนนักเรียนได้" };
       }
-      enrolled = rows.length;
+      const insertedCount = insertedRows?.length ?? 0;
+      enrolled = insertedCount;
+      // แถวที่เป็นซ้ำ (ถูกข้ามโดย ignoreDuplicates) นับเป็น skipped เพิ่ม
+      skipped += rows.length - insertedCount;
     }
   }
 
