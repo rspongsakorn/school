@@ -16,7 +16,7 @@ import { searchStudentsForPayment } from "@/lib/data/payments";
 import { getStudentGradeMap } from "@/lib/data/enrollments";
 
 export type RecordPaymentResult =
-  | { ok: true; paymentId: string; snapshot: Record<string, unknown> }
+  | { ok: true; paymentId: string; receiptNumber: string; snapshot: Record<string, unknown> }
   | { ok: false; error: string };
 
 type RecordPaymentInput = {
@@ -170,7 +170,7 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
   }
 
   revalidateFinancePaths();
-  return { ok: true, paymentId: payment.id, snapshot };
+  return { ok: true, paymentId: payment.id, receiptNumber, snapshot };
 }
 
 export async function getStudentOutstandingAction(studentId: string, semesterId: string) {

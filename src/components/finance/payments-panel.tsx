@@ -71,6 +71,7 @@ export function PaymentsPanel() {
 
   const gradeParam = searchParams.get("grade") ?? "all";
   const classroomParam = searchParams.get("classroom") ?? "all";
+  const qParam = searchParams.get("q") ?? "";
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchGrade, setSearchGrade] = useState("all");
@@ -90,8 +91,10 @@ export function PaymentsPanel() {
   const [transferRef, setTransferRef] = useState("");
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [lastPayment, setLastPayment] = useState<{ id: string; receiptNumber: string; amount: number } | null>(null);
   const [voidTarget, setVoidTarget] = useState<PaymentListRow | null>(null);
   const [voidReason, setVoidReason] = useState("");
+  const [paymentSearch, setPaymentSearch] = useState(qParam);
   const [voiding, setVoiding] = useState(false);
   const [isNavigating, startTransition] = useTransition();
 
@@ -201,6 +204,7 @@ export function PaymentsPanel() {
 
   async function selectStudent(student: (typeof searchResults)[number]) {
     if (!ctx?.semesterId) return;
+    setLastPayment(null);
     setSelectedStudent(student);
     setSearchQuery("");
     setSearchResults([]);
@@ -249,6 +253,7 @@ export function PaymentsPanel() {
     }
 
     toast.success("บันทึกการชำระและออกใบเสร็จแล้ว");
+    setLastPayment({ id: result.paymentId, receiptNumber: result.receiptNumber, amount: parsedAmount });
     const receiptUrl = `/receipts/${result.paymentId}`;
     const w = window.open(receiptUrl, "_blank", "noopener,noreferrer");
     if (!w) {
@@ -289,6 +294,16 @@ export function PaymentsPanel() {
   }
 
   const isLoading = ctxLoading || paymentsLoading;
+
+  const displayedPayments = paymentSearch.trim()
+    ? filteredPayments.filter((p) => {
+        const q = paymentSearch.trim().toLowerCase();
+        return (
+          p.studentCode.toLowerCase().includes(q) ||
+          p.studentName.toLowerCase().includes(q)
+        );
+      })
+    : filteredPayments;
 
   if (ctxLoading) {
     return (
@@ -401,7 +416,36 @@ export function PaymentsPanel() {
                 <CardTitle className="text-base">รับชำระเงิน</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {!selectedStudent ? (
+                {!selectedStudent && lastPayment ? (
+                  <div className="space-y-3">
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm">
+                      <p className="font-medium text-emerald-800">✓ บันทึกการชำระแล้ว</p>
+                      <p className="mt-0.5 text-emerald-700">
+                        ใบเสร็จ {lastPayment.receiptNumber} · {formatBaht(lastPayment.amount)}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <a href={`/receipts/${lastPayment.id}`} target="_blank" rel="noopener noreferrer" className="flex-1">
+                        <Button type="button" variant="outline" className="w-full" size="sm">
+                          ดูใบเสร็จ
+                        </Button>
+                      </a>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 text-destructive"
+                        onClick={() => {
+                          const row = filteredPayments.find((p) => p.id === lastPayment.id);
+                          if (row) setVoidTarget(row);
+                        }}
+                      >
+                        ยกเลิกการชำระนี้
+                      </Button>
+                    </div>
+                    <p className="text-center text-xs text-muted-foreground">หรือค้นหานักเรียนรายถัดไป</p>
+                  </div>
+                ) : !selectedStudent ? (
                   <p className="text-sm text-muted-foreground">เลือกนักเรียนจากการค้นหาด้านซ้าย</p>
                 ) : (
                   <>
@@ -520,13 +564,14 @@ export function PaymentsPanel() {
                     </Button>
                   </>
                 )}
-              </CardContent>
+                </CardContent>
             </Card>
 
             <Card className="border-border shadow-sm">
-              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <CardTitle className="text-base">รายการการชำระ</CardTitle>
-                <div className="flex flex-wrap gap-2">
+              <CardHeader className="flex flex-col gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <CardTitle className="text-base">รายการการชำระ</CardTitle>
+                  <div className="flex flex-wrap gap-2">
                   <Select
                     value={gradeParam}
                     onValueChange={(v) =>
@@ -562,16 +607,24 @@ export function PaymentsPanel() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <input
+                type="text"
+                value={paymentSearch}
+                onChange={(e) => setPaymentSearch(e.target.value)}
+                placeholder="ค้นหาชื่อ / รหัสนักเรียน…"
+                className="h-8 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50 sm:max-w-xs"
+              />
               </CardHeader>
               <CardContent className="px-0 pb-0">
                 {/* Mobile stacked cards */}
-                {filteredPayments.length === 0 ? (
+                {displayedPayments.length === 0 ? (
                   <p className="px-4 py-6 text-center text-sm text-muted-foreground sm:hidden">
-                    ไม่พบรายการการชำระตามตัวกรอง
+                    ไม่พบรายการการชำระ
                   </p>
                 ) : (
                   <div className="sm:hidden divide-y divide-border">
-                    {filteredPayments.map((p) => (
+                    {displayedPayments.map((p) => (
                       <div key={p.id} className="space-y-2 px-4 py-3">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
@@ -633,14 +686,14 @@ export function PaymentsPanel() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredPayments.length === 0 ? (
+                      {displayedPayments.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={9} className="py-6 text-center text-muted-foreground">
-                            ไม่พบรายการการชำระตามตัวกรอง
+                            ไม่พบรายการการชำระ
                           </TableCell>
                         </TableRow>
                       ) : (
-                        filteredPayments.map((p) => (
+                        displayedPayments.map((p) => (
                           <TableRow key={p.id}>
                             <TableCell className="tabular-nums">{p.receiptNumber}</TableCell>
                             <TableCell className="tabular-nums">{p.studentCode}</TableCell>

@@ -440,6 +440,15 @@ export function InvoicesPanel() {
                         ) : null}
                       </div>
                       <div className="flex justify-end gap-2">
+                        {row.paidAmount > 0 ? (
+                          <a
+                            href={`/payments?q=${row.studentCode}${searchParams.get("year") ? `&year=${searchParams.get("year")}` : ""}${searchParams.get("semester") ? `&semester=${searchParams.get("semester")}` : ""}`}
+                          >
+                            <Button type="button" size="sm" variant="outline">
+                              ดูการชำระ
+                            </Button>
+                          </a>
+                        ) : null}
                         {row.paidAmount === 0 ? (
                           <Button
                             type="button"
@@ -556,6 +565,15 @@ export function InvoicesPanel() {
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-wrap justify-end gap-2">
+                              {row.paidAmount > 0 ? (
+                                <a
+                                  href={`/payments?q=${row.studentCode}${searchParams.get("year") ? `&year=${searchParams.get("year")}` : ""}${searchParams.get("semester") ? `&semester=${searchParams.get("semester")}` : ""}`}
+                                >
+                                  <Button type="button" size="sm" variant="outline">
+                                    ดูการชำระ
+                                  </Button>
+                                </a>
+                              ) : null}
                               {row.paidAmount === 0 ? (
                                 <Button
                                   type="button"

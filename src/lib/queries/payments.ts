@@ -102,14 +102,19 @@ export async function fetchPaymentsFiltered(params: {
   const supabase = createClient();
   const gradeByStudent = await getStudentGradeMap(params.semesterId);
 
-  const studentIds = await studentIdsForPaymentFilter({
-    semesterId: params.semesterId,
-    gradeLevelId: params.gradeLevelId,
-    classroomId: params.classroomId,
-  });
+  const hasFilter = Boolean(params.gradeLevelId || params.classroomId);
 
-  if (studentIds && studentIds.length === 0) {
-    return [];
+  // Only fetch student IDs when a grade/classroom filter is active —
+  // passing 800+ IDs into an IN clause exceeds PostgREST URL limits.
+  let studentIds: string[] | null = null;
+  if (hasFilter) {
+    const ids = await studentIdsForPaymentFilter({
+      semesterId: params.semesterId,
+      gradeLevelId: params.gradeLevelId,
+      classroomId: params.classroomId,
+    });
+    if (ids.length === 0) return [];
+    studentIds = ids;
   }
 
   let query = supabase
