@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -53,7 +53,7 @@ export function SemesterDialog({
   existingSemesters,
   initial,
 }: SemesterDialogProps) {
-  const router = useRouter();
+  const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -105,7 +105,7 @@ export function SemesterDialog({
 
     toast.success(mode === "create" ? "เพิ่มภาคเรียนแล้ว" : "บันทึกภาคเรียนแล้ว");
     onOpenChange(false);
-    router.refresh();
+    void queryClient.invalidateQueries({ queryKey: ["academic-year", academicYearId] });
   }
 
   return (

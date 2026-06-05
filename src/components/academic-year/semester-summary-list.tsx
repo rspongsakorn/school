@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -41,7 +41,7 @@ export function SemesterSummaryList({
   addDialogOpen,
   onAddDialogOpenChange,
 }: SemesterSummaryListProps) {
-  const router = useRouter();
+  const queryClient = useQueryClient();
   const [editTarget, setEditTarget] = useState<SemesterDialogInitial | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SemesterRow | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -61,7 +61,7 @@ export function SemesterSummaryList({
     }
 
     toast.success("ลบภาคเรียนแล้ว");
-    router.refresh();
+    void queryClient.invalidateQueries({ queryKey: ["academic-year", academicYearId] });
   }
 
   if (sorted.length === 0) {
