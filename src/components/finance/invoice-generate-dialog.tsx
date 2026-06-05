@@ -199,6 +199,7 @@ export function InvoiceGenerateDialog({
     }
 
     toast.success(`สร้างใบแจ้ง ${result.created} รายการ (ข้าม ${result.skipped})`);
+    setConfirmOpen(false);
     onOpenChange(false);
     queryClient.invalidateQueries({ queryKey: ["invoices"] });
     queryClient.invalidateQueries({ queryKey: ["invoice-candidates"] });
