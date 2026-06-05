@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -91,12 +91,28 @@ export function PaymentsPanel() {
   const [transferRef, setTransferRef] = useState("");
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [lastPayment, setLastPayment] = useState<{ id: string; receiptNumber: string; amount: number } | null>(null);
   const [voidTarget, setVoidTarget] = useState<PaymentListRow | null>(null);
   const [voidReason, setVoidReason] = useState("");
   const [paymentSearch, setPaymentSearch] = useState(qParam);
   const [voiding, setVoiding] = useState(false);
   const [isNavigating, startTransition] = useTransition();
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const amountInputRef = useRef<HTMLInputElement>(null);
+  const receiptIframeRef = useRef<HTMLIFrameElement>(null);
+
+  function printReceipt(paymentId: string) {
+    const iframe = receiptIframeRef.current;
+    if (iframe) {
+      // Loads the receipt inside a hidden iframe; the receipt page
+      // auto-prints itself (?autoprint=1). Avoids the popup blocker.
+      iframe.src = `/receipts/${paymentId}?autoprint=1`;
+    } else {
+      window.open(`/receipts/${paymentId}`, "_blank", "noopener,noreferrer");
+    }
+  }
 
   const { data: grades = [] } = useQuery({
     queryKey: ["grade-levels", ctx?.semesterId],
@@ -218,9 +234,17 @@ export function PaymentsPanel() {
     setOutstanding(result.invoices);
     const totalDue = result.invoices.reduce((sum, r) => sum + r.outstanding, 0);
     setAmount(totalDue > 0 ? String(totalDue) : "");
+
+    // Move focus straight to the amount field for fast keyboard entry
+    if (totalDue > 0) {
+      setTimeout(() => {
+        amountInputRef.current?.focus();
+        amountInputRef.current?.select();
+      }, 50);
+    }
   }
 
-  async function handleRecord() {
+  function requestRecord() {
     if (!selectedStudent || !ctx) return;
     const parsedAmount = Number.parseFloat(amount);
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
@@ -233,6 +257,13 @@ export function PaymentsPanel() {
       toast.error(`จำนวนเงินเกินยอดค้างรวม (${formatBaht(totalDue)})`);
       return;
     }
+
+    setConfirmOpen(true);
+  }
+
+  async function handleRecord() {
+    if (!selectedStudent || !ctx) return;
+    const parsedAmount = Number.parseFloat(amount);
 
     setSubmitting(true);
     const result = await recordPayment({
@@ -252,16 +283,10 @@ export function PaymentsPanel() {
       return;
     }
 
+    setConfirmOpen(false);
     toast.success("บันทึกการชำระและออกใบเสร็จแล้ว");
     setLastPayment({ id: result.paymentId, receiptNumber: result.receiptNumber, amount: parsedAmount });
-    const receiptUrl = `/receipts/${result.paymentId}`;
-    const w = window.open(receiptUrl, "_blank", "noopener,noreferrer");
-    if (!w) {
-      toast.warning("ป๊อปอัปถูกบล็อก — คลิกเพื่อเปิดใบเสร็จ", {
-        action: { label: "เปิดใบเสร็จ", onClick: () => window.open(receiptUrl, "_blank", "noopener,noreferrer") },
-        duration: 10000,
-      });
-    }
+    printReceipt(result.paymentId);
     setSelectedStudent(null);
     setOutstanding([]);
     setAmount("");
@@ -271,6 +296,9 @@ export function PaymentsPanel() {
     void queryClient.invalidateQueries({ queryKey: ["invoices"] });
     void queryClient.invalidateQueries({ queryKey: ["invoice-candidates"] });
     router.refresh();
+
+    // Ready for the next parent: focus search again
+    setTimeout(() => searchInputRef.current?.focus(), 100);
   }
 
   async function handleVoid() {
@@ -346,60 +374,89 @@ export function PaymentsPanel() {
               <CardTitle className="text-base">ค้นหานักเรียน</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Select
-                  value={searchGrade}
-                  onValueChange={(v) => {
-                    setSearchGrade(v ?? "all");
-                    setSearchClassroom("all");
-                  }}
-                  items={gradeItems}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="ชั้น" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {gradeItems.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={searchClassroom}
-                  onValueChange={(v) => setSearchClassroom(v ?? "all")}
-                  items={searchClassroomItems}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="ห้อง" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {searchClassroomItems.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Primary search — type code or name, Enter to pick */}
               <Input
-                placeholder="รหัสหรือชื่อ (ไม่บังคับเมื่อเลือกชั้น/ห้อง)"
+                ref={searchInputRef}
+                autoFocus
+                className="h-11 text-base"
+                placeholder="พิมพ์รหัสหรือชื่อ แล้วกด Enter"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && searchResults.length > 0) {
+                    e.preventDefault();
+                    void selectStudent(searchResults[0]);
+                  }
+                }}
               />
+
+              {/* Secondary — browse by grade/classroom */}
+              <details className="group">
+                <summary className="cursor-pointer list-none text-xs text-muted-foreground hover:text-foreground">
+                  <span className="group-open:hidden">▸ หรือเลือกตามชั้น/ห้อง</span>
+                  <span className="hidden group-open:inline">▾ เลือกตามชั้น/ห้อง</span>
+                </summary>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  <Select
+                    value={searchGrade}
+                    onValueChange={(v) => {
+                      setSearchGrade(v ?? "all");
+                      setSearchClassroom("all");
+                    }}
+                    items={gradeItems}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="ชั้น" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {gradeItems.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={searchClassroom}
+                    onValueChange={(v) => setSearchClassroom(v ?? "all")}
+                    items={searchClassroomItems}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="ห้อง" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {searchClassroomItems.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </details>
+
               {searchResults.length > 0 ? (
                 <ul className="divide-y divide-border rounded-lg border border-border">
-                  {searchResults.map((s) => (
+                  {searchResults.map((s, i) => (
                     <li key={s.id}>
                       <button
                         type="button"
-                        className="flex w-full flex-col items-start px-3 py-2 text-left text-sm hover:bg-muted/50"
+                        className={cn(
+                          "flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50",
+                          i === 0 && "bg-primary/5",
+                        )}
                         onClick={() => selectStudent(s)}
                       >
-                        <span className="font-medium tabular-nums">{s.studentCode}</span>
-                        <span>{s.name}</span>
-                        <span className="text-xs text-muted-foreground">{s.gradeClassroom}</span>
+                        <span className="flex flex-col items-start">
+                          <span className="font-medium tabular-nums">{s.studentCode}</span>
+                          <span>{s.name}</span>
+                          <span className="text-xs text-muted-foreground">{s.gradeClassroom}</span>
+                        </span>
+                        {i === 0 ? (
+                          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                            Enter ↵
+                          </span>
+                        ) : null}
                       </button>
                     </li>
                   ))}
@@ -425,11 +482,15 @@ export function PaymentsPanel() {
                       </p>
                     </div>
                     <div className="flex gap-2">
-                      <a href={`/receipts/${lastPayment.id}`} target="_blank" rel="noopener noreferrer" className="flex-1">
-                        <Button type="button" variant="outline" className="w-full" size="sm">
-                          ดูใบเสร็จ
-                        </Button>
-                      </a>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => printReceipt(lastPayment.id)}
+                      >
+                        🖨 พิมพ์ซ้ำ
+                      </Button>
                       <Button
                         type="button"
                         variant="outline"
@@ -497,12 +558,21 @@ export function PaymentsPanel() {
                           </button>
                         </div>
                         <Input
+                          ref={amountInputRef}
                           id="pay-amount"
                           type="number"
                           min={0}
                           step="0.01"
                           value={amount}
                           onChange={(e) => setAmount(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              if (!submitting && outstanding.length > 0 && !amountExceeds) {
+                                requestRecord();
+                              }
+                            }
+                          }}
                           className="tabular-nums"
                           aria-invalid={amountExceeds}
                         />
@@ -557,10 +627,10 @@ export function PaymentsPanel() {
                     <Button
                       type="button"
                       className="w-full"
-                      onClick={handleRecord}
+                      onClick={requestRecord}
                       disabled={submitting || outstanding.length === 0 || amountExceeds}
                     >
-                      {submitting ? "กำลังบันทึก..." : "บันทึกและออกใบเสร็จ"}
+                      บันทึกและออกใบเสร็จ
                     </Button>
                   </>
                 )}
@@ -745,6 +815,41 @@ export function PaymentsPanel() {
             </Card>
           </div>
 
+          <AlertDialog open={confirmOpen} onOpenChange={(o) => !submitting && setConfirmOpen(o)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>ยืนยันรับชำระเงิน</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {selectedStudent?.studentCode} {selectedStudent?.name}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="space-y-1 rounded-lg border border-border bg-muted/30 p-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">จำนวนเงิน</span>
+                  <span className="font-semibold tabular-nums">
+                    {formatBaht(Number.parseFloat(amount) || 0)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">วิธีชำระ</span>
+                  <span>{PAYMENT_METHOD_LABELS[method]}</span>
+                </div>
+                {method === "transfer" && transferRef ? (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">เลขอ้างอิงโอน</span>
+                    <span className="tabular-nums">{transferRef}</span>
+                  </div>
+                ) : null}
+              </div>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={submitting}>ยกเลิก</AlertDialogCancel>
+                <AlertDialogAction autoFocus onClick={handleRecord} disabled={submitting}>
+                  {submitting ? "กำลังบันทึก..." : "ยืนยัน ออกใบเสร็จ"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
           <AlertDialog open={Boolean(voidTarget)} onOpenChange={(o) => !o && setVoidTarget(null)}>
             <AlertDialogContent>
               <AlertDialogHeader>
@@ -774,6 +879,14 @@ export function PaymentsPanel() {
           </AlertDialog>
         </div>
       </main>
+
+      {/* Hidden iframe for popup-free receipt printing */}
+      <iframe
+        ref={receiptIframeRef}
+        title="พิมพ์ใบเสร็จ"
+        aria-hidden="true"
+        style={{ position: "fixed", right: 0, bottom: 0, width: 0, height: 0, border: 0 }}
+      />
     </>
   );
 }

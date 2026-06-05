@@ -6,17 +6,21 @@ import { formatThaiDateLong } from "@/lib/format";
 import { PAYMENT_METHOD_LABELS } from "@/lib/finance/constants";
 import { PrintButton } from "./print-button";
 import { LogoImage } from "./logo-image";
+import { AutoPrint } from "./auto-print";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReceiptPrintPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ paymentId: string }>;
+  searchParams: Promise<{ autoprint?: string }>;
 }) {
   await requireFinancePage();
 
   const { paymentId } = await params;
+  const { autoprint } = await searchParams;
   const data = await getReceiptPrintData(paymentId);
   if (!data) notFound();
 
@@ -25,6 +29,7 @@ export default async function ReceiptPrintPage({
 
   return (
     <>
+      {autoprint ? <AutoPrint /> : null}
       <style>{`
         @page { size: A5; margin: 8mm; }
         @media print { .no-print { display: none !important; } }

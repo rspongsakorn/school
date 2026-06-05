@@ -541,32 +541,27 @@ export function InvoiceGenerateDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>ยืนยันสร้างใบแจ้งชำระ</AlertDialogTitle>
-          <AlertDialogDescription asChild>
-            <div className="space-y-2 text-sm">
-              <p>
-                จะสร้างใบแจ้งชำระ{" "}
-                <span className="font-semibold text-foreground tabular-nums">{targetCount}</span>{" "}
-                ใบ สำหรับ
-                {mode === "all" ? "นักเรียนทั้งภาคที่ยังไม่มีใบ" : "นักเรียนที่เลือกไว้"}
-              </p>
-              <ul className="list-disc pl-4 text-muted-foreground">
-                <li>
-                  รายการค่าใช้จ่าย{" "}
-                  <span className="font-medium text-foreground">{selectedFeeItemIds.size}</span>{" "}
-                  รายการ/ใบ
-                </li>
-                {reimbursableCount > 0 && (
-                  <li>
-                    เบิกได้{" "}
-                    <span className="font-medium text-sky-700 tabular-nums">{reimbursableCount}</span>{" "}
-                    คน
-                  </li>
-                )}
-              </ul>
-              <p className="text-muted-foreground">การดำเนินการนี้ไม่สามารถย้อนกลับได้</p>
-            </div>
+          <AlertDialogDescription>
+            จะสร้างใบแจ้งชำระ{" "}
+            <span className="font-semibold text-foreground tabular-nums">{targetCount}</span> ใบ
+            สำหรับ{mode === "all" ? "นักเรียนทั้งภาคที่ยังไม่มีใบ" : "นักเรียนที่เลือกไว้"}
           </AlertDialogDescription>
         </AlertDialogHeader>
+        <div className="space-y-2 text-sm">
+          <ul className="list-disc pl-5 text-muted-foreground">
+            <li>
+              รายการค่าใช้จ่าย{" "}
+              <span className="font-medium text-foreground">{selectedFeeItemIds.size}</span> รายการ/ใบ
+            </li>
+            {reimbursableCount > 0 && (
+              <li>
+                เบิกได้{" "}
+                <span className="font-medium text-sky-700 tabular-nums">{reimbursableCount}</span> คน
+              </li>
+            )}
+          </ul>
+          <p className="text-muted-foreground">การดำเนินการนี้ไม่สามารถย้อนกลับได้</p>
+        </div>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={submitting}>ยกเลิก</AlertDialogCancel>
           <AlertDialogAction onClick={handleConfirmedSubmit} disabled={submitting}>

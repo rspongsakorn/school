@@ -31,6 +31,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MoreHorizontal } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { InvoiceDiscountDialog } from "@/components/finance/invoice-discount-dialog";
 import { InvoiceReimbursableDialog } from "@/components/finance/invoice-reimbursable-dialog";
@@ -292,6 +299,15 @@ export function InvoicesPanel() {
 
   const bulkDeleteCount = selectedIds.size;
 
+  function paymentsHref(studentCode: string) {
+    const params = new URLSearchParams({ q: studentCode });
+    const year = searchParams.get("year");
+    const semester = searchParams.get("semester");
+    if (year) params.set("year", year);
+    if (semester) params.set("semester", semester);
+    return `/payments?${params.toString()}`;
+  }
+
   return (
     <>
       <AppHeader title="ใบแจ้งชำระ" basePath="/invoices" />
@@ -441,9 +457,7 @@ export function InvoicesPanel() {
                       </div>
                       <div className="flex justify-end gap-2">
                         {row.paidAmount > 0 ? (
-                          <a
-                            href={`/payments?q=${row.studentCode}${searchParams.get("year") ? `&year=${searchParams.get("year")}` : ""}${searchParams.get("semester") ? `&semester=${searchParams.get("semester")}` : ""}`}
-                          >
+                          <a href={paymentsHref(row.studentCode)}>
                             <Button type="button" size="sm" variant="outline">
                               ดูการชำระ
                             </Button>
@@ -564,54 +578,47 @@ export function InvoicesPanel() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <div className="flex flex-wrap justify-end gap-2">
-                              {row.paidAmount > 0 ? (
-                                <a
-                                  href={`/payments?q=${row.studentCode}${searchParams.get("year") ? `&year=${searchParams.get("year")}` : ""}${searchParams.get("semester") ? `&semester=${searchParams.get("semester")}` : ""}`}
+                            <div className="flex justify-end">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger
+                                  render={
+                                    <Button type="button" size="icon-sm" variant="ghost" aria-label="จัดการ" />
+                                  }
                                 >
-                                  <Button type="button" size="sm" variant="outline">
-                                    ดูการชำระ
-                                  </Button>
-                                </a>
-                              ) : null}
-                              {row.paidAmount === 0 ? (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => setReimbursableTarget(row)}
-                                >
-                                  {row.isReimbursable ? "เปลี่ยนเป็นเบิกไม่ได้" : "เปลี่ยนเป็นเบิกได้"}
-                                </Button>
-                              ) : null}
-                              {row.paidAmount === 0 ? (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => setDiscountTarget(row)}
-                                >
-                                  ส่วนลด
-                                </Button>
-                              ) : null}
-                              {deletable ? (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-destructive"
-                                  onClick={() => setDeleteTargetIds([row.id])}
-                                >
-                                  ลบ
-                                </Button>
-                              ) : blockedReason ? (
-                                <span
-                                  className="text-xs text-muted-foreground"
-                                  title={blockedReason}
-                                >
-                                  ลบไม่ได้
-                                </span>
-                              ) : null}
+                                  <MoreHorizontal />
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {row.paidAmount > 0 ? (
+                                    <DropdownMenuItem
+                                      render={<a href={paymentsHref(row.studentCode)} />}
+                                    >
+                                      ดูการชำระ
+                                    </DropdownMenuItem>
+                                  ) : null}
+                                  {row.paidAmount === 0 ? (
+                                    <DropdownMenuItem onClick={() => setReimbursableTarget(row)}>
+                                      {row.isReimbursable ? "เปลี่ยนเป็นเบิกไม่ได้" : "เปลี่ยนเป็นเบิกได้"}
+                                    </DropdownMenuItem>
+                                  ) : null}
+                                  {row.paidAmount === 0 ? (
+                                    <DropdownMenuItem onClick={() => setDiscountTarget(row)}>
+                                      ส่วนลด
+                                    </DropdownMenuItem>
+                                  ) : null}
+                                  {deletable ? (
+                                    <DropdownMenuItem
+                                      variant="destructive"
+                                      onClick={() => setDeleteTargetIds([row.id])}
+                                    >
+                                      ลบ
+                                    </DropdownMenuItem>
+                                  ) : blockedReason ? (
+                                    <DropdownMenuItem disabled title={blockedReason}>
+                                      ลบไม่ได้
+                                    </DropdownMenuItem>
+                                  ) : null}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           </TableCell>
                         </TableRow>
