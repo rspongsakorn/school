@@ -71,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setState({ profile: null, isLoading: false });
         router.push("/login");
       }
-      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") {
+      if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
         void loadProfile();
       }
     });
