@@ -6,6 +6,16 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -57,6 +67,7 @@ export function InvoiceGenerateDialog({
   const [classroomFilter, setClassroomFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   // Unique classrooms in order of appearance
   const classrooms = useMemo(() => {
@@ -153,19 +164,22 @@ export function InvoiceGenerateDialog({
       ? filtered.filter((c) => selectedStudentIds.has(c.studentId)).length
       : null;
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleRequestSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const feeItemIds = [...selectedFeeItemIds];
-    if (feeItemIds.length === 0) {
+    if (selectedFeeItemIds.size === 0) {
       toast.error("กรุณาเลือกรายการค่าใช้จ่าย");
       return;
     }
-
-    const studentIds = mode === "selected" ? [...selectedStudentIds] : undefined;
-    if (mode === "selected" && (!studentIds || studentIds.length === 0)) {
+    if (mode === "selected" && selectedStudentIds.size === 0) {
       toast.error("กรุณาเลือกนักเรียนอย่างน้อย 1 คน");
       return;
     }
+    setConfirmOpen(true);
+  }
+
+  async function handleConfirmedSubmit() {
+    const feeItemIds = [...selectedFeeItemIds];
+    const studentIds = mode === "selected" ? [...selectedStudentIds] : undefined;
 
     setSubmitting(true);
     const result = await generateInvoices({
@@ -192,9 +206,10 @@ export function InvoiceGenerateDialog({
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-[calc(100%-2rem)] overflow-y-auto p-0 sm:max-w-5xl">
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleRequestSubmit}>
           {/* Header */}
           <div className="px-5 pt-5 pb-3">
             <DialogHeader>
@@ -509,5 +524,45 @@ export function InvoiceGenerateDialog({
         </form>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>ยืนยันสร้างใบแจ้งชำระ</AlertDialogTitle>
+          <AlertDialogDescription asChild>
+            <div className="space-y-2 text-sm">
+              <p>
+                จะสร้างใบแจ้งชำระ{" "}
+                <span className="font-semibold text-foreground tabular-nums">{targetCount}</span>{" "}
+                ใบ สำหรับ
+                {mode === "all" ? "นักเรียนทั้งภาคที่ยังไม่มีใบ" : "นักเรียนที่เลือกไว้"}
+              </p>
+              <ul className="list-disc pl-4 text-muted-foreground">
+                <li>
+                  รายการค่าใช้จ่าย{" "}
+                  <span className="font-medium text-foreground">{selectedFeeItemIds.size}</span>{" "}
+                  รายการ/ใบ
+                </li>
+                {reimbursableCount > 0 && (
+                  <li>
+                    เบิกได้{" "}
+                    <span className="font-medium text-sky-700 tabular-nums">{reimbursableCount}</span>{" "}
+                    คน
+                  </li>
+                )}
+              </ul>
+              <p className="text-muted-foreground">การดำเนินการนี้ไม่สามารถย้อนกลับได้</p>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={submitting}>ยกเลิก</AlertDialogCancel>
+          <AlertDialogAction onClick={handleConfirmedSubmit} disabled={submitting}>
+            {submitting ? "กำลังสร้าง..." : `ยืนยัน สร้าง ${targetCount} ใบ`}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
