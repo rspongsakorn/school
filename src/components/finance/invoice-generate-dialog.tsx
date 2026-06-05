@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -68,6 +68,17 @@ export function InvoiceGenerateDialog({
   const [search, setSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  // Reset ทุก selection เมื่อเปิด dialog ใหม่
+  useEffect(() => {
+    if (!open) return;
+    setMode("all");
+    setSelectedFeeItemIds(new Set(activeItems.map((i) => i.id)));
+    setSelectedStudentIds(new Set());
+    setReimbursableStudentIds(new Set());
+    setClassroomFilter("all");
+    setSearch("");
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Unique classrooms in order of appearance
   const classrooms = useMemo(() => {
