@@ -365,10 +365,11 @@ export function PaymentsPanel() {
       <main className="p-4 lg:p-6">
         <div
           className={cn(
-            "grid gap-6 transition-opacity lg:grid-cols-[320px_1fr]",
+            "space-y-6 transition-opacity",
             (isNavigating || isLoading) && "pointer-events-none opacity-60",
           )}
         >
+          <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
           <Card className="border-border shadow-sm">
             <CardHeader>
               <CardTitle className="text-base">ค้นหานักเรียน</CardTitle>
@@ -467,8 +468,7 @@ export function PaymentsPanel() {
             </CardContent>
           </Card>
 
-          <div className="space-y-6">
-            <Card className="border-border shadow-sm">
+          <Card className="border-border shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base">รับชำระเงิน</CardTitle>
               </CardHeader>
@@ -636,8 +636,9 @@ export function PaymentsPanel() {
                 )}
                 </CardContent>
             </Card>
+          </div>
 
-            <Card className="border-border shadow-sm">
+          <Card className="border-border shadow-sm">
               <CardHeader className="flex flex-col gap-3">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <CardTitle className="text-base">รายการการชำระ</CardTitle>
@@ -813,7 +814,6 @@ export function PaymentsPanel() {
                 </div>
               </CardContent>
             </Card>
-          </div>
 
           <AlertDialog open={confirmOpen} onOpenChange={(o) => !submitting && setConfirmOpen(o)}>
             <AlertDialogContent>
