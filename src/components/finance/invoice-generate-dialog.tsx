@@ -80,17 +80,21 @@ export function InvoiceGenerateDialog({
     setSearch("");
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Unique classrooms in order of appearance
+  // Unique classrooms sorted by grade sort_order defined in the system
   const classrooms = useMemo(() => {
-    const seen = new Set<string>();
-    const list: string[] = [];
+    const sortOrderByRoom = new Map<string, number>();
     for (const c of selectableCandidates) {
-      if (!seen.has(c.gradeClassroom)) {
-        seen.add(c.gradeClassroom);
-        list.push(c.gradeClassroom);
+      if (!sortOrderByRoom.has(c.gradeClassroom)) {
+        sortOrderByRoom.set(c.gradeClassroom, c.gradeSortOrder);
       }
     }
-    return list;
+    return [...sortOrderByRoom.keys()].sort((a, b) => {
+      const orderDiff = (sortOrderByRoom.get(a) ?? 0) - (sortOrderByRoom.get(b) ?? 0);
+      if (orderDiff !== 0) return orderDiff;
+      const nameA = a.split("/").pop() ?? a;
+      const nameB = b.split("/").pop() ?? b;
+      return nameA.localeCompare(nameB, "th", { numeric: true });
+    });
   }, [selectableCandidates]);
 
   // Filtered list: classroom chip + search

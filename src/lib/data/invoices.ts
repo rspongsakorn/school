@@ -1,5 +1,5 @@
 import { formatClassroom, formatStudentName } from "@/lib/format";
-import { getStudentGradeMap } from "@/lib/data/enrollments";
+import { getStudentGradeMap, getStudentGradeSortMap } from "@/lib/data/enrollments";
 import type { InvoiceDeleteContext } from "@/lib/finance/invoice-delete-eligibility";
 import { buildStudentSearchOrFilter } from "@/lib/students/search";
 import { createClient } from "@/lib/supabase/server";
@@ -211,13 +211,15 @@ export type InvoiceCandidateRow = {
   studentCode: string;
   studentName: string;
   gradeClassroom: string;
+  gradeSortOrder: number;
   hasInvoice: boolean;
 };
 
 export async function listInvoiceCandidates(semesterId: string): Promise<InvoiceCandidateRow[]> {
   const supabase = await createClient();
-  const [gradeByStudent, existingSet] = await Promise.all([
+  const [gradeByStudent, gradeSortByStudent, existingSet] = await Promise.all([
     getStudentGradeMap(semesterId),
+    getStudentGradeSortMap(semesterId),
     listStudentIdsWithInvoice(semesterId),
   ]);
 
@@ -243,6 +245,7 @@ export async function listInvoiceCandidates(semesterId: string): Promise<Invoice
     studentCode: row.students.student_code,
     studentName: formatStudentName(row.students.first_name, row.students.last_name),
     gradeClassroom: gradeByStudent.get(row.student_id) ?? "—",
+    gradeSortOrder: gradeSortByStudent.get(row.student_id) ?? 0,
     hasInvoice: existingSet.has(row.student_id),
   }));
 }

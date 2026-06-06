@@ -26,6 +26,27 @@ export type StudentEnrollmentCandidate = {
   name: string;
 };
 
+type GradeSortRow = {
+  student_id: string;
+  classrooms: { grade_levels: { sort_order: number } | null } | null;
+};
+
+export async function getStudentGradeSortMap(semesterId: string): Promise<Map<string, number>> {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("student_enrollments")
+    .select("student_id, classrooms ( grade_levels ( sort_order ) )")
+    .eq("semester_id", semesterId)
+    .eq("status", "enrolled");
+
+  const map = new Map<string, number>();
+  for (const row of (data ?? []) as unknown as GradeSortRow[]) {
+    map.set(row.student_id, row.classrooms?.grade_levels?.sort_order ?? 0);
+  }
+  return map;
+}
+
 export async function getStudentGradeMap(semesterId: string) {
   const supabase = await createClient();
 

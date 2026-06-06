@@ -36,6 +36,7 @@ export type InvoiceCandidateRow = {
   studentCode: string;
   studentName: string;
   gradeClassroom: string;
+  gradeSortOrder: number;
   hasInvoice: boolean;
 };
 
@@ -71,6 +72,27 @@ async function getStudentGradeMap(semesterId: string): Promise<Map<string, strin
     map.set(row.student_id, formatClassroom(gradeName, classroom?.name ?? null));
   }
 
+  return map;
+}
+
+async function getStudentGradeSortMap(semesterId: string): Promise<Map<string, number>> {
+  const supabase = createClient();
+
+  type GradeSortRow = {
+    student_id: string;
+    classrooms: { grade_levels: { sort_order: number } | null } | null;
+  };
+
+  const { data } = await supabase
+    .from("student_enrollments")
+    .select("student_id, classrooms ( grade_levels ( sort_order ) )")
+    .eq("semester_id", semesterId)
+    .eq("status", "enrolled");
+
+  const map = new Map<string, number>();
+  for (const row of (data ?? []) as unknown as GradeSortRow[]) {
+    map.set(row.student_id, row.classrooms?.grade_levels?.sort_order ?? 0);
+  }
   return map;
 }
 
@@ -240,8 +262,9 @@ export async function fetchInvoicesPaginated(params: {
 
 export async function fetchInvoiceCandidates(semesterId: string): Promise<InvoiceCandidateRow[]> {
   const supabase = createClient();
-  const [gradeByStudent, existingSet] = await Promise.all([
+  const [gradeByStudent, gradeSortByStudent, existingSet] = await Promise.all([
     getStudentGradeMap(semesterId),
+    getStudentGradeSortMap(semesterId),
     listStudentIdsWithInvoice(semesterId),
   ]);
 
@@ -267,6 +290,7 @@ export async function fetchInvoiceCandidates(semesterId: string): Promise<Invoic
     studentCode: row.students.student_code,
     studentName: formatStudentName(row.students.first_name, row.students.last_name),
     gradeClassroom: gradeByStudent.get(row.student_id) ?? "—",
+    gradeSortOrder: gradeSortByStudent.get(row.student_id) ?? 0,
     hasInvoice: existingSet.has(row.student_id),
   }));
 }
