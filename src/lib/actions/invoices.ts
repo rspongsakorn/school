@@ -125,6 +125,30 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
   let created = 0;
   let skipped = 0;
 
+  // Phase 1: build all rows in memory (no DB calls)
+  type InvoiceRow = {
+    id: string;
+    student_id: string;
+    academic_year_id: string;
+    semester_id: string;
+    invoice_name: string;
+    subtotal: number;
+    total_amount: number;
+    paid_amount: number;
+    status: string;
+    is_reimbursable: boolean;
+  };
+  type LineRow = {
+    invoice_id: string;
+    fee_item_id: string;
+    description: string;
+    amount: number;
+    variant: "standard" | "reimbursable";
+  };
+
+  const invoiceRows: InvoiceRow[] = [];
+  const lineRows: LineRow[] = [];
+
   for (const enrollment of enrollments) {
     if (existingSet.has(enrollment.studentId)) {
       skipped += 1;
@@ -132,12 +156,7 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
     }
 
     const isReimbursable = reimbursableSet.has(enrollment.studentId);
-    const lines: {
-      fee_item_id: string;
-      description: string;
-      amount: number;
-      variant: "standard" | "reimbursable";
-    }[] = [];
+    const lines: LineRow[] = [];
 
     for (const feeItemId of input.feeItemIds) {
       const rate = rateMap.get(`${enrollment.gradeLevelId}:${feeItemId}`);
@@ -149,6 +168,7 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
         amountReimbursable: rate.amountReimbursable,
       });
       lines.push({
+        invoice_id: "", // filled below
         fee_item_id: feeItemId,
         description: rate.name,
         amount: picked.amount,
@@ -163,43 +183,45 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
 
     const subtotal = lines.reduce((sum, line) => sum + line.amount, 0);
     const totalAmount = computeInvoiceTotal(subtotal, null, null);
+    const invoiceId = crypto.randomUUID();
 
-    const { data: invoice, error: invoiceError } = await supabase
+    invoiceRows.push({
+      id: invoiceId,
+      student_id: enrollment.studentId,
+      academic_year_id: input.academicYearId,
+      semester_id: input.semesterId,
+      invoice_name: invoiceName,
+      subtotal,
+      total_amount: totalAmount,
+      paid_amount: 0,
+      status: "unpaid",
+      is_reimbursable: isReimbursable,
+    });
+
+    for (const line of lines) {
+      lineRows.push({ ...line, invoice_id: invoiceId });
+    }
+
+    created += 1;
+  }
+
+  // Phase 2 & 3: two batch inserts
+  if (invoiceRows.length > 0) {
+    const { error: invoiceError } = await supabase
       .from("student_invoices")
-      .insert({
-        student_id: enrollment.studentId,
-        academic_year_id: input.academicYearId,
-        semester_id: input.semesterId,
-        invoice_name: invoiceName,
-        subtotal,
-        total_amount: totalAmount,
-        paid_amount: 0,
-        status: "unpaid",
-        is_reimbursable: isReimbursable,
-      })
-      .select("id")
-      .single();
+      .insert(invoiceRows);
 
-    if (invoiceError || !invoice) {
+    if (invoiceError) {
       return { ok: false, error: "ไม่สามารถสร้างใบแจ้งชำระได้" };
     }
 
-    const { error: linesError } = await supabase.from("invoice_lines").insert(
-      lines.map((line) => ({
-        invoice_id: invoice.id,
-        fee_item_id: line.fee_item_id,
-        description: line.description,
-        amount: line.amount,
-        variant: line.variant,
-      })),
-    );
+    const { error: linesError } = await supabase
+      .from("invoice_lines")
+      .insert(lineRows);
 
     if (linesError) {
       return { ok: false, error: "ไม่สามารถสร้างรายการในใบแจ้งชำระได้" };
     }
-
-    existingSet.add(enrollment.studentId);
-    created += 1;
   }
 
   revalidateFinancePaths();
