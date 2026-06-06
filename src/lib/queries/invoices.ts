@@ -10,6 +10,8 @@ export type InvoiceListRow = {
   studentCode: string;
   studentName: string;
   gradeClassroom: string;
+  gradeLevelId: string | null;
+  classroomId: string | null;
   invoiceName: string;
   subtotal: number;
   totalAmount: number;
@@ -94,6 +96,116 @@ async function getStudentGradeSortMap(semesterId: string): Promise<Map<string, n
     map.set(row.student_id, row.classrooms?.grade_levels?.sort_order ?? 0);
   }
   return map;
+}
+
+type EnrollmentInfo = {
+  gradeClassroom: string;
+  classroomId: string | null;
+  gradeLevelId: string | null;
+};
+
+async function getStudentEnrollmentMap(semesterId: string): Promise<Map<string, EnrollmentInfo>> {
+  const supabase = createClient();
+
+  type EnrollRow = {
+    student_id: string;
+    classroom_id: string | null;
+    classrooms: { name: string; grade_level_id: string; grade_levels: { name: string } | null } | null;
+  };
+
+  const { data } = await supabase
+    .from("student_enrollments")
+    .select("student_id, classroom_id, classrooms ( name, grade_level_id, grade_levels ( name ) )")
+    .eq("semester_id", semesterId)
+    .eq("status", "enrolled");
+
+  const map = new Map<string, EnrollmentInfo>();
+  for (const row of (data ?? []) as unknown as EnrollRow[]) {
+    const classroom = row.classrooms;
+    const gradeName = classroom?.grade_levels?.name ?? null;
+    map.set(row.student_id, {
+      gradeClassroom: formatClassroom(gradeName, classroom?.name ?? null),
+      classroomId: row.classroom_id,
+      gradeLevelId: classroom?.grade_level_id ?? null,
+    });
+  }
+  return map;
+}
+
+export async function fetchAllInvoices(params: {
+  semesterId: string;
+  academicYearId: string;
+}): Promise<InvoiceListRow[]> {
+  const supabase = createClient();
+  const enrollmentMap = await getStudentEnrollmentMap(params.semesterId);
+
+  const { data, error } = await supabase
+    .from("student_invoices")
+    .select(
+      `
+      id,
+      student_id,
+      invoice_name,
+      subtotal,
+      total_amount,
+      paid_amount,
+      status,
+      discount_type,
+      discount_value,
+      is_reimbursable,
+      created_at,
+      students!inner ( student_code, first_name, last_name )
+    `,
+    )
+    .eq("academic_year_id", params.academicYearId)
+    .eq("semester_id", params.semesterId)
+    .order("created_at", { ascending: false });
+
+  if (error || !data) return [];
+
+  type Row = {
+    id: string;
+    student_id: string;
+    invoice_name: string;
+    subtotal: number;
+    total_amount: number;
+    paid_amount: number;
+    status: InvoiceStatus;
+    discount_type: "percent" | "fixed" | null;
+    discount_value: number | null;
+    is_reimbursable: boolean;
+    created_at: string;
+    students: { student_code: string; first_name: string; last_name: string };
+  };
+
+  const invoiceIds = (data as unknown as Row[]).map((r) => r.id);
+  const activeAllocationIds = await loadActiveAllocationInvoiceIds(invoiceIds);
+
+  return (data as unknown as Row[]).map((row) => {
+    const totalAmount = Number(row.total_amount);
+    const paidAmount = Number(row.paid_amount);
+    const enroll = enrollmentMap.get(row.student_id);
+    return {
+      id: row.id,
+      studentId: row.student_id,
+      studentCode: row.students.student_code,
+      studentName: formatStudentName(row.students.first_name, row.students.last_name),
+      gradeClassroom: enroll?.gradeClassroom ?? "—",
+      gradeLevelId: enroll?.gradeLevelId ?? null,
+      classroomId: enroll?.classroomId ?? null,
+      invoiceName: row.invoice_name,
+      subtotal: Number(row.subtotal),
+      totalAmount,
+      paidAmount,
+      outstanding: Math.max(0, round2(totalAmount - paidAmount)),
+      status: row.status,
+      discountType: row.discount_type,
+      discountValue: row.discount_value != null ? Number(row.discount_value) : null,
+      isReimbursable: row.is_reimbursable,
+      createdAt: row.created_at,
+      hasActivePaymentAllocation: activeAllocationIds.has(row.id),
+    };
+  });
 }
 
 async function loadActiveAllocationInvoiceIds(invoiceIds: string[]): Promise<Set<string>> {
@@ -236,6 +348,8 @@ export async function fetchInvoicesPaginated(params: {
       studentCode: row.students.student_code,
       studentName: formatStudentName(row.students.first_name, row.students.last_name),
       gradeClassroom: gradeByStudent.get(row.student_id) ?? "—",
+      gradeLevelId: null,
+      classroomId: null,
       invoiceName: row.invoice_name,
       subtotal: Number(row.subtotal),
       totalAmount,

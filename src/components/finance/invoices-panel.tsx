@@ -46,7 +46,7 @@ import {
   canDeleteInvoice,
   invoiceDeleteBlockedReason,
 } from "@/lib/finance/invoice-delete-eligibility";
-import { fetchInvoicesPaginated, fetchInvoiceCandidates } from "@/lib/queries/invoices";
+import { fetchAllInvoices, fetchInvoiceCandidates } from "@/lib/queries/invoices";
 import { fetchGradeLevels, fetchClassroomsBySemester } from "@/lib/queries/classrooms";
 import { fetchFeeItems } from "@/lib/queries/fee-rates";
 import type { InvoiceListRow, InvoiceStatus } from "@/lib/queries/invoices";
@@ -106,29 +106,9 @@ export function InvoicesPanel() {
       ? reimbursableParam
       : "all";
 
-  const { data: invoicesData, isLoading: invoicesLoading } = useQuery({
-    queryKey: [
-      "invoices",
-      ctx?.semesterId,
-      ctx?.academicYearId,
-      qParam,
-      status,
-      gradeParam,
-      classroomParam,
-      reimbursable,
-      pageParam,
-    ],
-    queryFn: () =>
-      fetchInvoicesPaginated({
-        semesterId: ctx!.semesterId,
-        academicYearId: ctx!.academicYearId,
-        q: qParam || undefined,
-        gradeLevelId: gradeParam && gradeParam !== "all" ? gradeParam : undefined,
-        classroomId: classroomParam && classroomParam !== "all" ? classroomParam : undefined,
-        status,
-        reimbursable,
-        page: pageParam,
-      }),
+  const { data: allInvoices = [], isLoading: invoicesLoading } = useQuery({
+    queryKey: ["invoices", ctx?.semesterId, ctx?.academicYearId],
+    queryFn: () => fetchAllInvoices({ semesterId: ctx!.semesterId, academicYearId: ctx!.academicYearId }),
     enabled: Boolean(ctx?.semesterId),
     staleTime: 30_000,
   });
@@ -162,7 +142,37 @@ export function InvoicesPanel() {
 
   const isLoading = ctxLoading || invoicesLoading;
 
-  const data = invoicesData ?? { rows: [], total: 0, page: pageParam, pageSize: 50, totalPages: 0 };
+  const PAGE_SIZE = 50;
+
+  const filteredRows = useMemo(() => {
+    let rows = allInvoices;
+    if (gradeParam !== "all") rows = rows.filter((r) => r.gradeLevelId === gradeParam);
+    if (classroomParam !== "all") rows = rows.filter((r) => r.classroomId === classroomParam);
+    if (status !== "all") rows = rows.filter((r) => r.status === status);
+    if (reimbursable !== "all")
+      rows = rows.filter((r) => r.isReimbursable === (reimbursable === "reimbursable"));
+    const q = qParam.trim().toLowerCase();
+    if (q)
+      rows = rows.filter(
+        (r) =>
+          r.studentName.toLowerCase().includes(q) ||
+          r.studentCode.toLowerCase().includes(q) ||
+          r.gradeClassroom.toLowerCase().includes(q),
+      );
+    return rows;
+  }, [allInvoices, gradeParam, classroomParam, status, reimbursable, qParam]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+  const safePage = Math.min(pageParam, totalPages);
+  const pagedRows = filteredRows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const data = {
+    rows: pagedRows,
+    total: filteredRows.length,
+    page: safePage,
+    pageSize: PAGE_SIZE,
+    totalPages,
+  };
 
   function deleteContextFor(row: InvoiceListRow) {
     return {
@@ -171,8 +181,6 @@ export function InvoicesPanel() {
       hasActivePaymentAllocation: row.hasActivePaymentAllocation,
     };
   }
-
-  const filteredRows = data.rows;
 
   const deletableRows = useMemo(
     () => filteredRows.filter((row) => canDeleteInvoice(deleteContextFor(row))),
