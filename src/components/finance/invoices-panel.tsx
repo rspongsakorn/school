@@ -31,7 +31,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge as BadgeIcon, BadgeCheck, CreditCard, Percent, Trash2 } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { InvoiceDiscountDialog } from "@/components/finance/invoice-discount-dialog";
 import { InvoiceReimbursableDialog } from "@/components/finance/invoice-reimbursable-dialog";
@@ -51,6 +50,7 @@ import { fetchGradeLevels, fetchClassroomsBySemester } from "@/lib/queries/class
 import { fetchFeeItems } from "@/lib/queries/fee-rates";
 import type { InvoiceListRow, InvoiceStatus } from "@/lib/queries/invoices";
 import { cn } from "@/lib/utils";
+import { buttonVariants } from "@/components/ui/button";
 import { Skeleton, TableSkeleton } from "@/components/ui/skeleton";
 
 const STATUS_FILTER_ITEMS = [
@@ -580,65 +580,55 @@ export function InvoicesPanel() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center justify-end gap-0.5">
+                            <div className="flex items-center justify-end gap-1">
                               {row.paidAmount > 0 ? (
                                 <a
                                   href={paymentsHref(row.studentCode)}
-                                  aria-label="ดูการชำระ"
-                                  title="ดูการชำระ"
-                                  className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                                  className={buttonVariants({ size: "sm", variant: "outline" })}
                                 >
-                                  <CreditCard className="size-4" />
+                                  ดูการชำระ
                                 </a>
                               ) : null}
                               {row.paidAmount === 0 ? (
                                 <Button
                                   type="button"
-                                  size="icon-sm"
-                                  variant="ghost"
-                                  aria-label={row.isReimbursable ? "เปลี่ยนเป็นเบิกไม่ได้" : "เปลี่ยนเป็นเบิกได้"}
-                                  title={row.isReimbursable ? "เปลี่ยนเป็นเบิกไม่ได้" : "เปลี่ยนเป็นเบิกได้"}
-                                  className={row.isReimbursable ? "text-sky-600" : ""}
+                                  size="sm"
+                                  variant="outline"
+                                  className={row.isReimbursable ? "text-sky-600 border-sky-200" : ""}
                                   onClick={() => setReimbursableTarget(row)}
                                 >
-                                  {row.isReimbursable ? <BadgeCheck /> : <BadgeIcon />}
+                                  {row.isReimbursable ? "เบิกได้ ✓" : "เบิกได้"}
                                 </Button>
                               ) : null}
                               {row.paidAmount === 0 ? (
                                 <Button
                                   type="button"
-                                  size="icon-sm"
-                                  variant="ghost"
-                                  aria-label="ส่วนลด"
-                                  title="ส่วนลด"
+                                  size="sm"
+                                  variant="outline"
                                   onClick={() => setDiscountTarget(row)}
                                 >
-                                  <Percent />
+                                  ส่วนลด
                                 </Button>
                               ) : null}
                               {deletable ? (
                                 <Button
                                   type="button"
-                                  size="icon-sm"
-                                  variant="ghost"
-                                  aria-label="ลบ"
-                                  title="ลบ"
-                                  className="text-destructive hover:text-destructive"
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-destructive"
                                   onClick={() => setDeleteTargetIds([row.id])}
                                 >
-                                  <Trash2 />
+                                  ลบ
                                 </Button>
                               ) : blockedReason ? (
                                 <Button
                                   type="button"
-                                  size="icon-sm"
-                                  variant="ghost"
+                                  size="sm"
+                                  variant="outline"
                                   disabled
-                                  aria-label="ลบไม่ได้"
                                   title={blockedReason}
-                                  className="opacity-40"
                                 >
-                                  <Trash2 />
+                                  ลบไม่ได้
                                 </Button>
                               ) : null}
                             </div>
