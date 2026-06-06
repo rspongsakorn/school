@@ -31,13 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { MoreHorizontal } from "lucide-react";
+import { Badge as BadgeIcon, BadgeCheck, CreditCard, Percent, Trash2 } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { InvoiceDiscountDialog } from "@/components/finance/invoice-discount-dialog";
 import { InvoiceReimbursableDialog } from "@/components/finance/invoice-reimbursable-dialog";
@@ -578,47 +572,67 @@ export function InvoicesPanel() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <div className="flex justify-end">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger
-                                  render={
-                                    <Button type="button" size="icon-sm" variant="ghost" aria-label="จัดการ" />
-                                  }
+                            <div className="flex items-center justify-end gap-0.5">
+                              {row.paidAmount > 0 ? (
+                                <a
+                                  href={paymentsHref(row.studentCode)}
+                                  aria-label="ดูการชำระ"
+                                  title="ดูการชำระ"
+                                  className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                                 >
-                                  <MoreHorizontal />
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  {row.paidAmount > 0 ? (
-                                    <DropdownMenuItem
-                                      render={<a href={paymentsHref(row.studentCode)} />}
-                                    >
-                                      ดูการชำระ
-                                    </DropdownMenuItem>
-                                  ) : null}
-                                  {row.paidAmount === 0 ? (
-                                    <DropdownMenuItem onClick={() => setReimbursableTarget(row)}>
-                                      {row.isReimbursable ? "เปลี่ยนเป็นเบิกไม่ได้" : "เปลี่ยนเป็นเบิกได้"}
-                                    </DropdownMenuItem>
-                                  ) : null}
-                                  {row.paidAmount === 0 ? (
-                                    <DropdownMenuItem onClick={() => setDiscountTarget(row)}>
-                                      ส่วนลด
-                                    </DropdownMenuItem>
-                                  ) : null}
-                                  {deletable ? (
-                                    <DropdownMenuItem
-                                      variant="destructive"
-                                      onClick={() => setDeleteTargetIds([row.id])}
-                                    >
-                                      ลบ
-                                    </DropdownMenuItem>
-                                  ) : blockedReason ? (
-                                    <DropdownMenuItem disabled title={blockedReason}>
-                                      ลบไม่ได้
-                                    </DropdownMenuItem>
-                                  ) : null}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                                  <CreditCard className="size-4" />
+                                </a>
+                              ) : null}
+                              {row.paidAmount === 0 ? (
+                                <Button
+                                  type="button"
+                                  size="icon-sm"
+                                  variant="ghost"
+                                  aria-label={row.isReimbursable ? "เปลี่ยนเป็นเบิกไม่ได้" : "เปลี่ยนเป็นเบิกได้"}
+                                  title={row.isReimbursable ? "เปลี่ยนเป็นเบิกไม่ได้" : "เปลี่ยนเป็นเบิกได้"}
+                                  className={row.isReimbursable ? "text-sky-600" : ""}
+                                  onClick={() => setReimbursableTarget(row)}
+                                >
+                                  {row.isReimbursable ? <BadgeCheck /> : <BadgeIcon />}
+                                </Button>
+                              ) : null}
+                              {row.paidAmount === 0 ? (
+                                <Button
+                                  type="button"
+                                  size="icon-sm"
+                                  variant="ghost"
+                                  aria-label="ส่วนลด"
+                                  title="ส่วนลด"
+                                  onClick={() => setDiscountTarget(row)}
+                                >
+                                  <Percent />
+                                </Button>
+                              ) : null}
+                              {deletable ? (
+                                <Button
+                                  type="button"
+                                  size="icon-sm"
+                                  variant="ghost"
+                                  aria-label="ลบ"
+                                  title="ลบ"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={() => setDeleteTargetIds([row.id])}
+                                >
+                                  <Trash2 />
+                                </Button>
+                              ) : blockedReason ? (
+                                <Button
+                                  type="button"
+                                  size="icon-sm"
+                                  variant="ghost"
+                                  disabled
+                                  aria-label="ลบไม่ได้"
+                                  title={blockedReason}
+                                  className="opacity-40"
+                                >
+                                  <Trash2 />
+                                </Button>
+                              ) : null}
                             </div>
                           </TableCell>
                         </TableRow>
