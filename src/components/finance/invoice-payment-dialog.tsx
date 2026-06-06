@@ -53,8 +53,10 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  const semesterId = ctx?.semesterId ?? null;
+
   useEffect(() => {
-    if (!open || !invoice || !ctx) return;
+    if (!open || !invoice || !semesterId) return;
     setAmount("");
     setMethod("cash");
     setTransferRef("");
@@ -62,7 +64,7 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
     setOutstanding([]);
     setLoading(true);
 
-    getStudentOutstandingAction(invoice.studentId, ctx.semesterId).then((result) => {
+    getStudentOutstandingAction(invoice.studentId, semesterId).then((result) => {
       setLoading(false);
       if (!result.ok) {
         toast.error(result.error);
@@ -72,7 +74,7 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
       const totalDue = result.invoices.reduce((sum, r) => sum + r.outstanding, 0);
       setAmount(totalDue > 0 ? String(totalDue) : "");
     });
-  }, [open, invoice, ctx]);
+  }, [open, invoice, semesterId]);
 
   function printReceipt(paymentId: string) {
     if (iframeRef.current) {
