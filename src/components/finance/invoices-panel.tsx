@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/table";
 import { AppHeader } from "@/components/app-header";
 import { InvoiceDiscountDialog } from "@/components/finance/invoice-discount-dialog";
+import { InvoicePaymentDialog } from "@/components/finance/invoice-payment-dialog";
 import { InvoiceReimbursableDialog } from "@/components/finance/invoice-reimbursable-dialog";
 import { InvoiceGenerateDialog } from "@/components/finance/invoice-generate-dialog";
 import { StudentSearchInput } from "@/components/students/student-search-input";
@@ -96,6 +97,8 @@ export function InvoicesPanel() {
   const [generateOpen, setGenerateOpen] = useState(false);
   const [discountTarget, setDiscountTarget] = useState<InvoiceListRow | null>(null);
   const [reimbursableTarget, setReimbursableTarget] = useState<InvoiceListRow | null>(null);
+  const [paymentTarget, setPaymentTarget] = useState<InvoiceListRow | null>(null);
+  const [paymentOpen, setPaymentOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [deleteTargetIds, setDeleteTargetIds] = useState<string[] | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -458,6 +461,16 @@ export function InvoicesPanel() {
                         ) : null}
                       </div>
                       <div className="flex justify-end gap-2">
+                        {row.status !== "paid" ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => { setPaymentTarget(row); setPaymentOpen(true); }}
+                          >
+                            ชำระเงิน
+                          </Button>
+                        ) : null}
                         {row.paidAmount > 0 ? (
                           <a href={paymentsHref(row.studentCode)}>
                             <Button type="button" size="sm" variant="outline">
@@ -581,6 +594,16 @@ export function InvoicesPanel() {
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center justify-end gap-1">
+                              {row.status !== "paid" ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => { setPaymentTarget(row); setPaymentOpen(true); }}
+                                >
+                                  ชำระเงิน
+                                </Button>
+                              ) : null}
                               {row.paidAmount > 0 ? (
                                 <a
                                   href={paymentsHref(row.studentCode)}
@@ -676,6 +699,15 @@ export function InvoicesPanel() {
               semesterNumber={ctx.semesterNumber}
               feeItems={feeItems}
               candidates={candidates}
+            />
+
+            <InvoicePaymentDialog
+              invoice={paymentTarget}
+              open={paymentOpen}
+              onOpenChange={(open) => {
+                setPaymentOpen(open);
+                if (!open) setPaymentTarget(null);
+              }}
             />
 
             <InvoiceDiscountDialog
