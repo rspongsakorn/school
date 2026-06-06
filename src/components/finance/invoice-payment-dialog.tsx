@@ -6,6 +6,16 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -52,6 +62,7 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
   const [transferRef, setTransferRef] = useState("");
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const semesterId = ctx?.semesterId ?? null;
 
@@ -84,7 +95,7 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!invoice || !ctx) return;
 
@@ -102,6 +113,14 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
       toast.error("กรุณาระบุเลขอ้างอิงการโอน");
       return;
     }
+
+    setConfirmOpen(true);
+  }
+
+  async function handleConfirm() {
+    if (!invoice || !ctx) return;
+
+    const parsed = Number.parseFloat(amount);
 
     setSubmitting(true);
     const result = await recordPayment({
@@ -123,6 +142,7 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
 
     toast.success("บันทึกการชำระและออกใบเสร็จแล้ว");
     printReceipt(result.paymentId);
+    setConfirmOpen(false);
     onOpenChange(false);
     void queryClient.invalidateQueries({ queryKey: ["invoices"] });
     void queryClient.invalidateQueries({ queryKey: ["invoice-candidates"] });
@@ -246,6 +266,23 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
           </form>
         </DialogContent>
       </Dialog>
+      <AlertDialog open={confirmOpen} onOpenChange={(o) => !submitting && setConfirmOpen(o)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ยืนยันการชำระเงิน</AlertDialogTitle>
+            <AlertDialogDescription>
+              {invoice?.studentName} — ชำระ {formatBaht(Number.parseFloat(amount) || 0)}{" "}
+              ({method === "cash" ? "เงินสด" : `โอน ref: ${transferRef}`})
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submitting}>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirm} disabled={submitting}>
+              {submitting ? "กำลังบันทึก..." : "ยืนยัน"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
