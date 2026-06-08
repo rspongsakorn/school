@@ -457,7 +457,7 @@ export function InvoiceGenerateDialog({
                           key={c.studentId}
                           className={cn(
                             "flex items-center gap-2 px-3 py-2 transition-colors",
-                            reimb && "bg-sky-50/70",
+                            reimb && "bg-green-50",
                             mode === "selected" && !selected && "opacity-55",
                           )}
                         >
@@ -476,18 +476,27 @@ export function InvoiceGenerateDialog({
                               <span className="text-xs text-muted-foreground">{c.gradeClassroom}</span>
                             )}
                           </div>
+                          {/* Toggle switch */}
                           <button
                             type="button"
                             onClick={() => toggleReimbursable(c.studentId)}
                             disabled={mode === "selected" && !selected}
                             className={cn(
-                              "shrink-0 rounded-full px-2 py-0.5 text-xs font-medium transition-colors disabled:opacity-40",
-                              reimb
-                                ? "bg-sky-600 text-white"
-                                : "bg-muted text-muted-foreground hover:bg-muted/80",
+                              "relative h-6 w-[54px] shrink-0 rounded-full transition-colors disabled:opacity-40",
+                              reimb ? "bg-primary" : "bg-muted",
                             )}
                           >
-                            {reimb ? "เบิกได้ ✓" : "เบิกได้"}
+                            <span
+                              className={cn(
+                                "absolute top-[3px] size-[18px] rounded-full bg-white shadow-sm transition-all",
+                                reimb ? "left-[33px]" : "left-[3px]",
+                              )}
+                            />
+                            {reimb && (
+                              <span className="absolute left-[7px] top-1/2 -translate-y-1/2 text-[10px] font-semibold text-white">
+                                เบิก
+                              </span>
+                            )}
                           </button>
                         </div>
                       );
