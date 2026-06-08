@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { requireFinancePage } from "@/lib/auth/require-finance";
 import { getReceiptPrintData } from "@/lib/data/receipt-print";
 import { SCHOOL_CONFIG } from "@/lib/school-config";
-import { formatThaiDateLong } from "@/lib/format";
+import { formatThaiDateLong, bahtText } from "@/lib/format";
 import { PAYMENT_METHOD_LABELS } from "@/lib/finance/constants";
 import { PrintButton } from "./print-button";
 import { LogoImage } from "./logo-image";
@@ -221,11 +221,38 @@ export default async function ReceiptPrintPage({
                 บาท
               </td>
             </tr>
+            <tr>
+              <td
+                colSpan={2}
+                style={{
+                  padding: "5px 8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "11px",
+                  color: "#374151",
+                }}
+              >
+                <span style={{ color: "#6b7280" }}>จำนวนเงินเป็นอักษร: </span>
+                <strong>{bahtText(data.amount)}</strong>
+              </td>
+            </tr>
           </tfoot>
         </table>
 
+        {/* ── Remark ── */}
+        <div
+          style={{
+            marginTop: "12px",
+            fontSize: "10px",
+            color: "#6b7280",
+            borderTop: "1px dashed #d1d5db",
+            paddingTop: "6px",
+          }}
+        >
+          หมายเหตุ: ใบเสร็จฉบับนี้จะสมบูรณ์เมื่อผู้รับเงินลงลายมือชื่อ
+        </div>
+
         {/* ── Signature ── */}
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "20px" }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "16px" }}>
           <div style={{ textAlign: "center" }}>
             <div
               style={{
