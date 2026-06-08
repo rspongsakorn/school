@@ -329,7 +329,6 @@ export function InvoicesPanel() {
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex flex-1 flex-wrap gap-2">
                 <StudentSearchInput
-                  key={qParam}
                   initialQuery={qParam}
                   onDebouncedChange={(q) => pushParams({ q, page: 1 })}
                 />
@@ -422,7 +421,7 @@ export function InvoicesPanel() {
               </p>
             ) : (
               <div className="sm:hidden divide-y divide-border rounded-lg border border-border">
-                {filteredRows.map((row) => {
+                {data.rows.map((row) => {
                   const deleteCtx = deleteContextFor(row);
                   const deletable = canDeleteInvoice(deleteCtx);
                   const blockedReason = invoiceDeleteBlockedReason(deleteCtx);
@@ -553,7 +552,7 @@ export function InvoicesPanel() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredRows.map((row) => {
+                    data.rows.map((row) => {
                       const deleteCtx = deleteContextFor(row);
                       const deletable = canDeleteInvoice(deleteCtx);
                       const blockedReason = invoiceDeleteBlockedReason(deleteCtx);
