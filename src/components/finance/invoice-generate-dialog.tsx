@@ -91,9 +91,7 @@ export function InvoiceGenerateDialog({
     return [...sortOrderByRoom.keys()].sort((a, b) => {
       const orderDiff = (sortOrderByRoom.get(a) ?? 0) - (sortOrderByRoom.get(b) ?? 0);
       if (orderDiff !== 0) return orderDiff;
-      const nameA = a.split("/").pop() ?? a;
-      const nameB = b.split("/").pop() ?? b;
-      return nameA.localeCompare(nameB, "th", { numeric: true });
+      return a.localeCompare(b, "th", { numeric: true });
     });
   }, [selectableCandidates]);
 
