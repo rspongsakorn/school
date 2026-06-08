@@ -399,14 +399,16 @@ export async function fetchInvoiceCandidates(semesterId: string): Promise<Invoic
     students: { student_code: string; first_name: string; last_name: string };
   };
 
-  return ((data ?? []) as unknown as Row[]).map((row) => ({
-    studentId: row.student_id,
-    studentCode: row.students.student_code,
-    studentName: formatStudentName(row.students.first_name, row.students.last_name),
-    gradeClassroom: gradeByStudent.get(row.student_id) ?? "—",
-    gradeSortOrder: gradeSortByStudent.get(row.student_id) ?? 0,
-    hasInvoice: existingSet.has(row.student_id),
-  }));
+  return ((data ?? []) as unknown as Row[])
+    .map((row) => ({
+      studentId: row.student_id,
+      studentCode: row.students.student_code,
+      studentName: formatStudentName(row.students.first_name, row.students.last_name),
+      gradeClassroom: gradeByStudent.get(row.student_id) ?? "—",
+      gradeSortOrder: gradeSortByStudent.get(row.student_id) ?? 0,
+      hasInvoice: existingSet.has(row.student_id),
+    }))
+    .sort((a, b) => a.studentCode.localeCompare(b.studentCode, undefined, { numeric: true }));
 }
 
 function round2(n: number) {
