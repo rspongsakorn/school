@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -533,12 +533,24 @@ export function PaymentsPanel() {
                           </TableRow>
                         ) : (
                           outstanding.map((inv) => (
-                            <TableRow key={inv.id}>
-                              <TableCell>{inv.invoiceName}</TableCell>
-                              <TableCell className="text-right tabular-nums">
-                                {formatBaht(inv.outstanding)}
-                              </TableCell>
-                            </TableRow>
+                            <Fragment key={inv.id}>
+                              <TableRow>
+                                <TableCell className="font-medium">{inv.invoiceName}</TableCell>
+                                <TableCell className="text-right tabular-nums">
+                                  {formatBaht(inv.outstanding)}
+                                </TableCell>
+                              </TableRow>
+                              {inv.lines.map((line) => (
+                                <TableRow key={line.id} className="border-0">
+                                  <TableCell className="py-0.5 pl-5 text-xs text-muted-foreground">
+                                    · {line.description}
+                                  </TableCell>
+                                  <TableCell className="py-0.5 text-right text-xs tabular-nums text-muted-foreground">
+                                    {formatBaht(line.amount)}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </Fragment>
                           ))
                         )}
                       </TableBody>

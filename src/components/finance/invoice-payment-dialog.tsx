@@ -173,12 +173,21 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
               ) : (
                 <div className="rounded-md border text-sm">
                   {outstanding.map((inv) => (
-                    <div
-                      key={inv.id}
-                      className="flex items-center justify-between px-3 py-2 border-b last:border-b-0"
-                    >
-                      <span className="text-muted-foreground truncate max-w-[200px]">{inv.invoiceName}</span>
-                      <span className="tabular-nums font-medium">{formatBaht(inv.outstanding)}</span>
+                    <div key={inv.id} className="border-b last:border-b-0">
+                      <div className="flex items-center justify-between px-3 py-2">
+                        <span className="font-medium truncate max-w-[220px]">{inv.invoiceName}</span>
+                        <span className="tabular-nums font-medium">{formatBaht(inv.outstanding)}</span>
+                      </div>
+                      {inv.lines.length > 0 && (
+                        <div className="px-3 pb-2 space-y-0.5">
+                          {inv.lines.map((line) => (
+                            <div key={line.id} className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span className="truncate max-w-[200px]">· {line.description}</span>
+                              <span className="tabular-nums">{formatBaht(line.amount)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                   <div className="flex items-center justify-between px-3 py-2 font-semibold bg-muted/40">

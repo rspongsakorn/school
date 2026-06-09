@@ -35,6 +35,12 @@ export type PaginatedInvoices = {
 
 const INVOICE_PAGE_SIZE = 50;
 
+export type InvoiceLine = {
+  id: string;
+  description: string;
+  amount: number;
+};
+
 export type OutstandingInvoiceRow = {
   id: string;
   invoiceName: string;
@@ -42,6 +48,7 @@ export type OutstandingInvoiceRow = {
   paidAmount: number;
   outstanding: number;
   createdAt: string;
+  lines: InvoiceLine[];
 };
 
 export async function listInvoicesPaginated(params: {
@@ -186,7 +193,7 @@ export async function getStudentOutstandingInvoices(
   const supabase = await createClient();
   const { data } = await supabase
     .from("student_invoices")
-    .select("id, invoice_name, total_amount, paid_amount, created_at, status")
+    .select("id, invoice_name, total_amount, paid_amount, created_at, status, invoice_lines(id, description, amount)")
     .eq("student_id", studentId)
     .eq("semester_id", semesterId)
     .in("status", ["unpaid", "partial"])
@@ -195,6 +202,11 @@ export async function getStudentOutstandingInvoices(
   return (data ?? []).map((row) => {
     const totalAmount = Number(row.total_amount);
     const paidAmount = Number(row.paid_amount);
+    const lines: InvoiceLine[] = (row.invoice_lines ?? []).map((l: { id: string; description: string; amount: number }) => ({
+      id: l.id,
+      description: l.description,
+      amount: Number(l.amount),
+    }));
     return {
       id: row.id,
       invoiceName: row.invoice_name,
@@ -202,6 +214,7 @@ export async function getStudentOutstandingInvoices(
       paidAmount,
       outstanding: Math.max(0, round2(totalAmount - paidAmount)),
       createdAt: row.created_at,
+      lines,
     };
   });
 }
