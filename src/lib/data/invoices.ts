@@ -199,10 +199,19 @@ export async function getStudentOutstandingInvoices(
     .in("status", ["unpaid", "partial"])
     .order("created_at", { ascending: true });
 
-  return (data ?? []).map((row) => {
+  type Row = {
+    id: string;
+    invoice_name: string;
+    total_amount: number;
+    paid_amount: number;
+    created_at: string;
+    invoice_lines: { id: string; description: string; amount: number }[] | null;
+  };
+
+  return ((data ?? []) as unknown as Row[]).map((row) => {
     const totalAmount = Number(row.total_amount);
     const paidAmount = Number(row.paid_amount);
-    const lines: InvoiceLine[] = (row.invoice_lines ?? []).map((l: { id: string; description: string; amount: number }) => ({
+    const lines: InvoiceLine[] = (row.invoice_lines ?? []).map((l) => ({
       id: l.id,
       description: l.description,
       amount: Number(l.amount),
