@@ -80,3 +80,53 @@ export function parsePaymentCsv(text: string): ParsedCsvRow[] {
 
   return rows;
 }
+
+export type ImportRowStatus =
+  | "full"
+  | "partial"
+  | "format_error"
+  | "not_found"
+  | "over"
+  | "no_outstanding";
+
+export type ImportRowAssessment = {
+  status: ImportRowStatus;
+  nameMismatch: boolean;
+  willImport: boolean;
+};
+
+function normalizeName(s: string): string {
+  return s.replace(/\s+/g, "");
+}
+
+const EPSILON = 0.005;
+
+export function assessImportRow(args: {
+  parseError: string | null;
+  matchedStudentId: string | null;
+  systemName: string | null;
+  csvName: string;
+  amount: number;
+  outstanding: number | null;
+}): ImportRowAssessment {
+  if (args.parseError) {
+    return { status: "format_error", nameMismatch: false, willImport: false };
+  }
+  if (!args.matchedStudentId || args.outstanding === null) {
+    return { status: "not_found", nameMismatch: false, willImport: false };
+  }
+
+  const nameMismatch =
+    normalizeName(args.systemName ?? "") !== normalizeName(args.csvName);
+
+  if (args.outstanding <= 0) {
+    return { status: "no_outstanding", nameMismatch, willImport: false };
+  }
+  if (args.amount > args.outstanding + EPSILON) {
+    return { status: "over", nameMismatch, willImport: false };
+  }
+
+  const status: ImportRowStatus =
+    Math.abs(args.amount - args.outstanding) < EPSILON ? "full" : "partial";
+  return { status, nameMismatch, willImport: true };
+}

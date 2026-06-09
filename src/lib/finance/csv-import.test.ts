@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { parseBuddhistDate, parsePaymentCsv } from "./csv-import";
+import {
+  assessImportRow,
+  parseBuddhistDate,
+  parsePaymentCsv,
+} from "./csv-import";
 
 describe("parseBuddhistDate", () => {
   it("parses DD/MM/YYYY Buddhist date to ISO CE date", () => {
@@ -52,5 +56,62 @@ describe("parsePaymentCsv", () => {
     const rows = parsePaymentCsv('14399,อลิสา,"1,300",12/05/2569');
     expect(rows[0].amount).toBe(1300);
     expect(rows[0].error).toBeNull();
+  });
+});
+
+describe("assessImportRow", () => {
+  const base = {
+    parseError: null,
+    matchedStudentId: "s1",
+    systemName: "อลิสา มูลทา",
+    csvName: "อลิสา มูลทา",
+    amount: 2000,
+    outstanding: 2000,
+  };
+
+  it("marks a full payment", () => {
+    expect(assessImportRow(base)).toEqual({
+      status: "full",
+      nameMismatch: false,
+      willImport: true,
+    });
+  });
+  it("marks a partial payment", () => {
+    expect(assessImportRow({ ...base, amount: 1500 })).toMatchObject({
+      status: "partial",
+      willImport: true,
+    });
+  });
+  it("blocks overpayment", () => {
+    expect(assessImportRow({ ...base, amount: 2500 })).toMatchObject({
+      status: "over",
+      willImport: false,
+    });
+  });
+  it("blocks zero outstanding", () => {
+    expect(assessImportRow({ ...base, outstanding: 0 })).toMatchObject({
+      status: "no_outstanding",
+      willImport: false,
+    });
+  });
+  it("blocks unmatched student", () => {
+    expect(
+      assessImportRow({ ...base, matchedStudentId: null, outstanding: null }),
+    ).toMatchObject({ status: "not_found", willImport: false });
+  });
+  it("blocks parse errors", () => {
+    expect(assessImportRow({ ...base, parseError: "วันที่ไม่ถูกต้อง" })).toMatchObject({
+      status: "format_error",
+      willImport: false,
+    });
+  });
+  it("warns on name mismatch but still imports", () => {
+    const r = assessImportRow({ ...base, csvName: "อลิสา มูลทาa" });
+    expect(r.nameMismatch).toBe(true);
+    expect(r.willImport).toBe(true);
+  });
+  it("treats whitespace-only name differences as matching", () => {
+    const r = assessImportRow({ ...base, csvName: "อลิสา  มูลทา" });
+    expect(r.nameMismatch).toBe(false);
   });
 });
