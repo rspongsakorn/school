@@ -391,13 +391,32 @@ export async function importPaymentsBackfill(input: {
       continue;
     }
 
+    let invoiceUpdateError = false;
     for (const alloc of allocations) {
       const inv = outstanding.find((i) => i.id === alloc.invoiceId)!;
       const newPaid = round2(inv.paidAmount + alloc.amount);
-      await supabase
+      const { error: updateError } = await supabase
         .from("student_invoices")
         .update({ paid_amount: newPaid, status: deriveInvoiceStatus(newPaid, inv.totalAmount) })
         .eq("id", alloc.invoiceId);
+      if (updateError) {
+        invoiceUpdateError = true;
+        break;
+      }
+    }
+
+    // The payment + receipt are already committed at this point. If the invoice
+    // balance update failed, surface the row so the operator can reconcile by
+    // hand rather than silently leaving outstanding stale (which would also
+    // defeat the re-import guard that relies on outstanding reaching 0).
+    if (invoiceUpdateError) {
+      failed.push({
+        lineNumber: row.lineNumber,
+        studentCode: row.studentCode,
+        reason: "อัปเดตยอดใบแจ้งไม่ได้ (ออกใบเสร็จแล้ว ตรวจสอบด้วยตนเอง)",
+      });
+      nextSeq += 1;
+      continue;
     }
 
     nextSeq += 1;
