@@ -35,6 +35,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { AppHeader } from "@/components/app-header";
+import { PaymentImportDialog } from "@/components/finance/payment-import-dialog";
 import { useRequireRole } from "@/components/providers/auth-provider";
 import { useSemesterContext } from "@/hooks/use-semester-context";
 import { formatBaht } from "@/lib/format";
@@ -92,6 +93,7 @@ export function PaymentsPanel() {
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [lastPayment, setLastPayment] = useState<{ id: string; receiptNumber: string; amount: number } | null>(null);
   const [voidTarget, setVoidTarget] = useState<PaymentListRow | null>(null);
   const [voidReason, setVoidReason] = useState("");
@@ -469,8 +471,11 @@ export function PaymentsPanel() {
           </Card>
 
           <Card className="border-border shadow-sm">
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base">รับชำระเงิน</CardTitle>
+                <Button type="button" variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+                  นำเข้า CSV
+                </Button>
               </CardHeader>
               <CardContent className="space-y-4">
                 {!selectedStudent && lastPayment ? (
@@ -889,6 +894,22 @@ export function PaymentsPanel() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+
+          {ctx ? (
+            <PaymentImportDialog
+              open={importOpen}
+              onOpenChange={setImportOpen}
+              academicYearId={ctx.academicYearId}
+              academicYearName={ctx.academicYearName}
+              semesterId={ctx.semesterId}
+              onImported={() => {
+                void queryClient.invalidateQueries({ queryKey: ["payments"] });
+                void queryClient.invalidateQueries({ queryKey: ["invoices"] });
+                void queryClient.invalidateQueries({ queryKey: ["invoice-candidates"] });
+                router.refresh();
+              }}
+            />
+          ) : null}
         </div>
       </main>
 
