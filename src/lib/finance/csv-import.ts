@@ -16,3 +16,67 @@ export function parseBuddhistDate(input: string): string | null {
   }
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
+
+export type ParsedCsvRow = {
+  lineNumber: number;
+  studentCode: string;
+  studentName: string;
+  amount: number;
+  paidDateIso: string; // "" when the date is invalid
+  rawDate: string;
+  error: string | null;
+};
+
+/** Split one CSV line into trimmed cells, honoring simple double-quote wrapping (used for amounts like "1,300"). */
+function splitCsvLine(line: string): string[] {
+  const cells: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (const ch of line) {
+    if (ch === '"') {
+      inQuotes = !inQuotes;
+    } else if (ch === "," && !inQuotes) {
+      cells.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  cells.push(current);
+  return cells.map((c) => c.trim());
+}
+
+export function parsePaymentCsv(text: string): ParsedCsvRow[] {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (lines.length === 0) return [];
+
+  const startIdx = /student_code/i.test(lines[0]) ? 1 : 0;
+  const rows: ParsedCsvRow[] = [];
+
+  for (let i = startIdx; i < lines.length; i++) {
+    const cells = splitCsvLine(lines[i]);
+    const studentCode = cells[0] ?? "";
+    const studentName = cells[1] ?? "";
+    const amountRaw = (cells[2] ?? "").replace(/,/g, "");
+    const rawDate = cells[3] ?? "";
+    const amount = Number(amountRaw);
+    const paidDateIso = parseBuddhistDate(rawDate);
+
+    let error: string | null = null;
+    if (!studentCode) error = "ไม่มีรหัสนักเรียน";
+    else if (!Number.isFinite(amount) || amount <= 0) error = "ยอดเงินไม่ถูกต้อง";
+    else if (!paidDateIso) error = "วันที่ไม่ถูกต้อง";
+
+    rows.push({
+      lineNumber: i + 1,
+      studentCode,
+      studentName,
+      amount: Number.isFinite(amount) ? amount : 0,
+      paidDateIso: paidDateIso ?? "",
+      rawDate,
+      error,
+    });
+  }
+
+  return rows;
+}
