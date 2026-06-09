@@ -404,11 +404,7 @@ export async function importPaymentsBackfill(input: {
     imported += 1;
   }
 
-  revalidatePath("/payments");
-  revalidatePath("/invoices");
-  revalidatePath("/reports/outstanding");
-  revalidatePath("/reports/collections");
-  revalidatePath("/");
+  revalidateFinancePaths();
 
   return { ok: true, imported, failed };
 }
