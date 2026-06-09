@@ -56,9 +56,11 @@ export function parsePaymentCsv(text: string): ParsedCsvRow[] {
   for (let i = startIdx; i < lines.length; i++) {
     const cells = splitCsvLine(lines[i]);
     const studentCode = cells[0] ?? "";
-    const studentName = cells[1] ?? "";
-    const amountRaw = (cells[2] ?? "").replace(/,/g, "");
-    const rawDate = cells[3] ?? "";
+    const firstName = cells[1] ?? "";
+    const lastName = cells[2] ?? "";
+    const studentName = `${firstName} ${lastName}`.trim();
+    const amountRaw = (cells[3] ?? "").replace(/,/g, "");
+    const rawDate = cells[4] ?? "";
     const amount = Number(amountRaw);
     const paidDateIso = parseBuddhistDate(rawDate);
 

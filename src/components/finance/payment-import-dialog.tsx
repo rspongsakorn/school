@@ -60,7 +60,7 @@ const STATUS_CLASS: Record<ImportRowStatus, string> = {
 };
 
 const TEMPLATE_CSV =
-  "student_code,student_name,amount,paid_date\n14333,นาลันทา ศรีวัฒนพงศ์,3600,06/05/2569\n";
+  "student_code,first_name,last_name,amount,paid_date\n14333,นาลันทา,ศรีวัฒนพงศ์,3600,06/05/2569\n";
 
 type Props = {
   open: boolean;
@@ -197,7 +197,7 @@ export function PaymentImportDialog({
         <DialogHeader>
           <DialogTitle>นำเข้าการชำระเงินจาก CSV</DialogTitle>
           <DialogDescription>
-            ไฟล์ต้องมีคอลัมน์: รหัส, ชื่อ, ยอดชำระ, วันที่ (พ.ศ. วว/ดด/ปปปป)
+            ไฟล์ต้องมีคอลัมน์: รหัส, ชื่อ, สกุล, ยอดชำระ, วันที่ (พ.ศ. วว/ดด/ปปปป)
           </DialogDescription>
         </DialogHeader>
 

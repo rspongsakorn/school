@@ -25,9 +25,9 @@ describe("parseBuddhistDate", () => {
 
 describe("parsePaymentCsv", () => {
   const csv = [
-    "student_code,student_name,amount,paid_date",
-    "14333,นาลันทา ศรีวัฒนพงศ์,3600,06/05/2569",
-    "14399,อลิสา มูลทา,2000,12/05/2569",
+    "student_code,first_name,last_name,amount,paid_date",
+    "14333,นาลันทา,ศรีวัฒนพงศ์,3600,06/05/2569",
+    "14399,อลิสา,มูลทา,2000,12/05/2569",
   ].join("\n");
 
   it("skips the header row and parses data rows", () => {
@@ -45,15 +45,15 @@ describe("parsePaymentCsv", () => {
     expect(parsePaymentCsv(csv + "\n\n")).toHaveLength(2);
   });
   it("flags a bad amount", () => {
-    const rows = parsePaymentCsv("14399,อลิสา,abc,12/05/2569");
+    const rows = parsePaymentCsv("14399,อลิสา,มูลทา,abc,12/05/2569");
     expect(rows[0].error).toBe("ยอดเงินไม่ถูกต้อง");
   });
   it("flags a bad date", () => {
-    const rows = parsePaymentCsv("14399,อลิสา,2000,2026-05-12");
+    const rows = parsePaymentCsv("14399,อลิสา,มูลทา,2000,2026-05-12");
     expect(rows[0].error).toBe("วันที่ไม่ถูกต้อง");
   });
   it("strips thousands separators in amount", () => {
-    const rows = parsePaymentCsv('14399,อลิสา,"1,300",12/05/2569');
+    const rows = parsePaymentCsv('14399,อลิสา,มูลทา,"1,300",12/05/2569');
     expect(rows[0].amount).toBe(1300);
     expect(rows[0].error).toBeNull();
   });
