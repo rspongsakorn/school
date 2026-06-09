@@ -180,6 +180,63 @@ export async function getStudentOutstandingAction(studentId: string, semesterId:
   return { ok: true as const, invoices };
 }
 
+export type ImportPreviewStudent = {
+  studentCode: string;
+  studentId: string;
+  name: string;
+  outstanding: number;
+};
+
+export async function getImportPreviewDataAction(
+  studentCodes: string[],
+  semesterId: string,
+) {
+  const auth = await requireFinanceAction();
+  if (!auth.ok) return auth;
+
+  const codes = [...new Set(studentCodes.map((c) => c.trim()).filter(Boolean))];
+  if (codes.length === 0) {
+    return { ok: true as const, students: [] as ImportPreviewStudent[] };
+  }
+
+  const supabase = await createClient();
+
+  const { data: students } = await supabase
+    .from("students")
+    .select("id, student_code, first_name, last_name")
+    .in("student_code", codes);
+
+  const studentRows = students ?? [];
+  const studentIds = studentRows.map((s) => s.id);
+
+  const outstandingByStudent = new Map<string, number>();
+  if (studentIds.length > 0) {
+    const { data: invoices } = await supabase
+      .from("student_invoices")
+      .select("student_id, total_amount, paid_amount")
+      .in("student_id", studentIds)
+      .eq("semester_id", semesterId)
+      .in("status", ["unpaid", "partial"]);
+
+    for (const inv of invoices ?? []) {
+      const due = Math.max(0, Number(inv.total_amount) - Number(inv.paid_amount));
+      outstandingByStudent.set(
+        inv.student_id,
+        round2((outstandingByStudent.get(inv.student_id) ?? 0) + due),
+      );
+    }
+  }
+
+  const result: ImportPreviewStudent[] = studentRows.map((s) => ({
+    studentCode: s.student_code,
+    studentId: s.id,
+    name: formatStudentName(s.first_name, s.last_name),
+    outstanding: outstandingByStudent.get(s.id) ?? 0,
+  }));
+
+  return { ok: true as const, students: result };
+}
+
 export async function searchStudentsForPaymentAction(
   semesterId: string,
   options: {
