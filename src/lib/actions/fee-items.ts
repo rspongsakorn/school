@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { feeItemDeleteBlockedReason } from "@/lib/finance/fee-item-delete-eligibility";
 
 function revalidateFeePaths() {
-  revalidatePath("/fee-rates");
+  revalidatePath("/receipt-types");
   revalidatePath("/invoices");
 }
 
@@ -16,12 +16,14 @@ export async function createFeeItem(input: {
   description?: string;
   isTuition: boolean;
   hasReimbursableVariant: boolean;
+  receiptTypeId: string;
 }): Promise<ActionState> {
   const auth = await requireAdminAction();
   if (!auth.ok) return auth;
 
   const name = input.name.trim();
   if (!name) return { ok: false, error: "กรุณาระบุชื่อรายการ" };
+  if (!input.receiptTypeId) return { ok: false, error: "ไม่พบประเภทใบเสร็จ" };
 
   const supabase = await createClient();
   const { error } = await supabase.from("fee_items").insert({
@@ -30,6 +32,7 @@ export async function createFeeItem(input: {
     is_tuition: input.isTuition,
     is_active: true,
     has_reimbursable_variant: input.hasReimbursableVariant,
+    receipt_type_id: input.receiptTypeId,
   });
 
   if (error) return { ok: false, error: "ไม่สามารถเพิ่มรายการค่าใช้จ่ายได้" };
