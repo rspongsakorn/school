@@ -79,6 +79,7 @@ export type Database = {
         is_active: boolean;
         sort_order: number;
         has_reimbursable_variant: boolean;
+        receipt_type_id: string;
       }>;
       receipt_types: TableDef<{
         id: string;
