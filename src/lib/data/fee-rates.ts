@@ -21,10 +21,13 @@ export type FeeRateMatrix = {
   rates: Record<string, FeeRateMatrixCell>;
 };
 
-export async function getFeeRateMatrix(semesterId: string): Promise<FeeRateMatrix> {
+export async function getFeeRateMatrix(
+  semesterId: string,
+  receiptTypeId: string,
+): Promise<FeeRateMatrix> {
   const [grades, allItems, supabase] = await Promise.all([
     listGradeLevels(semesterId),
-    listFeeItems(),
+    listFeeItems(receiptTypeId),
     createClient(),
   ]);
 

@@ -3,48 +3,36 @@ import { feeRateKey } from "@/lib/finance/fee-rate-keys";
 import type { FeeItemRow } from "@/lib/data/fee-items";
 import type { FeeRateMatrix } from "@/lib/data/fee-rates";
 
-export async function fetchFeeItems(): Promise<FeeItemRow[]> {
+export async function fetchFeeItems(receiptTypeId: string): Promise<FeeItemRow[]> {
   const supabase = createClient();
 
-  // Primary query: with sort_order
   const { data, error } = await supabase
     .from("fee_items")
-    .select("id, name, description, is_tuition, is_active, sort_order, has_reimbursable_variant")
+    .select(
+      "id, name, description, is_tuition, is_active, sort_order, has_reimbursable_variant, receipt_type_id",
+    )
+    .eq("receipt_type_id", receiptTypeId)
     .order("sort_order", { ascending: true })
     .order("name", { ascending: true });
 
-  if (!error && data) {
-    return data.map((row) => ({
-      id: row.id,
-      name: row.name,
-      description: row.description,
-      isTuition: row.is_tuition,
-      isActive: row.is_active,
-      sortOrder: row.sort_order,
-      hasReimbursableVariant: row.has_reimbursable_variant,
-    }));
-  }
+  if (error || !data) return [];
 
-  // Fallback: sort_order column not yet added — order by name only
-  const { data: fbData, error: fbError } = await supabase
-    .from("fee_items")
-    .select("id, name, description, is_tuition, is_active")
-    .order("name", { ascending: true });
-
-  if (fbError || !fbData) return [];
-
-  return fbData.map((row) => ({
+  return data.map((row) => ({
     id: row.id,
     name: row.name,
     description: row.description,
     isTuition: row.is_tuition,
     isActive: row.is_active,
-    sortOrder: 0,
-    hasReimbursableVariant: false,
+    sortOrder: row.sort_order,
+    hasReimbursableVariant: row.has_reimbursable_variant,
+    receiptTypeId: row.receipt_type_id,
   }));
 }
 
-export async function fetchFeeRateMatrix(semesterId: string): Promise<FeeRateMatrix> {
+export async function fetchFeeRateMatrix(
+  semesterId: string,
+  receiptTypeId: string,
+): Promise<FeeRateMatrix> {
   const supabase = createClient();
 
   const [{ data: gradeData }, { data: itemData }, { data: rateData }] = await Promise.all([
@@ -56,8 +44,9 @@ export async function fetchFeeRateMatrix(semesterId: string): Promise<FeeRateMat
     supabase
       .from("fee_items")
       .select(
-        "id, name, description, is_tuition, is_active, sort_order, has_reimbursable_variant",
+        "id, name, description, is_tuition, is_active, sort_order, has_reimbursable_variant, receipt_type_id",
       )
+      .eq("receipt_type_id", receiptTypeId)
       .order("sort_order", { ascending: true })
       .order("name", { ascending: true }),
     supabase
