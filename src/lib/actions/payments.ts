@@ -10,6 +10,7 @@ import {
 import { formatReceiptNumber, parseMaxSequence } from "@/lib/finance/receipt-number";
 import { getStudentOutstandingInvoices } from "@/lib/data/invoices";
 import { getDefaultReceiptTypeId } from "@/lib/data/receipt-types";
+import { resolveSingleInvoicePayment } from "@/lib/finance/single-invoice-allocation";
 import { createClient } from "@/lib/supabase/server";
 import { formatStudentName } from "@/lib/format";
 import { searchStudentsForPayment } from "@/lib/data/payments";
@@ -20,6 +21,7 @@ export type RecordPaymentResult =
   | { ok: false; error: string };
 
 type RecordPaymentInput = {
+  invoiceId: string;
   studentId: string;
   academicYearId: string;
   academicYearName: string;
@@ -38,32 +40,37 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
     return { ok: false, error: "จำนวนเงินต้องมากกว่า 0" };
   }
 
-  const outstanding = await getStudentOutstandingInvoices(input.studentId, input.semesterId);
-  if (outstanding.length === 0) {
-    return { ok: false, error: "ไม่มีใบค้างชำระ" };
-  }
-
-  const allocations = allocatePaymentFifo(
-    input.amount,
-    outstanding.map((inv) => ({
-      id: inv.id,
-      createdAt: inv.createdAt,
-      outstanding: inv.outstanding,
-    })),
-  );
-
-  if (allocations.length === 0) {
-    return { ok: false, error: "จำนวนเงินไม่เพียงพอสำหรับใบค้างชำระ" };
-  }
-
   const supabase = await createClient();
 
-  const [{ data: existingReceipts }, receiptTypeId, { data: student }] = await Promise.all([
+  const { data: invoice } = await supabase
+    .from("student_invoices")
+    .select("id, invoice_name, total_amount, paid_amount, receipt_type_id, student_id")
+    .eq("id", input.invoiceId)
+    .maybeSingle();
+
+  if (!invoice) return { ok: false, error: "ไม่พบใบแจ้งชำระ" };
+  if (invoice.student_id !== input.studentId) {
+    return { ok: false, error: "ใบแจ้งชำระไม่ตรงกับนักเรียน" };
+  }
+
+  const outstanding = Math.max(
+    0,
+    Math.round((Number(invoice.total_amount) - Number(invoice.paid_amount)) * 100) / 100,
+  );
+
+  const resolved = resolveSingleInvoicePayment({ amount: input.amount, outstanding });
+  if (!resolved.ok) return { ok: false, error: resolved.error };
+
+  const receiptTypeId = invoice.receipt_type_id;
+  if (!receiptTypeId) return { ok: false, error: "ใบแจ้งชำระไม่มีประเภทใบเสร็จ" };
+
+  const allocations = [{ invoiceId: invoice.id, amount: resolved.amount }];
+
+  const [{ data: existingReceipts }, { data: student }] = await Promise.all([
     supabase
       .from("payments")
       .select("receipt_number")
       .eq("academic_year_id", input.academicYearId),
-    getDefaultReceiptTypeId(),
     supabase
       .from("students")
       .select("student_code, first_name, last_name")
@@ -72,7 +79,6 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
   ]);
 
   if (!student) return { ok: false, error: "ไม่พบนักเรียน" };
-  if (!receiptTypeId) return { ok: false, error: "ไม่พบประเภทใบเสร็จเริ่มต้น" };
 
   const nextSeq =
     parseMaxSequence(
@@ -84,14 +90,11 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
   const gradeByStudent = await getStudentGradeMap(input.semesterId);
   const gradeClassroom = gradeByStudent.get(input.studentId) ?? "—";
 
-  const allocationDetails = allocations.map((a) => {
-    const inv = outstanding.find((i) => i.id === a.invoiceId)!;
-    return {
-      invoiceId: a.invoiceId,
-      invoiceName: inv.invoiceName,
-      amount: a.amount,
-    };
-  });
+  const allocationDetails = allocations.map((a) => ({
+    invoiceId: a.invoiceId,
+    invoiceName: invoice.invoice_name,
+    amount: a.amount,
+  }));
 
   const paidTotal = allocations.reduce((sum, a) => sum + a.amount, 0);
 
@@ -155,9 +158,8 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
   }
 
   for (const alloc of allocations) {
-    const inv = outstanding.find((i) => i.id === alloc.invoiceId)!;
-    const newPaid = round2(inv.paidAmount + alloc.amount);
-    const newStatus = deriveInvoiceStatus(newPaid, inv.totalAmount);
+    const newPaid = round2(Number(invoice.paid_amount) + alloc.amount);
+    const newStatus = deriveInvoiceStatus(newPaid, Number(invoice.total_amount));
 
     const { error: updateError } = await supabase
       .from("student_invoices")
