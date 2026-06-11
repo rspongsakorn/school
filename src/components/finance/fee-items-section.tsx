@@ -43,15 +43,16 @@ import type { FeeItemRow } from "@/lib/data/fee-items";
 
 type FeeItemsSectionProps = {
   items: FeeItemRow[];
+  receiptTypeId: string;
 };
 
-export function FeeItemsSection({ items }: FeeItemsSectionProps) {
+export function FeeItemsSection({ items, receiptTypeId }: FeeItemsSectionProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [localItems, setLocalItems] = useState<FeeItemRow[]>(items);
 
   function refreshLists() {
-    queryClient.invalidateQueries({ queryKey: ["fee-items"] });
+    queryClient.invalidateQueries({ queryKey: ["fee-items", receiptTypeId] });
     queryClient.invalidateQueries({ queryKey: ["fee-rate-matrix"] });
     router.refresh();
   }
@@ -107,7 +108,7 @@ export function FeeItemsSection({ items }: FeeItemsSectionProps) {
     setSubmitting(true);
     const result =
       mode === "create"
-        ? await createFeeItem({ name, description, isTuition, hasReimbursableVariant })
+        ? await createFeeItem({ name, description, isTuition, hasReimbursableVariant, receiptTypeId })
         : await updateFeeItem(editTarget!.id, {
             name,
             description,
