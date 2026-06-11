@@ -79,6 +79,23 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
   }
 
   const supabase = await createClient();
+
+  // Enforce the invariant that every selected fee item belongs to the chosen
+  // receipt type (the client filters by type, but never trust the client).
+  const { data: itemTypeRows } = await supabase
+    .from("fee_items")
+    .select("id, receipt_type_id")
+    .in("id", input.feeItemIds);
+
+  const itemsMatchType =
+    itemTypeRows != null &&
+    itemTypeRows.length === input.feeItemIds.length &&
+    itemTypeRows.every((r) => r.receipt_type_id === input.receiptTypeId);
+
+  if (!itemsMatchType) {
+    return { ok: false, error: "รายการค่าใช้จ่ายไม่ตรงกับประเภทใบเสร็จ" };
+  }
+
   const [enrollments, existingSet] = await Promise.all([
     loadEnrollmentsForInvoice(input.semesterId, input.studentIds),
     listStudentIdsWithInvoice(input.semesterId),
