@@ -348,6 +348,35 @@ export async function listStudentInvoiceTypeMap(
   return map;
 }
 
+/** grade_level ids with an issued invoice of this type in this semester (server). */
+export async function listInvoicedGradeLevelIds(
+  semesterId: string,
+  invoiceTypeId: string,
+): Promise<Set<string>> {
+  const supabase = await createClient();
+
+  const { data: invoices } = await supabase
+    .from("student_invoices")
+    .select("student_id")
+    .eq("semester_id", semesterId)
+    .eq("invoice_type_id", invoiceTypeId);
+
+  const studentIds = [...new Set((invoices ?? []).map((r) => r.student_id))];
+  if (studentIds.length === 0) return new Set();
+
+  const { data: enrollments } = await supabase
+    .from("student_enrollments")
+    .select("student_id, classrooms!inner(grade_level_id)")
+    .eq("semester_id", semesterId)
+    .eq("status", "enrolled")
+    .in("student_id", studentIds);
+
+  type Row = { student_id: string; classrooms: { grade_level_id: string } };
+  return new Set(
+    ((enrollments ?? []) as unknown as Row[]).map((r) => r.classrooms.grade_level_id),
+  );
+}
+
 function round2(n: number) {
   return Math.round(n * 100) / 100;
 }
