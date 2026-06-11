@@ -13,7 +13,8 @@
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "db:push": "supabase db push",
-    "db:setup": "node scripts/setup-database.mjs"
+    "db:setup": "node scripts/setup-database.mjs",
+    "db:setup:prod": "node scripts/setup-database.mjs --env .env.prod"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

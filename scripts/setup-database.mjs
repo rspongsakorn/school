@@ -18,10 +18,17 @@ import pg from "pg";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 
+// Which env file to read connection details from. Override with `--env <file>`
+// (e.g. `node scripts/setup-database.mjs --env .env.prod`). Defaults to .env.local.
+const ENV_FILE = (() => {
+  const idx = process.argv.indexOf("--env");
+  return idx !== -1 && process.argv[idx + 1] ? process.argv[idx + 1] : ".env.local";
+})();
+
 function loadEnvLocal() {
-  const path = resolve(root, ".env.local");
+  const path = resolve(root, ENV_FILE);
   if (!existsSync(path)) {
-    console.error("Missing .env.local");
+    console.error(`Missing ${ENV_FILE}`);
     process.exit(1);
   }
   const env = {};
@@ -129,6 +136,13 @@ async function runSql(client, label, sql) {
 async function main() {
   const env = loadEnvLocal();
   const connectionString = getConnectionString(env);
+
+  // Show the target up front (no password) so a wrong DB is caught before any DDL runs.
+  const targetHost = connectionString
+    .replace(/^postgres(ql)?:\/\/[^@]*@/, "")
+    .replace(/\/.*$/, "");
+  console.log(`Env file: ${ENV_FILE}`);
+  console.log(`Target:   ${targetHost}\n`);
 
   const migrationsDir = resolve(root, "supabase/migrations");
   const migrationFiles = readdirSync(migrationsDir)
