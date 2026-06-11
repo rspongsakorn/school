@@ -280,7 +280,7 @@ mapping (ราว line 225): `invoiceName: row.receipt_types?.name ?? "—",`
 
 ---
 
-### Task 8: UI — เปลี่ยนหัวคอลัมน์เป็น "ประเภทใบเสร็จ"
+### Task 8: UI — เปลี่ยนหัวคอลัมน์เป็น "ประเภทใบแจ้ง"
 
 **Files:**
 - Modify: `src/components/finance/invoices-panel.tsx:540`
@@ -296,10 +296,37 @@ mapping (ราว line 225): `invoiceName: row.receipt_types?.name ?? "—",`
 เป็น:
 
 ```tsx
-                    <TableHead>ประเภทใบเสร็จ</TableHead>
+                    <TableHead>ประเภทใบแจ้ง</TableHead>
 ```
 
 เซลล์ (`row.invoiceName`) และการ์ด mobile ไม่ต้องแก้ — ค่ามาจาก receipt type แล้ว
+
+---
+
+### Task 8.5: เปลี่ยนคำเรียกที่แสดงผล "ประเภทใบเสร็จ" → "ประเภทใบแจ้ง" ทั้งแอป
+
+เปลี่ยน **เฉพาะวลี** `ประเภทใบเสร็จ` เป็น `ประเภทใบแจ้ง` ในข้อความที่แสดงต่อผู้ใช้
+ห้ามแตะชื่อตาราง/ตัวแปร/route (`receipt_type`, `receiptTypeId`, `/receipt-types`)
+และห้ามแตะคำว่า `ใบเสร็จ` เดี่ยวๆ (ใบเสร็จจริงที่พิมพ์)
+
+**Files (แต่ละไฟล์ใช้ replace_all วลี `ประเภทใบเสร็จ` → `ประเภทใบแจ้ง`):**
+- `src/components/app-sidebar.tsx` — 1 จุด (label เมนู, line 30)
+- `src/components/finance/receipt-types-panel.tsx` — 6 จุด (lines 94, 102, 120, 125, 186)
+- `src/components/finance/invoice-generate-dialog.tsx` — 2 จุด (lines 197, 263)
+- `src/lib/actions/receipt-types.ts` — 4 จุด (lines 34, 36, 70, 72)
+- `src/lib/actions/fee-items.ts` — 1 จุด (line 26)
+- `src/lib/actions/invoices.ts` — 2 จุด (lines 78, 96)
+- `src/lib/actions/payments.ts` — 2 จุด (lines 65, 278)
+
+- [ ] **Step 1: แทนที่ทุกไฟล์ข้างต้น**
+
+ในแต่ละไฟล์ แทนที่ทุก occurrence ของสตริง `ประเภทใบเสร็จ` ด้วย `ประเภทใบแจ้ง`
+(การแทนแบบ substring ปลอดภัย เพราะ `ใบเสร็จ` เดี่ยวๆ ไม่มี prefix `ประเภท`)
+
+- [ ] **Step 2: ยืนยันไม่เหลือคำเดิมในโค้ด**
+
+Run: `git grep -n "ประเภทใบเสร็จ" -- "src/"`
+Expected: ไม่มีผลลัพธ์
 
 ---
 
@@ -336,7 +363,8 @@ git commit -m "feat(invoice): derive invoice name from receipt type, drop invoic
 
 ## Manual verification (หลัง execute ครบ)
 
-- หน้า `/invoices`: คอลัมน์ "ประเภทใบเสร็จ" แสดงชื่อประเภทใบเสร็จของแต่ละใบแจ้ง
-- หน้า `/payments`: เลือกนักเรียน → รายการใบค้างชำระแสดงชื่อประเภทใบเสร็จ
+- หน้า `/invoices`: คอลัมน์ "ประเภทใบแจ้ง" แสดงชื่อประเภทของแต่ละใบแจ้ง
+- เมนู sidebar และหน้า `/receipt-types`: แสดงคำว่า "ประเภทใบแจ้ง"
+- หน้า `/payments`: เลือกนักเรียน → รายการใบค้างชำระแสดงชื่อประเภท
 - ชำระเงินเต็มจำนวน → พิมพ์ใบเสร็จ → line items เป็นรายการค่าธรรมเนียม (เหมือนเดิม)
-- ชำระบางส่วน → พิมพ์ใบเสร็จ → บรรทัดรวบยอดแสดงชื่อประเภทใบเสร็จ
+- ชำระบางส่วน → พิมพ์ใบเสร็จ → บรรทัดรวบยอดแสดงชื่อประเภท

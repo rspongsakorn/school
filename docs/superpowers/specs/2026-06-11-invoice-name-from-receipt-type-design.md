@@ -59,12 +59,30 @@
 
 ### 5. UI (`src/components/finance/invoices-panel.tsx`)
 
-- เปลี่ยนหัวคอลัมน์จาก `ใบแจ้ง` เป็น `ประเภทใบเสร็จ`
+- เปลี่ยนหัวคอลัมน์จาก `ใบแจ้ง` เป็น `ประเภทใบแจ้ง`
 - เซลล์ยังอ้าง `row.invoiceName` เหมือนเดิม (ค่าเปลี่ยนมาจาก receipt type)
 - การ์ดแบบ mobile ก็ใช้ `row.invoiceName` เดิม ไม่ต้องแก้
 
 Component อื่นที่ใช้ `invoiceName` (payments-panel, invoice-payment-dialog,
 receipt-dialog) ไม่ต้องแก้ เพราะรับ field ชื่อเดิม
+
+### 6. เปลี่ยนคำเรียกที่แสดงผล "ประเภทใบเสร็จ" → "ประเภทใบแจ้ง" ทั้งแอป
+
+เปลี่ยนเฉพาะข้อความภาษาไทยที่แสดงต่อผู้ใช้ (วลี `ประเภทใบเสร็จ` → `ประเภทใบแจ้ง`)
+โครงสร้างโค้ด/ชื่อตาราง/ตัวแปร (`receipt_type`, `receiptTypeId`, route `/receipt-types`)
+ยังคงเดิม ไม่ต้องแตะ ไฟล์ที่ต้องแก้:
+
+- `src/components/app-sidebar.tsx` — label เมนู
+- `src/components/finance/receipt-types-panel.tsx` — page title, card title, dialog
+  title, toast
+- `src/components/finance/invoice-generate-dialog.tsx` — label + toast
+- `src/lib/actions/receipt-types.ts` — error messages
+- `src/lib/actions/fee-items.ts` — error message
+- `src/lib/actions/invoices.ts` — error messages
+- `src/lib/actions/payments.ts` — error messages
+
+หมายเหตุ: แทนที่เฉพาะวลี `ประเภทใบเสร็จ` เท่านั้น คำว่า `ใบเสร็จ` เดี่ยวๆ
+(ใบเสร็จจริงที่พิมพ์) ต้องคงไว้
 
 ## สิ่งที่ไม่กระทบ
 
