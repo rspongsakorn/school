@@ -257,7 +257,6 @@ export function FeeItemsSection({ items, invoiceTypeId }: FeeItemsSectionProps) 
                   />
                 </TableHead>
                 <TableHead>ชื่อ</TableHead>
-                <TableHead>ประเภท</TableHead>
                 <TableHead>สถานะ</TableHead>
                 <TableHead className="w-[180px] text-right">จัดการ</TableHead>
               </TableRow>
@@ -298,18 +297,6 @@ export function FeeItemsSection({ items, invoiceTypeId }: FeeItemsSectionProps) 
                               />
                             </TableCell>
                             <TableCell className="font-medium">{item.name}</TableCell>
-                            <TableCell>
-                              <div className="flex flex-wrap items-center gap-1">
-                                {item.isTuition ? (
-                                  <Badge variant="secondary">ค่าเทอมหลัก</Badge>
-                                ) : (
-                                  <span className="text-muted-foreground">รายการเพิ่มเติม</span>
-                                )}
-                                {item.hasReimbursableVariant ? (
-                                  <Badge className="bg-sky-50 text-sky-700 hover:bg-sky-50">2 ราคา</Badge>
-                                ) : null}
-                              </div>
-                            </TableCell>
                             <TableCell>
                               {item.isActive ? (
                                 <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50">
@@ -383,15 +370,6 @@ export function FeeItemsSection({ items, invoiceTypeId }: FeeItemsSectionProps) 
                   onChange={(e) => setDescription(e.target.value)}
                 />
               </div>
-              <Label className="flex w-fit cursor-pointer items-center gap-3">
-                <input
-                  type="checkbox"
-                  className="size-4 rounded border-border accent-primary"
-                  checked={isTuition}
-                  onChange={(e) => setIsTuition(e.target.checked)}
-                />
-                เป็นค่าเทอมหลัก
-              </Label>
               <Label className="flex w-fit cursor-pointer items-center gap-3">
                 <input
                   type="checkbox"

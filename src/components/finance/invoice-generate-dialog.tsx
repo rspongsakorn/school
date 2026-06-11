@@ -275,83 +275,87 @@ export function InvoiceGenerateDialog({
                 </select>
               </div>
 
-              {/* Mode */}
-              <div className="space-y-2">
-                <Label className="text-xs font-medium text-muted-foreground">สร้างให้ใคร</Label>
-                <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
-                  {[
-                    { v: "all",      label: "ทั้งภาค",      hint: `${selectableCandidates.length} คน` },
-                    { v: "selected", label: "เลือกรายชื่อ", hint: "เจาะจง" },
-                  ].map((opt) => (
-                    <button
-                      key={opt.v}
-                      type="button"
-                      onClick={() => setMode(opt.v as "all" | "selected")}
-                      className={cn(
-                        "flex flex-col items-center gap-0.5 rounded-md px-3 py-2 text-sm transition-all",
-                        mode === opt.v
-                          ? "bg-background font-medium text-foreground shadow-sm ring-1 ring-foreground/10"
-                          : "text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      <span>{opt.label}</span>
-                      <span className="text-xs text-muted-foreground">{opt.hint}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {invoiceTypeId && (
+                <>
+                  {/* Mode */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium text-muted-foreground">สร้างให้ใคร</Label>
+                    <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
+                      {[
+                        { v: "all",      label: "ทั้งภาค",      hint: `${selectableCandidates.length} คน` },
+                        { v: "selected", label: "เลือกรายชื่อ", hint: "เจาะจง" },
+                      ].map((opt) => (
+                        <button
+                          key={opt.v}
+                          type="button"
+                          onClick={() => setMode(opt.v as "all" | "selected")}
+                          className={cn(
+                            "flex flex-col items-center gap-0.5 rounded-md px-3 py-2 text-sm transition-all",
+                            mode === opt.v
+                              ? "bg-background font-medium text-foreground shadow-sm ring-1 ring-foreground/10"
+                              : "text-muted-foreground hover:text-foreground",
+                          )}
+                        >
+                          <span>{opt.label}</span>
+                          <span className="text-xs text-muted-foreground">{opt.hint}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-              {/* Fee items */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs font-medium text-muted-foreground">
-                    รายการค่าใช้จ่าย
-                    <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[11px] tabular-nums text-foreground">
-                      {selectedFeeItemIds.size}/{activeItems.length}
-                    </span>
-                  </Label>
-                  <button
-                    type="button"
-                    className="text-xs font-medium text-primary hover:underline"
-                    onClick={() =>
-                      setSelectedFeeItemIds(
-                        allFeeSelected ? new Set() : new Set(activeItems.map((i) => i.id)),
-                      )
-                    }
-                  >
-                    {allFeeSelected ? "ล้างทั้งหมด" : "เลือกทั้งหมด"}
-                  </button>
-                </div>
-                <div className="space-y-1.5">
-                  {activeItems.map((item) => {
-                    const checked = selectedFeeItemIds.has(item.id);
-                    return (
-                      <Label
-                        key={item.id}
-                        className={cn(
-                          "flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-normal transition-colors",
-                          checked
-                            ? "border-primary/30 bg-primary/5"
-                            : "border-border hover:bg-muted/50",
-                        )}
-                      >
-                        <input
-                          type="checkbox"
-                          className="size-4 shrink-0 rounded border-border accent-primary"
-                          checked={checked}
-                          onChange={() => toggleFeeItem(item.id)}
-                        />
-                        <span className="flex-1 truncate">{item.name}</span>
-                        {item.isTuition ? (
-                          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                            เล่าเรียน
-                          </span>
-                        ) : null}
+                  {/* Fee items */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-medium text-muted-foreground">
+                        รายการค่าใช้จ่าย
+                        <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[11px] tabular-nums text-foreground">
+                          {selectedFeeItemIds.size}/{activeItems.length}
+                        </span>
                       </Label>
-                    );
-                  })}
-                </div>
-              </div>
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-primary hover:underline"
+                        onClick={() =>
+                          setSelectedFeeItemIds(
+                            allFeeSelected ? new Set() : new Set(activeItems.map((i) => i.id)),
+                          )
+                        }
+                      >
+                        {allFeeSelected ? "ล้างทั้งหมด" : "เลือกทั้งหมด"}
+                      </button>
+                    </div>
+                    <div className="space-y-1.5">
+                      {activeItems.map((item) => {
+                        const checked = selectedFeeItemIds.has(item.id);
+                        return (
+                          <Label
+                            key={item.id}
+                            className={cn(
+                              "flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-normal transition-colors",
+                              checked
+                                ? "border-primary/30 bg-primary/5"
+                                : "border-border hover:bg-muted/50",
+                            )}
+                          >
+                            <input
+                              type="checkbox"
+                              className="size-4 shrink-0 rounded border-border accent-primary"
+                              checked={checked}
+                              onChange={() => toggleFeeItem(item.id)}
+                            />
+                            <span className="flex-1 truncate">{item.name}</span>
+                            {item.isTuition ? (
+                              <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                เล่าเรียน
+                              </span>
+                            ) : null}
+                          </Label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* RIGHT — students with classroom chips */}
