@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,7 +9,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useSemesterContext } from "@/hooks/use-semester-context";
-import { fetchFeeItems, fetchFeeRateMatrix } from "@/lib/queries/fee-rates";
+import {
+  fetchFeeItems,
+  fetchFeeRateMatrix,
+  fetchInvoicedFeeItemIds,
+  fetchInvoicedGradeIds,
+} from "@/lib/queries/fee-rates";
 import { FeeItemsSection } from "@/components/finance/fee-items-section";
 import { FeeRatesMatrix } from "@/components/finance/fee-rates-matrix";
 import type { InvoiceTypeRow } from "@/lib/data/invoice-types";
@@ -37,6 +43,21 @@ export function InvoiceTypeFeeDialog({ invoiceType, open, onOpenChange }: Props)
     staleTime: 30_000,
   });
 
+  const { data: invoicedItemIds = [] } = useQuery({
+    queryKey: ["invoiced-fee-items", invoiceTypeId],
+    queryFn: () => fetchInvoicedFeeItemIds(invoiceTypeId!),
+    enabled: open && Boolean(invoiceTypeId),
+  });
+
+  const { data: invoicedGradeIds = [] } = useQuery({
+    queryKey: ["invoiced-grades", ctx?.semesterId, invoiceTypeId],
+    queryFn: () => fetchInvoicedGradeIds(ctx!.semesterId, invoiceTypeId!),
+    enabled: open && Boolean(ctx?.semesterId) && Boolean(invoiceTypeId),
+  });
+
+  const lockedItemIds = useMemo(() => new Set(invoicedItemIds), [invoicedItemIds]);
+  const lockedGradeIds = useMemo(() => new Set(invoicedGradeIds), [invoicedGradeIds]);
+
   const isLoading = ctxLoading || matrixLoading;
 
   return (
@@ -52,8 +73,17 @@ export function InvoiceTypeFeeDialog({ invoiceType, open, onOpenChange }: Props)
             <div className="h-40 animate-pulse rounded-lg bg-muted" />
           ) : ctx && matrix && invoiceTypeId ? (
             <>
-              <FeeItemsSection items={feeItems} invoiceTypeId={invoiceTypeId} />
-              <FeeRatesMatrix semesterId={ctx.semesterId} matrix={matrix} />
+              <FeeItemsSection
+                items={feeItems}
+                invoiceTypeId={invoiceTypeId}
+                lockedItemIds={lockedItemIds}
+              />
+              <FeeRatesMatrix
+                semesterId={ctx.semesterId}
+                invoiceTypeId={invoiceTypeId}
+                matrix={matrix}
+                lockedGradeIds={lockedGradeIds}
+              />
             </>
           ) : null}
         </div>
