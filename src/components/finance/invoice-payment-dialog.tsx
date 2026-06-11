@@ -33,10 +33,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useSemesterContext } from "@/hooks/use-semester-context";
-import { getStudentOutstandingAction, recordPayment } from "@/lib/actions/payments";
+import { recordPayment } from "@/lib/actions/payments";
 import { formatBaht } from "@/lib/format";
 import type { InvoiceListRow } from "@/lib/queries/invoices";
-import type { OutstandingInvoiceRow } from "@/lib/data/invoices";
 
 const METHOD_ITEMS = [
   { value: "cash", label: "เงินสด" },
@@ -55,8 +54,6 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
   const { ctx } = useSemesterContext();
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  const [loading, setLoading] = useState(false);
-  const [outstanding, setOutstanding] = useState<OutstandingInvoiceRow[]>([]);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<"cash" | "transfer">("cash");
   const [transferRef, setTransferRef] = useState("");
@@ -64,28 +61,13 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const semesterId = ctx?.semesterId ?? null;
-
   useEffect(() => {
-    if (!open || !invoice || !semesterId) return;
-    setAmount("");
+    if (!open || !invoice) return;
     setMethod("cash");
     setTransferRef("");
     setNote("");
-    setOutstanding([]);
-    setLoading(true);
-
-    getStudentOutstandingAction(invoice.studentId, semesterId).then((result) => {
-      setLoading(false);
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
-      }
-      setOutstanding(result.invoices);
-      const totalDue = result.invoices.reduce((sum, r) => sum + r.outstanding, 0);
-      setAmount(totalDue > 0 ? String(totalDue) : "");
-    });
-  }, [open, invoice, semesterId]);
+    setAmount(invoice.outstanding > 0 ? String(invoice.outstanding) : "");
+  }, [open, invoice]);
 
   function printReceipt(paymentId: string) {
     if (iframeRef.current) {
@@ -104,9 +86,9 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
       toast.error("กรุณาระบุจำนวนเงิน");
       return;
     }
-    const totalDue = outstanding.reduce((sum, r) => sum + r.outstanding, 0);
-    if (parsed > totalDue) {
-      toast.error(`จำนวนเงินเกินยอดค้างรวม (${formatBaht(totalDue)})`);
+    const outstanding = invoice?.outstanding ?? 0;
+    if (parsed > outstanding) {
+      toast.error(`จำนวนเงินเกินยอดค้าง (${formatBaht(outstanding)})`);
       return;
     }
     if (method === "transfer" && !transferRef.trim()) {
@@ -124,6 +106,7 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
 
     setSubmitting(true);
     const result = await recordPayment({
+      invoiceId: invoice.id,
       studentId: invoice.studentId,
       academicYearId: ctx.academicYearId,
       academicYearName: ctx.academicYearName,
@@ -150,8 +133,6 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
     router.refresh();
   }
 
-  const totalDue = outstanding.reduce((sum, r) => sum + r.outstanding, 0);
-
   return (
     <>
       <iframe ref={iframeRef} className="hidden" title="receipt" />
@@ -166,38 +147,20 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
             </DialogHeader>
 
             <div className="grid gap-4 py-4">
-              {loading ? (
-                <p className="text-sm text-muted-foreground">กำลังโหลดข้อมูล...</p>
-              ) : outstanding.length === 0 ? (
+              {!invoice ? (
+                <p className="text-sm text-muted-foreground">ไม่พบรายการค้างชำระ</p>
+              ) : invoice.outstanding <= 0 ? (
                 <p className="text-sm text-muted-foreground">ไม่พบรายการค้างชำระ</p>
               ) : (
                 <div className="rounded-md border text-sm">
-                  {outstanding.map((inv) => (
-                    <div key={inv.id} className="border-b last:border-b-0">
-                      <div className="flex items-center justify-between px-3 py-2">
-                        <span className="font-medium truncate max-w-[220px]">{inv.invoiceName}</span>
-                        <span className="tabular-nums font-medium">{formatBaht(inv.outstanding)}</span>
-                      </div>
-                      {inv.lines.length > 0 && (
-                        <div className="px-3 pb-2 space-y-0.5">
-                          {inv.lines.map((line) => (
-                            <div key={line.id} className="flex items-center justify-between text-xs text-muted-foreground">
-                              <span className="truncate max-w-[200px]">· {line.description}</span>
-                              <span className="tabular-nums">{formatBaht(line.amount)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  <div className="flex items-center justify-between px-3 py-2 font-semibold bg-muted/40">
-                    <span>รวมค้างชำระ</span>
-                    <span className="tabular-nums">{formatBaht(totalDue)}</span>
+                  <div className="flex items-center justify-between px-3 py-2">
+                    <span className="font-medium truncate max-w-[220px]">{invoice.invoiceName}</span>
+                    <span className="tabular-nums font-medium">{formatBaht(invoice.outstanding)}</span>
                   </div>
                 </div>
               )}
 
-              {!loading && outstanding.length > 0 ? (
+              {invoice && invoice.outstanding > 0 ? (
                 <>
                   <div className="grid gap-2">
                     <Label htmlFor="pay-amount">จำนวนเงิน (บาท)</Label>
@@ -205,7 +168,7 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
                       id="pay-amount"
                       type="number"
                       min={0.01}
-                      max={totalDue}
+                      max={invoice?.outstanding}
                       step="0.01"
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
@@ -268,7 +231,7 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
               >
                 ยกเลิก
               </Button>
-              <Button type="submit" disabled={submitting || loading || outstanding.length === 0}>
+              <Button type="submit" disabled={submitting || !invoice || invoice.outstanding <= 0}>
                 {submitting ? "กำลังบันทึก..." : "บันทึกการชำระ"}
               </Button>
             </DialogFooter>
