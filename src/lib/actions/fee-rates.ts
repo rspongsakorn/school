@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import type { ActionState } from "@/lib/actions/academic-years";
 import { requireAdminAction } from "@/lib/auth/require-admin";
 import { getSemesterById } from "@/lib/data/semesters";
+import { listInvoicedGradeLevelIds } from "@/lib/data/invoices";
+import { partitionRateEntriesByLock } from "@/lib/finance/fee-rate-edit-eligibility";
 import { createClient } from "@/lib/supabase/server";
 
 export type FeeRateUpsertEntry = {
@@ -20,6 +22,7 @@ function revalidateFeePaths() {
 
 export async function upsertFeeRates(
   semesterId: string,
+  invoiceTypeId: string,
   entries: FeeRateUpsertEntry[],
 ): Promise<ActionState> {
   const auth = await requireAdminAction();
@@ -27,6 +30,15 @@ export async function upsertFeeRates(
 
   const semester = await getSemesterById(semesterId);
   if (!semester) return { ok: false, error: "ไม่พบภาคเรียน" };
+
+  const lockedGradeIds = await listInvoicedGradeLevelIds(semesterId, invoiceTypeId);
+  const { locked } = partitionRateEntriesByLock(entries, lockedGradeIds);
+  if (locked.length > 0) {
+    return {
+      ok: false,
+      error: "ออกใบแจ้งชำระแล้ว ไม่สามารถแก้อัตราของชั้นที่ออกบิลแล้วได้",
+    };
+  }
 
   const supabase = await createClient();
 
@@ -37,7 +49,7 @@ export async function upsertFeeRates(
     .eq("is_active", true)
     .maybeSingle();
 
-  const invoiceTypeId = defaultInvoiceType?.id ?? null;
+  const defaultInvoiceTypeId = defaultInvoiceType?.id ?? null;
 
   for (const entry of entries) {
     if (entry.amount < 0) {
@@ -55,7 +67,7 @@ export async function upsertFeeRates(
         fee_item_id: entry.feeItemId,
         amount: entry.amount,
         amount_reimbursable: entry.amountReimbursable,
-        invoice_type_id: invoiceTypeId,
+        invoice_type_id: defaultInvoiceTypeId,
       },
       { onConflict: "academic_year_id,semester_id,grade_level_id,fee_item_id" },
     );
