@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +35,7 @@ import {
 import { useSemesterContext } from "@/hooks/use-semester-context";
 import { recordPayment } from "@/lib/actions/payments";
 import { formatBaht } from "@/lib/format";
+import { fetchInvoiceLines } from "@/lib/queries/invoices";
 import type { InvoiceListRow } from "@/lib/queries/invoices";
 
 const METHOD_ITEMS = [
@@ -60,6 +61,12 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const { data: lines = [] } = useQuery({
+    queryKey: ["invoice-lines", invoice?.id],
+    queryFn: () => fetchInvoiceLines(invoice!.id),
+    enabled: !!invoice?.id && open,
+  });
 
   useEffect(() => {
     if (!open || !invoice) return;
@@ -147,16 +154,26 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
             </DialogHeader>
 
             <div className="grid gap-4 py-4">
-              {!invoice ? (
-                <p className="text-sm text-muted-foreground">ไม่พบรายการค้างชำระ</p>
-              ) : invoice.outstanding <= 0 ? (
+              {!invoice || invoice.outstanding <= 0 ? (
                 <p className="text-sm text-muted-foreground">ไม่พบรายการค้างชำระ</p>
               ) : (
-                <div className="rounded-md border text-sm">
-                  <div className="flex items-center justify-between px-3 py-2">
-                    <span className="font-medium truncate max-w-[220px]">{invoice.invoiceName}</span>
-                    <span className="tabular-nums font-medium">{formatBaht(invoice.outstanding)}</span>
+                <div className="rounded-md border text-sm overflow-hidden">
+                  {/* invoice header row */}
+                  <div className="flex items-center justify-between px-3 py-2 bg-muted/50 font-medium">
+                    <span className="truncate max-w-[220px]">{invoice.invoiceName}</span>
+                    <span className="tabular-nums shrink-0 ml-2">{formatBaht(invoice.outstanding)}</span>
                   </div>
+                  {/* line items */}
+                  {lines.length > 0 && (
+                    <div className="divide-y divide-border/60">
+                      {lines.map((line) => (
+                        <div key={line.id} className="flex items-center justify-between px-3 py-1.5 text-xs text-muted-foreground">
+                          <span>· {line.description}</span>
+                          <span className="tabular-nums shrink-0 ml-2">{formatBaht(line.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

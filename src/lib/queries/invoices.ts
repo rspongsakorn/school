@@ -431,6 +431,18 @@ export async function fetchInvoiceCandidates(semesterId: string): Promise<Invoic
     .sort((a, b) => a.studentCode.localeCompare(b.studentCode, undefined, { numeric: true }));
 }
 
+export type InvoiceLineRow = { id: string; description: string; amount: number };
+
+export async function fetchInvoiceLines(invoiceId: string): Promise<InvoiceLineRow[]> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("invoice_lines")
+    .select("id, description, amount")
+    .eq("invoice_id", invoiceId)
+    .order("id");
+  return (data ?? []).map((r) => ({ id: r.id, description: r.description, amount: Number(r.amount) }));
+}
+
 function round2(n: number) {
   return Math.round(n * 100) / 100;
 }
