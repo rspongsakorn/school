@@ -23,10 +23,17 @@ import type { FeeRateMatrix } from "@/lib/data/fee-rates";
 
 type FeeRatesMatrixProps = {
   semesterId: string;
+  invoiceTypeId: string;
   matrix: FeeRateMatrix;
+  lockedGradeIds: Set<string>;
 };
 
-export function FeeRatesMatrix({ semesterId, matrix }: FeeRatesMatrixProps) {
+export function FeeRatesMatrix({
+  semesterId,
+  invoiceTypeId,
+  matrix,
+  lockedGradeIds,
+}: FeeRatesMatrixProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   type DraftCell = { amount: string; amountReimbursable: string };
@@ -68,6 +75,7 @@ export function FeeRatesMatrix({ semesterId, matrix }: FeeRatesMatrixProps) {
   const changedEntries = useMemo(() => {
     const entries: FeeRateUpsertEntry[] = [];
     for (const grade of matrix.grades) {
+      if (lockedGradeIds.has(grade.id)) continue;
       for (const item of matrix.items) {
         const key = feeRateKey(grade.id, item.id);
         const cell = draft[key];
@@ -103,7 +111,7 @@ export function FeeRatesMatrix({ semesterId, matrix }: FeeRatesMatrixProps) {
       }
     }
     return entries;
-  }, [draft, matrix]);
+  }, [draft, matrix, lockedGradeIds]);
 
   function updateCell(
     key: string,
@@ -123,7 +131,7 @@ export function FeeRatesMatrix({ semesterId, matrix }: FeeRatesMatrixProps) {
     }
 
     setSaving(true);
-    const result = await upsertFeeRates(semesterId, changedEntries);
+    const result = await upsertFeeRates(semesterId, invoiceTypeId, changedEntries);
     setSaving(false);
 
     if (!result.ok) {
@@ -177,9 +185,20 @@ export function FeeRatesMatrix({ semesterId, matrix }: FeeRatesMatrixProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {matrix.grades.map((grade) => (
+                {matrix.grades.map((grade) => {
+                  const rowLocked = lockedGradeIds.has(grade.id);
+                  return (
                   <TableRow key={grade.id}>
-                    <TableCell className="sticky left-0 bg-card font-medium">{grade.name}</TableCell>
+                    <TableCell className="sticky left-0 bg-card font-medium">
+                      <div className="flex items-center gap-2">
+                        <span>{grade.name}</span>
+                        {rowLocked ? (
+                          <span className="rounded bg-muted px-1 text-[10px] text-muted-foreground">
+                            ออกบิลแล้ว
+                          </span>
+                        ) : null}
+                      </div>
+                    </TableCell>
                     {matrix.items.map((item) => {
                       const key = feeRateKey(grade.id, item.id);
                       return (
@@ -196,6 +215,7 @@ export function FeeRatesMatrix({ semesterId, matrix }: FeeRatesMatrixProps) {
                                   value={draft[key]?.amount ?? ""}
                                   onChange={(e) => updateCell(key, "amount", e.target.value)}
                                   placeholder="0"
+                                  disabled={rowLocked}
                                 />
                               </div>
                               <div className="flex items-center gap-1">
@@ -208,6 +228,7 @@ export function FeeRatesMatrix({ semesterId, matrix }: FeeRatesMatrixProps) {
                                   value={draft[key]?.amountReimbursable ?? ""}
                                   onChange={(e) => updateCell(key, "amountReimbursable", e.target.value)}
                                   placeholder="(ว่าง = ใช้ราคาปกติ)"
+                                  disabled={rowLocked}
                                 />
                               </div>
                             </div>
@@ -220,6 +241,7 @@ export function FeeRatesMatrix({ semesterId, matrix }: FeeRatesMatrixProps) {
                               value={draft[key]?.amount ?? ""}
                               onChange={(e) => updateCell(key, "amount", e.target.value)}
                               placeholder="0"
+                              disabled={rowLocked}
                             />
                           )}
                         </TableCell>
@@ -229,7 +251,8 @@ export function FeeRatesMatrix({ semesterId, matrix }: FeeRatesMatrixProps) {
                       {gradeTotals[grade.id] > 0 ? formatBaht(gradeTotals[grade.id]) : <span className="text-muted-foreground font-normal">—</span>}
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
