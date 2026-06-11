@@ -57,9 +57,6 @@ const methodItems = [
   { value: "transfer", label: PAYMENT_METHOD_LABELS.transfer },
 ];
 
-function round2(n: number) {
-  return Math.round(n * 100) / 100;
-}
 
 export function PaymentsPanel() {
   useRequireRole(["admin", "finance"]);
@@ -87,6 +84,7 @@ export function PaymentsPanel() {
     gradeClassroom: string;
   } | null>(null);
   const [outstanding, setOutstanding] = useState<OutstandingInvoiceRow[]>([]);
+  const [selectedInvoice, setSelectedInvoice] = useState<OutstandingInvoiceRow | null>(null);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<"cash" | "transfer">("cash");
   const [transferRef, setTransferRef] = useState("");
@@ -224,6 +222,7 @@ export function PaymentsPanel() {
     if (!ctx?.semesterId) return;
     setLastPayment(null);
     setSelectedStudent(student);
+    setSelectedInvoice(null);
     setSearchQuery("");
     setSearchResults([]);
 
@@ -234,29 +233,22 @@ export function PaymentsPanel() {
     }
 
     setOutstanding(result.invoices);
-    const totalDue = result.invoices.reduce((sum, r) => sum + r.outstanding, 0);
-    setAmount(totalDue > 0 ? String(totalDue) : "");
-
-    // Move focus straight to the amount field for fast keyboard entry
-    if (totalDue > 0) {
-      setTimeout(() => {
-        amountInputRef.current?.focus();
-        amountInputRef.current?.select();
-      }, 50);
-    }
+    setAmount("");
   }
 
   function requestRecord() {
     if (!selectedStudent || !ctx) return;
+    if (!selectedInvoice) {
+      toast.error("เลือกใบแจ้งที่จะชำระ");
+      return;
+    }
     const parsedAmount = Number.parseFloat(amount);
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
       toast.error("กรุณาระบุจำนวนเงิน");
       return;
     }
-
-    const totalDue = round2(outstanding.reduce((sum, r) => sum + r.outstanding, 0));
-    if (parsedAmount > totalDue) {
-      toast.error(`จำนวนเงินเกินยอดค้างรวม (${formatBaht(totalDue)})`);
+    if (parsedAmount > selectedInvoice.outstanding) {
+      toast.error(`จำนวนเงินเกินยอดค้าง (${formatBaht(selectedInvoice.outstanding)})`);
       return;
     }
 
@@ -264,11 +256,12 @@ export function PaymentsPanel() {
   }
 
   async function handleRecord() {
-    if (!selectedStudent || !ctx) return;
+    if (!selectedInvoice || !selectedStudent || !ctx) return;
     const parsedAmount = Number.parseFloat(amount);
 
     setSubmitting(true);
     const result = await recordPayment({
+      invoiceId: selectedInvoice.id,
       studentId: selectedStudent.id,
       academicYearId: ctx.academicYearId,
       academicYearName: ctx.academicYearName,
@@ -291,6 +284,7 @@ export function PaymentsPanel() {
     printReceipt(result.paymentId);
     setSelectedStudent(null);
     setOutstanding([]);
+    setSelectedInvoice(null);
     setAmount("");
     setNote("");
     setTransferRef("");
@@ -357,9 +351,9 @@ export function PaymentsPanel() {
     );
   }
 
-  const totalOutstanding = round2(outstanding.reduce((sum, r) => sum + r.outstanding, 0));
+  const selectedOutstanding = selectedInvoice?.outstanding ?? 0;
   const parsedAmount = Number.parseFloat(amount);
-  const amountExceeds = Number.isFinite(parsedAmount) && parsedAmount > totalOutstanding;
+  const amountExceeds = Number.isFinite(parsedAmount) && parsedAmount > selectedOutstanding;
 
   return (
     <>
@@ -527,12 +521,13 @@ export function PaymentsPanel() {
                         <TableRow>
                           <TableHead>ใบแจ้ง</TableHead>
                           <TableHead className="text-right">ค้าง</TableHead>
+                          <TableHead className="text-right" />
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {outstanding.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={2} className="text-muted-foreground">
+                            <TableCell colSpan={3} className="text-muted-foreground">
                               ไม่มีใบค้างชำระ
                             </TableCell>
                           </TableRow>
@@ -544,6 +539,23 @@ export function PaymentsPanel() {
                                 <TableCell className="text-right tabular-nums">
                                   {formatBaht(inv.outstanding)}
                                 </TableCell>
+                                <TableCell className="text-right">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={selectedInvoice?.id === inv.id ? "default" : "outline"}
+                                    onClick={() => {
+                                      setSelectedInvoice(inv);
+                                      setAmount(String(inv.outstanding));
+                                      setTimeout(() => {
+                                        amountInputRef.current?.focus();
+                                        amountInputRef.current?.select();
+                                      }, 50);
+                                    }}
+                                  >
+                                    ชำระ
+                                  </Button>
+                                </TableCell>
                               </TableRow>
                               {inv.lines.map((line) => (
                                 <TableRow key={line.id} className="border-0">
@@ -553,6 +565,7 @@ export function PaymentsPanel() {
                                   <TableCell className="py-0.5 text-right text-xs tabular-nums text-muted-foreground">
                                     {formatBaht(line.amount)}
                                   </TableCell>
+                                  <TableCell />
                                 </TableRow>
                               ))}
                             </Fragment>
@@ -561,6 +574,14 @@ export function PaymentsPanel() {
                       </TableBody>
                     </Table>
 
+                    {selectedInvoice ? (
+                      <p className="text-sm">
+                        กำลังชำระ: <span className="font-medium">{selectedInvoice.invoiceName}</span>
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">เลือกใบแจ้งที่จะชำระจากตารางด้านบน</p>
+                    )}
+
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="grid gap-2">
                         <div className="flex items-center justify-between">
@@ -568,8 +589,8 @@ export function PaymentsPanel() {
                           <button
                             type="button"
                             className="text-xs text-primary hover:underline disabled:opacity-50"
-                            disabled={totalOutstanding <= 0}
-                            onClick={() => setAmount(String(totalOutstanding))}
+                            disabled={!selectedInvoice || selectedOutstanding <= 0}
+                            onClick={() => setAmount(String(selectedOutstanding))}
                           >
                             ชำระเต็มจำนวน
                           </button>
@@ -585,7 +606,7 @@ export function PaymentsPanel() {
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
                               e.preventDefault();
-                              if (!submitting && outstanding.length > 0 && !amountExceeds) {
+                              if (!submitting && selectedInvoice && !amountExceeds) {
                                 requestRecord();
                               }
                             }
@@ -600,8 +621,8 @@ export function PaymentsPanel() {
                           )}
                         >
                           {amountExceeds
-                            ? `เกินยอดค้างรวม (${formatBaht(totalOutstanding)})`
-                            : `ยอดค้างรวม ${formatBaht(totalOutstanding)}`}
+                            ? `เกินยอดค้าง (${formatBaht(selectedOutstanding)})`
+                            : `ยอดค้าง ${formatBaht(selectedOutstanding)}`}
                         </p>
                       </div>
                       <div className="grid gap-2">
@@ -645,7 +666,7 @@ export function PaymentsPanel() {
                       type="button"
                       className="w-full"
                       onClick={requestRecord}
-                      disabled={submitting || outstanding.length === 0 || amountExceeds}
+                      disabled={submitting || !selectedInvoice || amountExceeds || !(parsedAmount > 0)}
                     >
                       บันทึกและออกใบเสร็จ
                     </Button>
