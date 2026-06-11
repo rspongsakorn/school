@@ -112,6 +112,7 @@ export type Database = {
         status: "unpaid" | "partial" | "paid";
         created_at: string;
         is_reimbursable: boolean;
+        receipt_type_id: string;
       }>;
       invoice_lines: TableDef<{
         id: string;
