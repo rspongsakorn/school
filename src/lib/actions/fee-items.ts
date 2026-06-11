@@ -5,6 +5,7 @@ import type { ActionState } from "@/lib/actions/academic-years";
 import { requireAdminAction } from "@/lib/auth/require-admin";
 import { createClient } from "@/lib/supabase/server";
 import { feeItemDeleteBlockedReason } from "@/lib/finance/fee-item-delete-eligibility";
+import { feeItemLockedFieldsChanged } from "@/lib/finance/fee-item-edit-eligibility";
 
 function revalidateFeePaths() {
   revalidatePath("/invoice-types");
@@ -58,11 +59,51 @@ export async function updateFeeItem(
   if (!name) return { ok: false, error: "กรุณาระบุชื่อรายการ" };
 
   const supabase = await createClient();
+
+  const { data: current } = await supabase
+    .from("fee_items")
+    .select("name, description, is_tuition, has_reimbursable_variant")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!current) return { ok: false, error: "ไม่พบรายการค่าใช้จ่าย" };
+
+  const nextDescription = input.description?.trim() || null;
+
+  const { count } = await supabase
+    .from("invoice_lines")
+    .select("id", { count: "exact", head: true })
+    .eq("fee_item_id", id);
+
+  const referenced = (count ?? 0) > 0;
+  if (
+    referenced &&
+    feeItemLockedFieldsChanged(
+      {
+        name: current.name,
+        description: current.description,
+        isTuition: current.is_tuition,
+        hasReimbursableVariant: current.has_reimbursable_variant,
+      },
+      {
+        name,
+        description: nextDescription,
+        isTuition: input.isTuition,
+        hasReimbursableVariant: input.hasReimbursableVariant,
+      },
+    )
+  ) {
+    return {
+      ok: false,
+      error: "ออกใบแจ้งชำระแล้ว ไม่สามารถแก้ไขรายการนี้ได้ (แก้ได้เฉพาะสถานะใช้งาน)",
+    };
+  }
+
   const { error } = await supabase
     .from("fee_items")
     .update({
       name,
-      description: input.description?.trim() || null,
+      description: nextDescription,
       is_tuition: input.isTuition,
       is_active: input.isActive,
       has_reimbursable_variant: input.hasReimbursableVariant,
