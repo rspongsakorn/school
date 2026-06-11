@@ -21,6 +21,7 @@ export type InvoiceListRow = {
   discountType: "percent" | "fixed" | null;
   discountValue: number | null;
   isReimbursable: boolean;
+  receiptTypeId: string;
   createdAt: string;
   hasActivePaymentAllocation: boolean;
 };
@@ -153,6 +154,7 @@ export async function fetchAllInvoices(params: {
       discount_type,
       discount_value,
       is_reimbursable,
+      receipt_type_id,
       created_at,
       students!inner ( student_code, first_name, last_name )
     `,
@@ -174,6 +176,7 @@ export async function fetchAllInvoices(params: {
     discount_type: "percent" | "fixed" | null;
     discount_value: number | null;
     is_reimbursable: boolean;
+    receipt_type_id: string;
     created_at: string;
     students: { student_code: string; first_name: string; last_name: string };
   };
@@ -202,6 +205,7 @@ export async function fetchAllInvoices(params: {
       discountType: row.discount_type,
       discountValue: row.discount_value != null ? Number(row.discount_value) : null,
       isReimbursable: row.is_reimbursable,
+      receiptTypeId: row.receipt_type_id,
       createdAt: row.created_at,
       hasActivePaymentAllocation: activeAllocationIds.has(row.id),
     };
@@ -286,6 +290,7 @@ export async function fetchInvoicesPaginated(params: {
       discount_type,
       discount_value,
       is_reimbursable,
+      receipt_type_id,
       created_at,
       students!inner ( student_code, first_name, last_name )
     `,
@@ -332,6 +337,7 @@ export async function fetchInvoicesPaginated(params: {
     discount_type: "percent" | "fixed" | null;
     discount_value: number | null;
     is_reimbursable: boolean;
+    receipt_type_id: string;
     created_at: string;
     students: { student_code: string; first_name: string; last_name: string };
   };
@@ -359,6 +365,7 @@ export async function fetchInvoicesPaginated(params: {
       discountType: row.discount_type,
       discountValue: row.discount_value != null ? Number(row.discount_value) : null,
       isReimbursable: row.is_reimbursable,
+      receiptTypeId: row.receipt_type_id,
       createdAt: row.created_at,
       hasActivePaymentAllocation: activeAllocationInvoiceIds.has(row.id),
     };
