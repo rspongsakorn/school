@@ -115,3 +115,49 @@ export async function fetchFeeRateMatrix(
     rates,
   };
 }
+
+/** fee_item ids of this invoice type that already appear on an issued invoice. */
+export async function fetchInvoicedFeeItemIds(invoiceTypeId: string): Promise<string[]> {
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from("invoice_lines")
+    .select("fee_item_id, fee_items!inner(invoice_type_id)")
+    .eq("fee_items.invoice_type_id", invoiceTypeId);
+
+  if (error || !data) return [];
+
+  type Row = { fee_item_id: string };
+  return [...new Set((data as unknown as Row[]).map((row) => row.fee_item_id))];
+}
+
+/** grade_level ids that have an issued invoice of this type in this semester. */
+export async function fetchInvoicedGradeIds(
+  semesterId: string,
+  invoiceTypeId: string,
+): Promise<string[]> {
+  const supabase = createClient();
+
+  const { data: invoices } = await supabase
+    .from("student_invoices")
+    .select("student_id")
+    .eq("semester_id", semesterId)
+    .eq("invoice_type_id", invoiceTypeId);
+
+  const studentIds = [...new Set((invoices ?? []).map((r) => r.student_id))];
+  if (studentIds.length === 0) return [];
+
+  const { data: enrollments } = await supabase
+    .from("student_enrollments")
+    .select("student_id, classrooms!inner(grade_level_id)")
+    .eq("semester_id", semesterId)
+    .eq("status", "enrolled")
+    .in("student_id", studentIds);
+
+  type Row = { student_id: string; classrooms: { grade_level_id: string } };
+  return [
+    ...new Set(
+      ((enrollments ?? []) as unknown as Row[]).map((r) => r.classrooms.grade_level_id),
+    ),
+  ];
+}
