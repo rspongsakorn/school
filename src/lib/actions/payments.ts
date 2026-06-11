@@ -42,11 +42,20 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
 
   const supabase = await createClient();
 
+  type InvoiceRow = {
+    id: string;
+    total_amount: number;
+    paid_amount: number;
+    receipt_type_id: string | null;
+    student_id: string;
+    receipt_types: { name: string } | null;
+  };
+
   const { data: invoice } = await supabase
     .from("student_invoices")
     .select("id, total_amount, paid_amount, receipt_type_id, student_id, receipt_types ( name )")
     .eq("id", input.invoiceId)
-    .maybeSingle();
+    .maybeSingle() as unknown as { data: InvoiceRow | null };
 
   if (!invoice) return { ok: false, error: "ไม่พบใบแจ้งชำระ" };
   if (invoice.student_id !== input.studentId) {
@@ -90,8 +99,7 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
   const gradeByStudent = await getStudentGradeMap(input.semesterId);
   const gradeClassroom = gradeByStudent.get(input.studentId) ?? "—";
 
-  const invoiceName =
-    (invoice as unknown as { receipt_types: { name: string } | null }).receipt_types?.name ?? "—";
+  const invoiceName = invoice.receipt_types?.name ?? "—";
   const allocationDetails = allocations.map((a) => ({
     invoiceId: a.invoiceId,
     invoiceName,

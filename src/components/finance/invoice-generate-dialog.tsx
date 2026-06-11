@@ -216,8 +216,6 @@ export function InvoiceGenerateDialog({
     const result = await generateInvoices({
       semesterId,
       academicYearId,
-      academicYearName,
-      semesterNumber,
       receiptTypeId,
       feeItemIds,
       studentIds,

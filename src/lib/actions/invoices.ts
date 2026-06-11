@@ -16,8 +16,6 @@ export type GenerateInvoicesResult =
 type GenerateInput = {
   semesterId: string;
   academicYearId: string;
-  academicYearName: string;
-  semesterNumber: number;
   receiptTypeId: string;
   feeItemIds: string[];
   studentIds?: string[];
