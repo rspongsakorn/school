@@ -333,6 +333,15 @@ export async function importPaymentsBackfill(input: {
     const paidAt = `${row.paidDateIso}T12:00:00+07:00`;
     const gradeClassroom = gradeByStudent.get(student.id) ?? "—";
 
+    // Derive the receipt type from the (FIFO-first) invoice this row settles;
+    // fall back to the default type for any row we can't match.
+    const { data: primaryInvoice } = await supabase
+      .from("student_invoices")
+      .select("receipt_type_id")
+      .eq("id", allocations[0].invoiceId)
+      .maybeSingle();
+    const rowReceiptTypeId = primaryInvoice?.receipt_type_id ?? receiptTypeId;
+
     const snapshot: Record<string, unknown> = {
       receiptNumber,
       paidAt,
@@ -383,7 +392,7 @@ export async function importPaymentsBackfill(input: {
     const { error: receiptError } = await supabase.from("receipts").insert({
       payment_id: payment.id,
       receipt_number: receiptNumber,
-      receipt_type_id: receiptTypeId,
+      receipt_type_id: rowReceiptTypeId,
       snapshot_data: snapshot,
     });
     if (receiptError) {
