@@ -27,7 +27,7 @@ const basicNav = [
 ];
 
 const financeNav = [
-  { href: "/receipt-types", label: "ประเภทใบแจ้ง", icon: Receipt },
+  { href: "/invoice-types", label: "ประเภทใบแจ้ง", icon: Receipt },
   { href: "/invoices", label: "ใบแจ้งชำระ", icon: FileText },
   { href: "/payments", label: "บันทึกการจ่าย", icon: CreditCard },
   { href: "/reports/daily", label: "รายรับรายวัน", icon: ChartColumn },

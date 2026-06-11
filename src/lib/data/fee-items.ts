@@ -8,22 +8,22 @@ export type FeeItemRow = {
   isActive: boolean;
   sortOrder: number;
   hasReimbursableVariant: boolean;
-  receiptTypeId: string;
+  invoiceTypeId: string;
 };
 
-export async function listFeeItems(receiptTypeId?: string): Promise<FeeItemRow[]> {
+export async function listFeeItems(invoiceTypeId?: string): Promise<FeeItemRow[]> {
   const supabase = await createClient();
 
   let query = supabase
     .from("fee_items")
     .select(
-      "id, name, description, is_tuition, is_active, sort_order, has_reimbursable_variant, receipt_type_id",
+      "id, name, description, is_tuition, is_active, sort_order, has_reimbursable_variant, invoice_type_id",
     )
     .order("sort_order", { ascending: true })
     .order("name", { ascending: true });
 
-  if (receiptTypeId) {
-    query = query.eq("receipt_type_id", receiptTypeId);
+  if (invoiceTypeId) {
+    query = query.eq("invoice_type_id", invoiceTypeId);
   }
 
   const { data, error } = await query;
@@ -38,6 +38,6 @@ export async function listFeeItems(receiptTypeId?: string): Promise<FeeItemRow[]
     isActive: row.is_active,
     sortOrder: row.sort_order,
     hasReimbursableVariant: row.has_reimbursable_variant,
-    receiptTypeId: row.receipt_type_id,
+    invoiceTypeId: row.invoice_type_id,
   }));
 }

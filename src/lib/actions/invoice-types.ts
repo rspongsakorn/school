@@ -5,12 +5,12 @@ import type { ActionState } from "@/lib/actions/academic-years";
 import { requireAdminAction } from "@/lib/auth/require-admin";
 import { createClient } from "@/lib/supabase/server";
 
-function revalidateReceiptTypePaths() {
-  revalidatePath("/receipt-types");
+function revalidateInvoiceTypePaths() {
+  revalidatePath("/invoice-types");
   revalidatePath("/payments");
 }
 
-export async function createReceiptType(input: {
+export async function createInvoiceType(input: {
   code: string;
   name: string;
   description?: string;
@@ -23,7 +23,7 @@ export async function createReceiptType(input: {
   if (!code || !name) return { ok: false, error: "กรุณาระบุรหัสและชื่อ" };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("receipt_types").insert({
+  const { error } = await supabase.from("invoice_types").insert({
     code,
     name,
     description: input.description?.trim() || null,
@@ -35,11 +35,11 @@ export async function createReceiptType(input: {
   }
   if (error) return { ok: false, error: "ไม่สามารถเพิ่มประเภทใบแจ้งได้" };
 
-  revalidateReceiptTypePaths();
+  revalidateInvoiceTypePaths();
   return { ok: true };
 }
 
-export async function updateReceiptType(
+export async function updateInvoiceType(
   id: string,
   input: {
     code: string;
@@ -57,7 +57,7 @@ export async function updateReceiptType(
 
   const supabase = await createClient();
   const { error } = await supabase
-    .from("receipt_types")
+    .from("invoice_types")
     .update({
       code,
       name,
@@ -71,6 +71,6 @@ export async function updateReceiptType(
   }
   if (error) return { ok: false, error: "ไม่สามารถบันทึกประเภทใบแจ้งได้" };
 
-  revalidateReceiptTypePaths();
+  revalidateInvoiceTypePaths();
   return { ok: true };
 }

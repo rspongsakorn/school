@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 
-export type ReceiptTypeRow = {
+export type InvoiceTypeRow = {
   id: string;
   code: string;
   name: string;
@@ -8,10 +8,10 @@ export type ReceiptTypeRow = {
   isActive: boolean;
 };
 
-export async function listReceiptTypes(): Promise<ReceiptTypeRow[]> {
+export async function listInvoiceTypes(): Promise<InvoiceTypeRow[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
-    .from("receipt_types")
+    .from("invoice_types")
     .select("id, code, name, description, is_active")
     .order("code", { ascending: true });
 
@@ -26,10 +26,10 @@ export async function listReceiptTypes(): Promise<ReceiptTypeRow[]> {
   }));
 }
 
-export async function getDefaultReceiptTypeId(): Promise<string | null> {
+export async function getDefaultInvoiceTypeId(): Promise<string | null> {
   const supabase = await createClient();
   const { data } = await supabase
-    .from("receipt_types")
+    .from("invoice_types")
     .select("id")
     .eq("code", "01")
     .eq("is_active", true)

@@ -174,9 +174,9 @@ async function main() {
     }
 
     const { rows: seeds } = await client.query(
-      "SELECT code, name FROM public.receipt_types ORDER BY code",
+      "SELECT code, name FROM public.invoice_types ORDER BY code",
     );
-    console.log("\nreceipt_types seed:");
+    console.log("\ninvoice_types seed:");
     for (const row of seeds) {
       console.log(`  - ${row.code}: ${row.name}`);
     }

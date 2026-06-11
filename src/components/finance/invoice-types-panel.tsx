@@ -26,31 +26,31 @@ import {
 } from "@/components/ui/table";
 import { useRequireRole } from "@/components/providers/auth-provider";
 import { AppHeader } from "@/components/app-header";
-import { createReceiptType, updateReceiptType } from "@/lib/actions/receipt-types";
-import { fetchReceiptTypes } from "@/lib/queries/receipt-types";
-import { ReceiptTypeFeeDialog } from "@/components/finance/receipt-type-fee-dialog";
-import type { ReceiptTypeRow } from "@/lib/data/receipt-types";
+import { createInvoiceType, updateInvoiceType } from "@/lib/actions/invoice-types";
+import { fetchInvoiceTypes } from "@/lib/queries/invoice-types";
+import { InvoiceTypeFeeDialog } from "@/components/finance/invoice-type-fee-dialog";
+import type { InvoiceTypeRow } from "@/lib/data/invoice-types";
 
-export function ReceiptTypesPanel() {
+export function InvoiceTypesPanel() {
   useRequireRole("admin");
   const queryClient = useQueryClient();
 
   const { data: types = [], isLoading } = useQuery({
-    queryKey: ["receipt-types"],
-    queryFn: fetchReceiptTypes,
+    queryKey: ["invoice-types"],
+    queryFn: fetchInvoiceTypes,
   });
 
   const [feeDialogOpen, setFeeDialogOpen] = useState(false);
-  const [feeTarget, setFeeTarget] = useState<ReceiptTypeRow | null>(null);
+  const [feeTarget, setFeeTarget] = useState<InvoiceTypeRow | null>(null);
 
-  function openFeeConfig(row: ReceiptTypeRow) {
+  function openFeeConfig(row: InvoiceTypeRow) {
     setFeeTarget(row);
     setFeeDialogOpen(true);
   }
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mode, setMode] = useState<"create" | "edit">("create");
-  const [editTarget, setEditTarget] = useState<ReceiptTypeRow | null>(null);
+  const [editTarget, setEditTarget] = useState<InvoiceTypeRow | null>(null);
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -67,7 +67,7 @@ export function ReceiptTypesPanel() {
     setDialogOpen(true);
   }
 
-  function openEdit(row: ReceiptTypeRow) {
+  function openEdit(row: InvoiceTypeRow) {
     setMode("edit");
     setEditTarget(row);
     setCode(row.code);
@@ -82,8 +82,8 @@ export function ReceiptTypesPanel() {
     setSubmitting(true);
     const result =
       mode === "create"
-        ? await createReceiptType({ code, name, description })
-        : await updateReceiptType(editTarget!.id, { code, name, description, isActive });
+        ? await createInvoiceType({ code, name, description })
+        : await updateInvoiceType(editTarget!.id, { code, name, description, isActive });
     setSubmitting(false);
 
     if (!result.ok) {
@@ -93,7 +93,7 @@ export function ReceiptTypesPanel() {
 
     toast.success(mode === "create" ? "เพิ่มประเภทใบแจ้งแล้ว" : "บันทึกแล้ว");
     setDialogOpen(false);
-    queryClient.invalidateQueries({ queryKey: ["receipt-types"] });
+    queryClient.invalidateQueries({ queryKey: ["invoice-types"] });
   }
 
   if (isLoading) {
@@ -172,8 +172,8 @@ export function ReceiptTypesPanel() {
         </Table>
       </CardContent>
 
-      <ReceiptTypeFeeDialog
-        receiptType={feeTarget}
+      <InvoiceTypeFeeDialog
+        invoiceType={feeTarget}
         open={feeDialogOpen}
         onOpenChange={setFeeDialogOpen}
       />

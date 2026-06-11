@@ -14,7 +14,7 @@ export type FeeRateUpsertEntry = {
 };
 
 function revalidateFeePaths() {
-  revalidatePath("/receipt-types");
+  revalidatePath("/invoice-types");
   revalidatePath("/invoices");
 }
 
@@ -30,14 +30,14 @@ export async function upsertFeeRates(
 
   const supabase = await createClient();
 
-  const { data: defaultReceiptType } = await supabase
-    .from("receipt_types")
+  const { data: defaultInvoiceType } = await supabase
+    .from("invoice_types")
     .select("id")
     .eq("code", "01")
     .eq("is_active", true)
     .maybeSingle();
 
-  const receiptTypeId = defaultReceiptType?.id ?? null;
+  const invoiceTypeId = defaultInvoiceType?.id ?? null;
 
   for (const entry of entries) {
     if (entry.amount < 0) {
@@ -55,7 +55,7 @@ export async function upsertFeeRates(
         fee_item_id: entry.feeItemId,
         amount: entry.amount,
         amount_reimbursable: entry.amountReimbursable,
-        receipt_type_id: receiptTypeId,
+        invoice_type_id: invoiceTypeId,
       },
       { onConflict: "academic_year_id,semester_id,grade_level_id,fee_item_id" },
     );

@@ -16,7 +16,7 @@ export type GenerateInvoicesResult =
 type GenerateInput = {
   semesterId: string;
   academicYearId: string;
-  receiptTypeId: string;
+  invoiceTypeId: string;
   feeItemIds: string[];
   studentIds?: string[];
   reimbursableStudentIds?: string[];
@@ -72,7 +72,7 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
     return { ok: false, error: "กรุณาเลือกรายการค่าใช้จ่ายอย่างน้อย 1 รายการ" };
   }
 
-  if (!input.receiptTypeId) {
+  if (!input.invoiceTypeId) {
     return { ok: false, error: "กรุณาเลือกประเภทใบแจ้ง" };
   }
 
@@ -82,13 +82,13 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
   // receipt type (the client filters by type, but never trust the client).
   const { data: itemTypeRows } = await supabase
     .from("fee_items")
-    .select("id, receipt_type_id")
+    .select("id, invoice_type_id")
     .in("id", input.feeItemIds);
 
   const itemsMatchType =
     itemTypeRows != null &&
     itemTypeRows.length === input.feeItemIds.length &&
-    itemTypeRows.every((r) => r.receipt_type_id === input.receiptTypeId);
+    itemTypeRows.every((r) => r.invoice_type_id === input.invoiceTypeId);
 
   if (!itemsMatchType) {
     return { ok: false, error: "รายการค่าใช้จ่ายไม่ตรงกับประเภทใบแจ้ง" };
@@ -150,7 +150,7 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
     student_id: string;
     academic_year_id: string;
     semester_id: string;
-    receipt_type_id: string;
+    invoice_type_id: string;
     subtotal: number;
     total_amount: number;
     paid_amount: number;
@@ -209,7 +209,7 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
       student_id: enrollment.studentId,
       academic_year_id: input.academicYearId,
       semester_id: input.semesterId,
-      receipt_type_id: input.receiptTypeId,
+      invoice_type_id: input.invoiceTypeId,
       subtotal,
       total_amount: totalAmount,
       paid_amount: 0,

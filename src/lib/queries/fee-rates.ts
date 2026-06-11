@@ -3,15 +3,15 @@ import { feeRateKey } from "@/lib/finance/fee-rate-keys";
 import type { FeeItemRow } from "@/lib/data/fee-items";
 import type { FeeRateMatrix } from "@/lib/data/fee-rates";
 
-export async function fetchFeeItems(receiptTypeId: string): Promise<FeeItemRow[]> {
+export async function fetchFeeItems(invoiceTypeId: string): Promise<FeeItemRow[]> {
   const supabase = createClient();
 
   const { data, error } = await supabase
     .from("fee_items")
     .select(
-      "id, name, description, is_tuition, is_active, sort_order, has_reimbursable_variant, receipt_type_id",
+      "id, name, description, is_tuition, is_active, sort_order, has_reimbursable_variant, invoice_type_id",
     )
-    .eq("receipt_type_id", receiptTypeId)
+    .eq("invoice_type_id", invoiceTypeId)
     .order("sort_order", { ascending: true })
     .order("name", { ascending: true });
 
@@ -25,7 +25,7 @@ export async function fetchFeeItems(receiptTypeId: string): Promise<FeeItemRow[]
     isActive: row.is_active,
     sortOrder: row.sort_order,
     hasReimbursableVariant: row.has_reimbursable_variant,
-    receiptTypeId: row.receipt_type_id,
+    invoiceTypeId: row.invoice_type_id,
   }));
 }
 
@@ -35,7 +35,7 @@ export async function fetchAllFeeItems(): Promise<FeeItemRow[]> {
   const { data, error } = await supabase
     .from("fee_items")
     .select(
-      "id, name, description, is_tuition, is_active, sort_order, has_reimbursable_variant, receipt_type_id",
+      "id, name, description, is_tuition, is_active, sort_order, has_reimbursable_variant, invoice_type_id",
     )
     .order("sort_order", { ascending: true })
     .order("name", { ascending: true });
@@ -50,13 +50,13 @@ export async function fetchAllFeeItems(): Promise<FeeItemRow[]> {
     isActive: row.is_active,
     sortOrder: row.sort_order,
     hasReimbursableVariant: row.has_reimbursable_variant,
-    receiptTypeId: row.receipt_type_id,
+    invoiceTypeId: row.invoice_type_id,
   }));
 }
 
 export async function fetchFeeRateMatrix(
   semesterId: string,
-  receiptTypeId: string,
+  invoiceTypeId: string,
 ): Promise<FeeRateMatrix> {
   const supabase = createClient();
 
@@ -69,9 +69,9 @@ export async function fetchFeeRateMatrix(
     supabase
       .from("fee_items")
       .select(
-        "id, name, description, is_tuition, is_active, sort_order, has_reimbursable_variant, receipt_type_id",
+        "id, name, description, is_tuition, is_active, sort_order, has_reimbursable_variant, invoice_type_id",
       )
-      .eq("receipt_type_id", receiptTypeId)
+      .eq("invoice_type_id", invoiceTypeId)
       .order("sort_order", { ascending: true })
       .order("name", { ascending: true }),
     supabase

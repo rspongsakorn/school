@@ -9,7 +9,7 @@ import {
 } from "@/lib/finance/amounts";
 import { formatReceiptNumber, parseMaxSequence } from "@/lib/finance/receipt-number";
 import { getStudentOutstandingInvoices } from "@/lib/data/invoices";
-import { getDefaultReceiptTypeId } from "@/lib/data/receipt-types";
+import { getDefaultInvoiceTypeId } from "@/lib/data/invoice-types";
 import { resolveSingleInvoicePayment } from "@/lib/finance/single-invoice-allocation";
 import { createClient } from "@/lib/supabase/server";
 import { formatStudentName } from "@/lib/format";
@@ -46,14 +46,14 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
     id: string;
     total_amount: number;
     paid_amount: number;
-    receipt_type_id: string | null;
+    invoice_type_id: string | null;
     student_id: string;
-    receipt_types: { name: string } | null;
+    invoice_types: { name: string } | null;
   };
 
   const { data: invoice } = await supabase
     .from("student_invoices")
-    .select("id, total_amount, paid_amount, receipt_type_id, student_id, receipt_types ( name )")
+    .select("id, total_amount, paid_amount, invoice_type_id, student_id, invoice_types ( name )")
     .eq("id", input.invoiceId)
     .maybeSingle() as unknown as { data: InvoiceRow | null };
 
@@ -70,8 +70,8 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
   const resolved = resolveSingleInvoicePayment({ amount: input.amount, outstanding });
   if (!resolved.ok) return { ok: false, error: resolved.error };
 
-  const receiptTypeId = invoice.receipt_type_id;
-  if (!receiptTypeId) return { ok: false, error: "ใบแจ้งชำระไม่มีประเภทใบแจ้ง" };
+  const invoiceTypeId = invoice.invoice_type_id;
+  if (!invoiceTypeId) return { ok: false, error: "ใบแจ้งชำระไม่มีประเภทใบแจ้ง" };
 
   const allocations = [{ invoiceId: invoice.id, amount: resolved.amount }];
 
@@ -99,7 +99,7 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
   const gradeByStudent = await getStudentGradeMap(input.semesterId);
   const gradeClassroom = gradeByStudent.get(input.studentId) ?? "—";
 
-  const invoiceName = invoice.receipt_types?.name ?? "—";
+  const invoiceName = invoice.invoice_types?.name ?? "—";
   const allocationDetails = allocations.map((a) => ({
     invoiceId: a.invoiceId,
     invoiceName,
@@ -157,7 +157,7 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
   const { error: receiptError } = await supabase.from("receipts").insert({
     payment_id: payment.id,
     receipt_number: receiptNumber,
-    receipt_type_id: receiptTypeId,
+    invoice_type_id: invoiceTypeId,
     snapshot_data: snapshot,
   });
 
@@ -279,13 +279,13 @@ export async function importPaymentsBackfill(input: {
     a.paidDateIso.localeCompare(b.paidDateIso),
   );
 
-  const [{ data: existingReceipts }, receiptTypeId, gradeByStudent] = await Promise.all([
+  const [{ data: existingReceipts }, invoiceTypeId, gradeByStudent] = await Promise.all([
     supabase.from("payments").select("receipt_number").eq("academic_year_id", input.academicYearId),
-    getDefaultReceiptTypeId(),
+    getDefaultInvoiceTypeId(),
     getStudentGradeMap(input.semesterId),
   ]);
 
-  if (!receiptTypeId) return { ok: false, error: "ไม่พบประเภทใบแจ้งเริ่มต้น" };
+  if (!invoiceTypeId) return { ok: false, error: "ไม่พบประเภทใบแจ้งเริ่มต้น" };
 
   let nextSeq =
     parseMaxSequence(
@@ -347,10 +347,10 @@ export async function importPaymentsBackfill(input: {
     // fall back to the default type for any row we can't match.
     const { data: primaryInvoice } = await supabase
       .from("student_invoices")
-      .select("receipt_type_id")
+      .select("invoice_type_id")
       .eq("id", allocations[0].invoiceId)
       .maybeSingle();
-    const rowReceiptTypeId = primaryInvoice?.receipt_type_id ?? receiptTypeId;
+    const rowInvoiceTypeId = primaryInvoice?.invoice_type_id ?? invoiceTypeId;
 
     const snapshot: Record<string, unknown> = {
       receiptNumber,
@@ -402,7 +402,7 @@ export async function importPaymentsBackfill(input: {
     const { error: receiptError } = await supabase.from("receipts").insert({
       payment_id: payment.id,
       receipt_number: receiptNumber,
-      receipt_type_id: rowReceiptTypeId,
+      invoice_type_id: rowInvoiceTypeId,
       snapshot_data: snapshot,
     });
     if (receiptError) {

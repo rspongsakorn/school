@@ -21,7 +21,7 @@ export type InvoiceListRow = {
   discountType: "percent" | "fixed" | null;
   discountValue: number | null;
   isReimbursable: boolean;
-  receiptTypeId: string;
+  invoiceTypeId: string;
   createdAt: string;
   hasActivePaymentAllocation: boolean;
 };
@@ -153,8 +153,8 @@ export async function fetchAllInvoices(params: {
       discount_type,
       discount_value,
       is_reimbursable,
-      receipt_type_id,
-      receipt_types ( name ),
+      invoice_type_id,
+      invoice_types ( name ),
       created_at,
       students!inner ( student_code, first_name, last_name )
     `,
@@ -168,7 +168,7 @@ export async function fetchAllInvoices(params: {
   type Row = {
     id: string;
     student_id: string;
-    receipt_types: { name: string } | null;
+    invoice_types: { name: string } | null;
     subtotal: number;
     total_amount: number;
     paid_amount: number;
@@ -176,7 +176,7 @@ export async function fetchAllInvoices(params: {
     discount_type: "percent" | "fixed" | null;
     discount_value: number | null;
     is_reimbursable: boolean;
-    receipt_type_id: string;
+    invoice_type_id: string;
     created_at: string;
     students: { student_code: string; first_name: string; last_name: string };
   };
@@ -196,7 +196,7 @@ export async function fetchAllInvoices(params: {
       gradeClassroom: enroll?.gradeClassroom ?? "—",
       gradeLevelId: enroll?.gradeLevelId ?? null,
       classroomId: enroll?.classroomId ?? null,
-      invoiceName: row.receipt_types?.name ?? "—",
+      invoiceName: row.invoice_types?.name ?? "—",
       subtotal: Number(row.subtotal),
       totalAmount,
       paidAmount,
@@ -205,7 +205,7 @@ export async function fetchAllInvoices(params: {
       discountType: row.discount_type,
       discountValue: row.discount_value != null ? Number(row.discount_value) : null,
       isReimbursable: row.is_reimbursable,
-      receiptTypeId: row.receipt_type_id,
+      invoiceTypeId: row.invoice_type_id,
       createdAt: row.created_at,
       hasActivePaymentAllocation: activeAllocationIds.has(row.id),
     };
@@ -289,8 +289,8 @@ export async function fetchInvoicesPaginated(params: {
       discount_type,
       discount_value,
       is_reimbursable,
-      receipt_type_id,
-      receipt_types ( name ),
+      invoice_type_id,
+      invoice_types ( name ),
       created_at,
       students!inner ( student_code, first_name, last_name )
     `,
@@ -329,7 +329,7 @@ export async function fetchInvoicesPaginated(params: {
   type Row = {
     id: string;
     student_id: string;
-    receipt_types: { name: string } | null;
+    invoice_types: { name: string } | null;
     subtotal: number;
     total_amount: number;
     paid_amount: number;
@@ -337,7 +337,7 @@ export async function fetchInvoicesPaginated(params: {
     discount_type: "percent" | "fixed" | null;
     discount_value: number | null;
     is_reimbursable: boolean;
-    receipt_type_id: string;
+    invoice_type_id: string;
     created_at: string;
     students: { student_code: string; first_name: string; last_name: string };
   };
@@ -356,7 +356,7 @@ export async function fetchInvoicesPaginated(params: {
       gradeClassroom: gradeByStudent.get(row.student_id) ?? "—",
       gradeLevelId: null,
       classroomId: null,
-      invoiceName: row.receipt_types?.name ?? "—",
+      invoiceName: row.invoice_types?.name ?? "—",
       subtotal: Number(row.subtotal),
       totalAmount,
       paidAmount,
@@ -365,7 +365,7 @@ export async function fetchInvoicesPaginated(params: {
       discountType: row.discount_type,
       discountValue: row.discount_value != null ? Number(row.discount_value) : null,
       isReimbursable: row.is_reimbursable,
-      receiptTypeId: row.receipt_type_id,
+      invoiceTypeId: row.invoice_type_id,
       createdAt: row.created_at,
       hasActivePaymentAllocation: activeAllocationInvoiceIds.has(row.id),
     };

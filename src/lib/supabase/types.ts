@@ -79,9 +79,9 @@ export type Database = {
         is_active: boolean;
         sort_order: number;
         has_reimbursable_variant: boolean;
-        receipt_type_id: string;
+        invoice_type_id: string;
       }>;
-      receipt_types: TableDef<{
+      invoice_types: TableDef<{
         id: string;
         code: string;
         name: string;
@@ -95,7 +95,7 @@ export type Database = {
         grade_level_id: string;
         fee_item_id: string;
         amount: number;
-        receipt_type_id: string | null;
+        invoice_type_id: string | null;
         amount_reimbursable: number | null;
       }>;
       student_invoices: TableDef<{
@@ -111,7 +111,7 @@ export type Database = {
         status: "unpaid" | "partial" | "paid";
         created_at: string;
         is_reimbursable: boolean;
-        receipt_type_id: string;
+        invoice_type_id: string;
       }>;
       invoice_lines: TableDef<{
         id: string;
@@ -144,7 +144,7 @@ export type Database = {
         id: string;
         payment_id: string;
         receipt_number: string;
-        receipt_type_id: string;
+        invoice_type_id: string;
         snapshot_data: Record<string, unknown>;
         issued_at: string;
       }>;

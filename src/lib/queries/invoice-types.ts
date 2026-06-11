@@ -1,10 +1,10 @@
 import { createClient } from "@/lib/supabase/client";
-import type { ReceiptTypeRow } from "@/lib/data/receipt-types";
+import type { InvoiceTypeRow } from "@/lib/data/invoice-types";
 
-export async function fetchReceiptTypes(): Promise<ReceiptTypeRow[]> {
+export async function fetchInvoiceTypes(): Promise<InvoiceTypeRow[]> {
   const supabase = createClient();
   const { data, error } = await supabase
-    .from("receipt_types")
+    .from("invoice_types")
     .select("id, code, name, description, is_active")
     .order("code", { ascending: true });
 

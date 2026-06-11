@@ -21,7 +21,7 @@ export type InvoiceListRow = {
   discountType: "percent" | "fixed" | null;
   discountValue: number | null;
   isReimbursable: boolean;
-  receiptTypeId: string;
+  invoiceTypeId: string;
   createdAt: string;
   hasActivePaymentAllocation: boolean;
 };
@@ -104,8 +104,8 @@ export async function listInvoicesPaginated(params: {
       discount_type,
       discount_value,
       is_reimbursable,
-      receipt_type_id,
-      receipt_types ( name ),
+      invoice_type_id,
+      invoice_types ( name ),
       created_at,
       students!inner ( student_code, first_name, last_name )
     `,
@@ -140,7 +140,7 @@ export async function listInvoicesPaginated(params: {
   type Row = {
     id: string;
     student_id: string;
-    receipt_types: { name: string } | null;
+    invoice_types: { name: string } | null;
     subtotal: number;
     total_amount: number;
     paid_amount: number;
@@ -148,7 +148,7 @@ export async function listInvoicesPaginated(params: {
     discount_type: "percent" | "fixed" | null;
     discount_value: number | null;
     is_reimbursable: boolean;
-    receipt_type_id: string;
+    invoice_type_id: string;
     created_at: string;
     students: { student_code: string; first_name: string; last_name: string };
   };
@@ -165,7 +165,7 @@ export async function listInvoicesPaginated(params: {
       studentCode: row.students.student_code,
       studentName: formatStudentName(row.students.first_name, row.students.last_name),
       gradeClassroom: gradeByStudent.get(row.student_id) ?? "—",
-      invoiceName: row.receipt_types?.name ?? "—",
+      invoiceName: row.invoice_types?.name ?? "—",
       subtotal: Number(row.subtotal),
       totalAmount,
       paidAmount,
@@ -174,7 +174,7 @@ export async function listInvoicesPaginated(params: {
       discountType: row.discount_type,
       discountValue: row.discount_value != null ? Number(row.discount_value) : null,
       isReimbursable: row.is_reimbursable,
-      receiptTypeId: row.receipt_type_id,
+      invoiceTypeId: row.invoice_type_id,
       createdAt: row.created_at,
       hasActivePaymentAllocation: activeAllocationInvoiceIds.has(row.id),
     };
@@ -197,7 +197,7 @@ export async function getStudentOutstandingInvoices(
   const supabase = await createClient();
   const { data } = await supabase
     .from("student_invoices")
-    .select("id, receipt_types ( name ), total_amount, paid_amount, created_at, status, invoice_lines(id, description, amount)")
+    .select("id, invoice_types ( name ), total_amount, paid_amount, created_at, status, invoice_lines(id, description, amount)")
     .eq("student_id", studentId)
     .eq("semester_id", semesterId)
     .in("status", ["unpaid", "partial"])
@@ -205,7 +205,7 @@ export async function getStudentOutstandingInvoices(
 
   type Row = {
     id: string;
-    receipt_types: { name: string } | null;
+    invoice_types: { name: string } | null;
     total_amount: number;
     paid_amount: number;
     created_at: string;
@@ -222,7 +222,7 @@ export async function getStudentOutstandingInvoices(
     }));
     return {
       id: row.id,
-      invoiceName: row.receipt_types?.name ?? "—",
+      invoiceName: row.invoice_types?.name ?? "—",
       totalAmount,
       paidAmount,
       outstanding: Math.max(0, round2(totalAmount - paidAmount)),
