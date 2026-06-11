@@ -582,68 +582,74 @@ export function PaymentsPanel() {
                       <p className="text-sm text-muted-foreground">เลือกใบแจ้งที่จะชำระจากตารางด้านบน</p>
                     )}
 
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="grid gap-2">
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="pay-amount">จำนวนเงิน (บาท)</Label>
-                          <button
-                            type="button"
-                            className="text-xs text-primary hover:underline disabled:opacity-50"
-                            disabled={!selectedInvoice || selectedOutstanding <= 0}
-                            onClick={() => setAmount(String(selectedOutstanding))}
-                          >
-                            ชำระเต็มจำนวน
-                          </button>
-                        </div>
-                        <Input
-                          ref={amountInputRef}
-                          id="pay-amount"
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          value={amount}
-                          onChange={(e) => setAmount(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              if (!submitting && selectedInvoice && !amountExceeds) {
-                                requestRecord();
-                              }
-                            }
-                          }}
-                          className="tabular-nums"
-                          aria-invalid={amountExceeds}
-                        />
-                        <p
-                          className={cn(
-                            "text-xs",
-                            amountExceeds ? "text-destructive" : "text-muted-foreground",
-                          )}
+                    {/* Shared-row grid: labels in row 1, fields in row 2 — fields
+                        share the same row track so they always align regardless
+                        of label height. */}
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                      {/* row 1 — labels */}
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="pay-amount">จำนวนเงิน (บาท)</Label>
+                        <button
+                          type="button"
+                          className="text-xs text-primary hover:underline disabled:opacity-50"
+                          disabled={!selectedInvoice || selectedOutstanding <= 0}
+                          onClick={() => setAmount(String(selectedOutstanding))}
                         >
-                          {amountExceeds
-                            ? `เกินยอดค้าง (${formatBaht(selectedOutstanding)})`
-                            : `ยอดค้าง ${formatBaht(selectedOutstanding)}`}
-                        </p>
+                          ชำระเต็มจำนวน
+                        </button>
                       </div>
-                      <div className="grid gap-2">
+                      <div className="flex items-center">
                         <Label>วิธีชำระ</Label>
-                        <Select
-                          value={method}
-                          onValueChange={(v) => setMethod(v as "cash" | "transfer")}
-                          items={methodItems}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {methodItems.map((item) => (
-                              <SelectItem key={item.value} value={item.value}>
-                                {item.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
                       </div>
+
+                      {/* row 2 — fields */}
+                      <Input
+                        ref={amountInputRef}
+                        id="pay-amount"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            if (!submitting && selectedInvoice && !amountExceeds) {
+                              requestRecord();
+                            }
+                          }
+                        }}
+                        className="tabular-nums"
+                        aria-invalid={amountExceeds}
+                      />
+                      <Select
+                        value={method}
+                        onValueChange={(v) => setMethod(v as "cash" | "transfer")}
+                        items={methodItems}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {methodItems.map((item) => (
+                            <SelectItem key={item.value} value={item.value}>
+                              {item.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      {/* row 3 — helper text under amount only */}
+                      <p
+                        className={cn(
+                          "col-start-1 text-xs",
+                          amountExceeds ? "text-destructive" : "text-muted-foreground",
+                        )}
+                      >
+                        {amountExceeds
+                          ? `เกินยอดค้าง (${formatBaht(selectedOutstanding)})`
+                          : `ยอดค้าง ${formatBaht(selectedOutstanding)}`}
+                      </p>
                     </div>
 
                     {method === "transfer" ? (

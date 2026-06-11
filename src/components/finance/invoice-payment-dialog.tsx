@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -19,10 +19,17 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -54,6 +61,7 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
   const queryClient = useQueryClient();
   const { ctx } = useSemesterContext();
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const amountInputRef = useRef<HTMLInputElement>(null);
 
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<"cash" | "transfer">("cash");
@@ -93,9 +101,8 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
       toast.error("กรุณาระบุจำนวนเงิน");
       return;
     }
-    const outstanding = invoice?.outstanding ?? 0;
-    if (parsed > outstanding) {
-      toast.error(`จำนวนเงินเกินยอดค้าง (${formatBaht(outstanding)})`);
+    if (parsed > invoice.outstanding) {
+      toast.error(`จำนวนเงินเกินยอดค้าง (${formatBaht(invoice.outstanding)})`);
       return;
     }
     if (method === "transfer" && !transferRef.trim()) {
@@ -109,8 +116,6 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
   async function handleConfirm() {
     if (!invoice || !ctx) return;
 
-    const parsed = Number.parseFloat(amount);
-
     setSubmitting(true);
     const result = await recordPayment({
       invoiceId: invoice.id,
@@ -118,7 +123,7 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
       academicYearId: ctx.academicYearId,
       academicYearName: ctx.academicYearName,
       semesterId: ctx.semesterId,
-      amount: parsed,
+      amount: Number.parseFloat(amount),
       paymentMethod: method,
       transferReference: method === "transfer" ? transferRef.trim() : undefined,
       note: note.trim() || undefined,
@@ -140,12 +145,14 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
     router.refresh();
   }
 
+  const hasOutstanding = invoice && invoice.outstanding > 0;
+
   return (
     <>
       <iframe ref={iframeRef} className="hidden" title="receipt" />
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent>
-          <form onSubmit={handleSubmit}>
+        <DialogContent className="max-w-xl">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <DialogHeader>
               <DialogTitle>ชำระเงิน</DialogTitle>
               <DialogDescription>
@@ -153,108 +160,139 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
               </DialogDescription>
             </DialogHeader>
 
-            <div className="grid gap-4 py-4">
-              {!invoice || invoice.outstanding <= 0 ? (
-                <p className="text-sm text-muted-foreground">ไม่พบรายการค้างชำระ</p>
-              ) : (
-                <div className="rounded-md border text-sm overflow-hidden">
-                  {/* invoice header row */}
-                  <div className="flex items-center justify-between px-3 py-2 bg-muted/50 font-medium">
-                    <span className="truncate max-w-[220px]">{invoice.invoiceName}</span>
-                    <span className="tabular-nums shrink-0 ml-2">{formatBaht(invoice.outstanding)}</span>
-                  </div>
-                  {/* line items */}
-                  {lines.length > 0 && (
-                    <div className="divide-y divide-border/60">
+            {!hasOutstanding ? (
+              <p className="text-sm text-muted-foreground">ไม่พบรายการค้างชำระ</p>
+            ) : (
+              <>
+                {/* Invoice table — same style as payments panel */}
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ใบแจ้ง</TableHead>
+                      <TableHead className="text-right">ค้าง</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <Fragment key={invoice.id}>
+                      <TableRow>
+                        <TableCell className="font-medium">{invoice.invoiceName}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatBaht(invoice.outstanding)}
+                        </TableCell>
+                      </TableRow>
                       {lines.map((line) => (
-                        <div key={line.id} className="flex items-center justify-between px-3 py-1.5 text-xs text-muted-foreground">
-                          <span>· {line.description}</span>
-                          <span className="tabular-nums shrink-0 ml-2">{formatBaht(line.amount)}</span>
-                        </div>
+                        <TableRow key={line.id} className="border-0">
+                          <TableCell className="py-0.5 pl-5 text-xs text-muted-foreground">
+                            · {line.description}
+                          </TableCell>
+                          <TableCell className="py-0.5 text-right text-xs tabular-nums text-muted-foreground">
+                            {formatBaht(line.amount)}
+                          </TableCell>
+                        </TableRow>
                       ))}
-                    </div>
-                  )}
-                </div>
-              )}
+                    </Fragment>
+                  </TableBody>
+                </Table>
 
-              {invoice && invoice.outstanding > 0 ? (
-                <>
-                  <div className="grid gap-2">
+                {/* Form fields — amount + method side by side. Shared-row grid
+                    so the input and select always align regardless of label
+                    height. */}
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                  {/* row 1 — labels */}
+                  <div className="flex items-center justify-between">
                     <Label htmlFor="pay-amount">จำนวนเงิน (บาท)</Label>
+                    <button
+                      type="button"
+                      className="text-xs text-primary hover:underline"
+                      onClick={() => {
+                        setAmount(String(invoice.outstanding));
+                        setTimeout(() => {
+                          amountInputRef.current?.focus();
+                          amountInputRef.current?.select();
+                        }, 50);
+                      }}
+                    >
+                      ชำระเต็มจำนวน
+                    </button>
+                  </div>
+                  <div className="flex items-center">
+                    <Label>วิธีชำระ</Label>
+                  </div>
+
+                  {/* row 2 — fields */}
+                  <Input
+                    ref={amountInputRef}
+                    id="pay-amount"
+                    type="number"
+                    min={0.01}
+                    max={invoice.outstanding}
+                    step="0.01"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="tabular-nums"
+                    required
+                  />
+                  <Select
+                    value={method}
+                    onValueChange={(v) => setMethod(v as "cash" | "transfer")}
+                    items={METHOD_ITEMS}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {METHOD_ITEMS.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* row 3 — helper text under amount only */}
+                  <p className="col-start-1 text-xs text-muted-foreground">
+                    ยอดค้าง {formatBaht(invoice.outstanding)}
+                  </p>
+                </div>
+
+                {method === "transfer" && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="pay-ref">เลขอ้างอิง</Label>
                     <Input
-                      id="pay-amount"
-                      type="number"
-                      min={0.01}
-                      max={invoice?.outstanding}
-                      step="0.01"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
+                      id="pay-ref"
+                      value={transferRef}
+                      onChange={(e) => setTransferRef(e.target.value)}
+                      placeholder="เลขที่อ้างอิงการโอน"
                       required
                     />
                   </div>
+                )}
 
-                  <div className="grid gap-2">
-                    <Label>วิธีชำระ</Label>
-                    <Select
-                      value={method}
-                      onValueChange={(v) => setMethod(v as "cash" | "transfer")}
-                      items={METHOD_ITEMS}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {METHOD_ITEMS.map((item) => (
-                          <SelectItem key={item.value} value={item.value}>
-                            {item.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pay-note">หมายเหตุ</Label>
+                  <Input
+                    id="pay-note"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="หมายเหตุ (ไม่บังคับ)"
+                  />
+                </div>
 
-                  {method === "transfer" ? (
-                    <div className="grid gap-2">
-                      <Label htmlFor="pay-ref">เลขอ้างอิง</Label>
-                      <Input
-                        id="pay-ref"
-                        value={transferRef}
-                        onChange={(e) => setTransferRef(e.target.value)}
-                        placeholder="เลขที่อ้างอิงการโอน"
-                        required
-                      />
-                    </div>
-                  ) : null}
+                <Button type="submit" className="w-full" disabled={submitting}>
+                  {submitting ? "กำลังบันทึก..." : "บันทึกและออกใบเสร็จ"}
+                </Button>
+              </>
+            )}
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="pay-note">หมายเหตุ (ไม่บังคับ)</Label>
-                    <Input
-                      id="pay-note"
-                      value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                      placeholder="หมายเหตุ"
-                    />
-                  </div>
-                </>
-              ) : null}
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={submitting}
-                onClick={() => onOpenChange(false)}
-              >
-                ยกเลิก
+            {!hasOutstanding && (
+              <Button type="button" variant="outline" className="w-full" onClick={() => onOpenChange(false)}>
+                ปิด
               </Button>
-              <Button type="submit" disabled={submitting || !invoice || invoice.outstanding <= 0}>
-                {submitting ? "กำลังบันทึก..." : "บันทึกการชำระ"}
-              </Button>
-            </DialogFooter>
+            )}
           </form>
         </DialogContent>
       </Dialog>
+
       <AlertDialog open={confirmOpen} onOpenChange={(o) => !submitting && setConfirmOpen(o)}>
         <AlertDialogContent>
           <AlertDialogHeader>
