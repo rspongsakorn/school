@@ -79,7 +79,7 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
   const supabase = await createClient();
 
   // Enforce the invariant that every selected fee item belongs to the chosen
-  // receipt type (the client filters by type, but never trust the client).
+  // invoice type (the client filters by type, but never trust the client).
   const { data: itemTypeRows } = await supabase
     .from("fee_items")
     .select("id, invoice_type_id")

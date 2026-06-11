@@ -343,7 +343,7 @@ export async function importPaymentsBackfill(input: {
     const paidAt = `${row.paidDateIso}T12:00:00+07:00`;
     const gradeClassroom = gradeByStudent.get(student.id) ?? "—";
 
-    // Derive the receipt type from the (FIFO-first) invoice this row settles;
+    // Derive the invoice type from the (FIFO-first) invoice this row settles;
     // fall back to the default type for any row we can't match.
     const { data: primaryInvoice } = await supabase
       .from("student_invoices")

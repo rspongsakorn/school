@@ -256,7 +256,7 @@ export function InvoiceGenerateDialog({
 
             {/* LEFT — mode + fee items */}
             <div className="space-y-5">
-              {/* Receipt type selector */}
+              {/* Invoice type selector */}
               <div className="space-y-2">
                 <Label className="text-xs font-medium text-muted-foreground">ประเภทใบแจ้ง</Label>
                 <select
