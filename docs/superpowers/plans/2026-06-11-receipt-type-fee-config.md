@@ -10,6 +10,27 @@
 
 **Testing reality for this repo:** Pure functions under `src/lib/finance` and `src/lib/**` have Vitest unit tests. Server actions and data functions talk to Supabase and are **not** unit-tested here — they are verified with `npx tsc --noEmit`, `npm run lint`, and manual preview. The plan uses TDD for new pure logic and type/lint/preview verification for DB, server-action, and UI work. Be honest in commits about which kind of verification ran.
 
+**Scope additions discovered during execution (2026-06-11):**
+- There are TWO parallel `InvoiceListRow` types — `src/lib/data/invoices.ts` AND `src/lib/queries/invoices.ts`. Both must gain `receiptTypeId` (the query-side one was a structural superset of the data-side one, so adding the field to only one breaks assignability in `invoices-panel.tsx`). Handled in a follow-up commit after Task 8/9.
+- The migrations are applied against a HOSTED Supabase, with Docker unavailable locally. Per user decision, subagents only WRITE migration files; the user applies them via `npm run db:push` later. DB-dependent preview verification is deferred until then.
+- `recordPayment` has TWO callers, not one: `invoice-payment-dialog.tsx` (Task 12) AND `payments-panel.tsx` (the primary daily "บันทึกการจ่าย" screen). The panel also used student-level FIFO. Per user decision, the panel is reworked to single-invoice via a per-row "ชำระ" button (new **Task 12.5** below), preserving its existing inline form, success card, and void shortcut.
+
+### Task 12.5: payments-panel — per-invoice payment via per-row "ชำระ" button
+
+**File:** Modify `src/components/finance/payments-panel.tsx`
+
+Convert the primary payment screen from student-level FIFO to single-invoice. Preserve the existing student search, outstanding table, payment-method/note inputs, confirm dialog, success card, receipt printing, and void shortcut. Changes:
+- Add state `const [selectedInvoice, setSelectedInvoice] = useState<OutstandingInvoiceRow | null>(null);`
+- In the outstanding table, add an action cell per INVOICE row (not per line) with a "ชำระ" button. Clicking it: `setSelectedInvoice(inv); setAmount(String(inv.outstanding));` then focus the amount input. Visually mark the selected invoice row.
+- Show a label above the amount form: which invoice is being paid (e.g. `กำลังชำระ: {selectedInvoice.invoiceName}`), shown only when one is selected.
+- Replace the form's `totalOutstanding`-based validation/labels with `selectedInvoice?.outstanding ?? 0`. "ชำระเต็มจำนวน" sets `amount = String(selectedInvoice.outstanding)`. The amount-exceeds check compares against `selectedInvoice.outstanding`.
+- `requestRecord`: require `selectedInvoice`; validate `parsedAmount <= selectedInvoice.outstanding`.
+- `handleRecord`: call `recordPayment({ invoiceId: selectedInvoice.id, studentId: selectedStudent.id, academicYearId, academicYearName, semesterId, amount: parsedAmount, paymentMethod: method, transferReference: method === "transfer" ? transferRef : undefined, note })`.
+- The submit button is disabled unless `selectedInvoice && !amountExceeds && parsedAmount > 0`.
+- On success and on selecting a new student, reset `selectedInvoice` to null.
+
+Verify with `npx tsc --noEmit` (clean for this file), `npm run lint` (no new problems), `npm test` (all pass). Commit: `feat(payment): payments-panel pays a single invoice per row`.
+
 ---
 
 ## File Structure
