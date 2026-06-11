@@ -85,6 +85,7 @@ export function RegistrationPanel() {
   const [deleteTarget, setDeleteTarget] = useState<
     { type: "grade"; id: string; name: string } | { type: "classroom"; id: string; name: string } | null
   >(null);
+  const [confirmCopyStudentsOpen, setConfirmCopyStudentsOpen] = useState(false);
 
   const semesterId = ctx?.semesterId ?? null;
   const semesterNumber = ctx?.semesterNumber ?? 1;
@@ -237,9 +238,6 @@ export function RegistrationPanel() {
       return;
     }
     if (!semesterId) return;
-    if (includeStudents && !window.confirm("คัดลอกโครงสร้างพร้อมลงทะเบียนนักเรียนที่กำลังเรียนเข้าห้องเดิม?")) {
-      return;
-    }
     startCopyTransition(async () => {
       const result = await copySemesterStructure(copySourceId, semesterId, includeStudents);
       if (!result.ok) {
@@ -316,7 +314,7 @@ export function RegistrationPanel() {
                 type="button"
                 size="sm"
                 disabled={copyPending || !copySourceId}
-                onClick={() => handleCopyStructure(true)}
+                onClick={() => setConfirmCopyStudentsOpen(true)}
               >
                 <Copy className="mr-1 h-4 w-4" />
                 {copyPending ? "กำลังคัดลอก..." : "คัดลอกพร้อมนักเรียน"}
@@ -743,6 +741,29 @@ export function RegistrationPanel() {
                   onClick={handleDelete}
                 >
                   ลบ
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          <AlertDialog open={confirmCopyStudentsOpen} onOpenChange={setConfirmCopyStudentsOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>คัดลอกพร้อมนักเรียน</AlertDialogTitle>
+                <AlertDialogDescription>
+                  คัดลอกโครงสร้างพร้อมลงทะเบียนนักเรียนที่กำลังเรียนเข้าห้องเดิม?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={copyPending}>ยกเลิก</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    setConfirmCopyStudentsOpen(false);
+                    handleCopyStructure(true);
+                  }}
+                  disabled={copyPending}
+                >
+                  ยืนยัน
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
