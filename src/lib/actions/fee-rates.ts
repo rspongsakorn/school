@@ -14,7 +14,7 @@ export type FeeRateUpsertEntry = {
 };
 
 function revalidateFeePaths() {
-  revalidatePath("/fee-rates");
+  revalidatePath("/receipt-types");
   revalidatePath("/invoices");
 }
 
