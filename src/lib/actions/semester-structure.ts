@@ -124,7 +124,12 @@ export async function copySemesterStructure(
     if (rows.length > 0) {
       const { error: insertError } = await supabase.from("student_enrollments").insert(rows);
       if (insertError) {
-        return { ok: false, error: "ไม่สามารถลงทะเบียนนักเรียนได้" };
+        // โครงสร้างถูกสร้างไปแล้ว แต่การลงทะเบียนล้มเหลว — แจ้งให้ชัดเพื่อให้แอดมินเพิ่มนักเรียนเองได้
+        revalidateRegistrationPaths();
+        return {
+          ok: false,
+          error: "คัดลอกโครงสร้างแล้ว แต่ลงทะเบียนนักเรียนไม่สำเร็จ — กรุณาเพิ่มนักเรียนในห้องด้วยตนเอง",
+        };
       }
       enrolledCount = rows.length;
     }
