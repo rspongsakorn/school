@@ -40,7 +40,8 @@ export type InvoiceCandidateRow = {
   studentName: string;
   gradeClassroom: string;
   gradeSortOrder: number;
-  hasInvoice: boolean;
+  /** Invoice type ids the student already has an invoice for this semester. */
+  invoiceTypeIds: string[];
 };
 
 const INVOICE_PAGE_SIZE = 50;
@@ -226,14 +227,26 @@ async function loadActiveAllocationInvoiceIds(invoiceIds: string[]): Promise<Set
   return new Set(((data ?? []) as unknown as Row[]).map((row) => row.invoice_id));
 }
 
-async function listStudentIdsWithInvoice(semesterId: string): Promise<Set<string>> {
+/** Map of studentId → set of invoice_type_ids the student already has this semester. */
+async function listStudentInvoiceTypeMap(
+  semesterId: string,
+): Promise<Map<string, Set<string>>> {
   const supabase = createClient();
   const { data } = await supabase
     .from("student_invoices")
-    .select("student_id")
+    .select("student_id, invoice_type_id")
     .eq("semester_id", semesterId);
 
-  return new Set((data ?? []).map((r) => r.student_id));
+  const map = new Map<string, Set<string>>();
+  for (const r of (data ?? []) as { student_id: string; invoice_type_id: string }[]) {
+    let set = map.get(r.student_id);
+    if (!set) {
+      set = new Set();
+      map.set(r.student_id, set);
+    }
+    set.add(r.invoice_type_id);
+  }
+  return map;
 }
 
 export async function fetchInvoicesPaginated(params: {
@@ -383,10 +396,10 @@ export async function fetchInvoicesPaginated(params: {
 
 export async function fetchInvoiceCandidates(semesterId: string): Promise<InvoiceCandidateRow[]> {
   const supabase = createClient();
-  const [gradeByStudent, gradeSortByStudent, existingSet] = await Promise.all([
+  const [gradeByStudent, gradeSortByStudent, typesByStudent] = await Promise.all([
     getStudentGradeMap(semesterId),
     getStudentGradeSortMap(semesterId),
-    listStudentIdsWithInvoice(semesterId),
+    listStudentInvoiceTypeMap(semesterId),
   ]);
 
   const { data } = await supabase
@@ -413,7 +426,7 @@ export async function fetchInvoiceCandidates(semesterId: string): Promise<Invoic
       studentName: formatStudentName(row.students.first_name, row.students.last_name),
       gradeClassroom: gradeByStudent.get(row.student_id) ?? "—",
       gradeSortOrder: gradeSortByStudent.get(row.student_id) ?? 0,
-      hasInvoice: existingSet.has(row.student_id),
+      invoiceTypeIds: [...(typesByStudent.get(row.student_id) ?? [])],
     }))
     .sort((a, b) => a.studentCode.localeCompare(b.studentCode, undefined, { numeric: true }));
 }

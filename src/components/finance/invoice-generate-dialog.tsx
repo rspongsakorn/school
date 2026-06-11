@@ -62,9 +62,14 @@ export function InvoiceGenerateDialog({
   const activeItems = feeItems.filter(
     (i) => i.isActive && (!invoiceTypeId || i.invoiceTypeId === invoiceTypeId),
   );
+  // A student is selectable for the chosen type unless they already have an
+  // invoice of that exact type. Empty until a type is picked.
   const selectableCandidates = useMemo(
-    () => candidates.filter((c) => !c.hasInvoice),
-    [candidates],
+    () =>
+      invoiceTypeId
+        ? candidates.filter((c) => !c.invoiceTypeIds.includes(invoiceTypeId))
+        : [],
+    [candidates, invoiceTypeId],
   );
 
   const [mode, setMode] = useState<"all" | "selected">("all");
@@ -360,6 +365,12 @@ export function InvoiceGenerateDialog({
 
             {/* RIGHT — students with classroom chips */}
             <div className="space-y-2">
+              {!invoiceTypeId ? (
+                <div className="flex h-full min-h-40 items-center justify-center rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                  เลือกประเภทใบแจ้งก่อน เพื่อแสดงรายชื่อนักเรียน
+                </div>
+              ) : (
+                <>
               <div className="flex items-center justify-between gap-2">
                 <Label className="text-xs font-medium text-muted-foreground">
                   {mode === "selected" ? "เลือกนักเรียน" : "นักเรียนที่จะได้รับใบ"}
@@ -544,6 +555,8 @@ export function InvoiceGenerateDialog({
                   )}
                 </div>
               </div>
+                </>
+              )}
             </div>
           </div>
 

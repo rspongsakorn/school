@@ -6,7 +6,7 @@ import { requireAdminAction } from "@/lib/auth/require-admin";
 import { computeInvoiceTotal } from "@/lib/finance/amounts";
 import { pickFeeAmount } from "@/lib/finance/pick-fee-amount";
 import { canDeleteInvoice } from "@/lib/finance/invoice-delete-eligibility";
-import { getInvoiceDeleteContext, listStudentIdsWithInvoice } from "@/lib/data/invoices";
+import { getInvoiceDeleteContext, listStudentInvoiceTypeMap } from "@/lib/data/invoices";
 import { createClient } from "@/lib/supabase/server";
 
 export type GenerateInvoicesResult =
@@ -94,9 +94,9 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
     return { ok: false, error: "รายการค่าใช้จ่ายไม่ตรงกับประเภทใบแจ้ง" };
   }
 
-  const [enrollments, existingSet] = await Promise.all([
+  const [enrollments, typesByStudent] = await Promise.all([
     loadEnrollmentsForInvoice(input.semesterId, input.studentIds),
-    listStudentIdsWithInvoice(input.semesterId),
+    listStudentInvoiceTypeMap(input.semesterId),
   ]);
 
   if (enrollments.length === 0) {
@@ -169,7 +169,9 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
   const lineRows: LineRow[] = [];
 
   for (const enrollment of enrollments) {
-    if (existingSet.has(enrollment.studentId)) {
+    // Skip only if the student already has an invoice of THIS type; they may
+    // still receive invoices of other types (e.g. ค่าเรียนพิเศษ after ค่าธรรมเนียม).
+    if (typesByStudent.get(enrollment.studentId)?.has(input.invoiceTypeId)) {
       skipped += 1;
       continue;
     }

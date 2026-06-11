@@ -238,15 +238,16 @@ export type InvoiceCandidateRow = {
   studentName: string;
   gradeClassroom: string;
   gradeSortOrder: number;
-  hasInvoice: boolean;
+  /** Invoice type ids the student already has an invoice for this semester. */
+  invoiceTypeIds: string[];
 };
 
 export async function listInvoiceCandidates(semesterId: string): Promise<InvoiceCandidateRow[]> {
   const supabase = await createClient();
-  const [gradeByStudent, gradeSortByStudent, existingSet] = await Promise.all([
+  const [gradeByStudent, gradeSortByStudent, typesByStudent] = await Promise.all([
     getStudentGradeMap(semesterId),
     getStudentGradeSortMap(semesterId),
-    listStudentIdsWithInvoice(semesterId),
+    listStudentInvoiceTypeMap(semesterId),
   ]);
 
   const { data } = await supabase
@@ -272,7 +273,7 @@ export async function listInvoiceCandidates(semesterId: string): Promise<Invoice
     studentName: formatStudentName(row.students.first_name, row.students.last_name),
     gradeClassroom: gradeByStudent.get(row.student_id) ?? "—",
     gradeSortOrder: gradeSortByStudent.get(row.student_id) ?? 0,
-    hasInvoice: existingSet.has(row.student_id),
+    invoiceTypeIds: [...(typesByStudent.get(row.student_id) ?? [])],
   }));
 }
 
@@ -323,6 +324,28 @@ export async function listStudentIdsWithInvoice(semesterId: string): Promise<Set
     .eq("semester_id", semesterId);
 
   return new Set((data ?? []).map((r) => r.student_id));
+}
+
+/** Map of studentId → set of invoice_type_ids the student already has this semester. */
+export async function listStudentInvoiceTypeMap(
+  semesterId: string,
+): Promise<Map<string, Set<string>>> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("student_invoices")
+    .select("student_id, invoice_type_id")
+    .eq("semester_id", semesterId);
+
+  const map = new Map<string, Set<string>>();
+  for (const r of (data ?? []) as { student_id: string; invoice_type_id: string }[]) {
+    let set = map.get(r.student_id);
+    if (!set) {
+      set = new Set();
+      map.set(r.student_id, set);
+    }
+    set.add(r.invoice_type_id);
+  }
+  return map;
 }
 
 function round2(n: number) {
