@@ -85,6 +85,7 @@ export function RegistrationPanel() {
   const [deleteTarget, setDeleteTarget] = useState<
     { type: "grade"; id: string; name: string } | { type: "classroom"; id: string; name: string } | null
   >(null);
+  const [confirmCopyStudentsOpen, setConfirmCopyStudentsOpen] = useState(false);
 
   const semesterId = ctx?.semesterId ?? null;
   const semesterNumber = ctx?.semesterNumber ?? 1;
@@ -231,19 +232,23 @@ export function RegistrationPanel() {
       label: s.name ? `ภาค ${s.number} (${s.name})` : `ภาค ${s.number}`,
     }));
 
-  function handleCopyStructure() {
+  function handleCopyStructure(includeStudents: boolean) {
     if (!copySourceId) {
       toast.error("กรุณาเลือกภาคเรียนต้นทาง");
       return;
     }
     if (!semesterId) return;
     startCopyTransition(async () => {
-      const result = await copySemesterStructure(copySourceId, semesterId);
+      const result = await copySemesterStructure(copySourceId, semesterId, includeStudents);
       if (!result.ok) {
         toast.error(result.error);
         return;
       }
-      toast.success("คัดลอกโครงสร้างแล้ว");
+      toast.success(
+        includeStudents
+          ? `คัดลอกพร้อมนักเรียน ${result.enrolledCount} คน`
+          : "คัดลอกโครงสร้างแล้ว",
+      );
       invalidateAll();
     });
   }
@@ -277,7 +282,7 @@ export function RegistrationPanel() {
           {isAdmin && grades.length === 0 && copySourceOptions.length > 0 && (
             <div className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3">
               <p className="text-sm text-muted-foreground">
-                ภาค {semesterNumber} ยังไม่มีชั้นเรียน — คัดลอกโครงสร้างจากภาคอื่น (ไม่รวมนักเรียน)
+                ภาค {semesterNumber} ยังไม่มีชั้นเรียน — คัดลอกโครงสร้างจากภาคอื่น
               </p>
               <Select
                 value={copySourceId || null}
@@ -300,10 +305,19 @@ export function RegistrationPanel() {
                 variant="secondary"
                 size="sm"
                 disabled={copyPending || !copySourceId}
-                onClick={handleCopyStructure}
+                onClick={() => handleCopyStructure(false)}
               >
                 <Copy className="mr-1 h-4 w-4" />
-                {copyPending ? "กำลังคัดลอก..." : "คัดลอกโครงสร้าง"}
+                {copyPending ? "กำลังคัดลอก..." : "คัดลอกแต่โครงสร้าง"}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={copyPending || !copySourceId}
+                onClick={() => setConfirmCopyStudentsOpen(true)}
+              >
+                <Copy className="mr-1 h-4 w-4" />
+                {copyPending ? "กำลังคัดลอก..." : "คัดลอกพร้อมนักเรียน"}
               </Button>
             </div>
           )}
@@ -727,6 +741,29 @@ export function RegistrationPanel() {
                   onClick={handleDelete}
                 >
                   ลบ
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          <AlertDialog open={confirmCopyStudentsOpen} onOpenChange={setConfirmCopyStudentsOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>คัดลอกพร้อมนักเรียน</AlertDialogTitle>
+                <AlertDialogDescription>
+                  คัดลอกโครงสร้างพร้อมลงทะเบียนนักเรียนที่กำลังเรียนเข้าห้องเดิม?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={copyPending}>ยกเลิก</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    setConfirmCopyStudentsOpen(false);
+                    handleCopyStructure(true);
+                  }}
+                  disabled={copyPending}
+                >
+                  ยืนยัน
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
