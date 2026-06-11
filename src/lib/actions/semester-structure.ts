@@ -91,6 +91,8 @@ export async function copySemesterStructure(
       return { ok: false, error: "ไม่สามารถคัดลอกห้องเรียนได้" };
     }
 
+    // Classroom names are unique within a grade (classrooms_semester_grade_name_unique),
+    // so matching source→target rooms by name within this grade is collision-free.
     const targetIdByName = new Map(insertedClassrooms.map((c) => [c.name, c.id]));
     for (const sourceClassroom of sourceClassrooms) {
       const targetId = targetIdByName.get(sourceClassroom.name);
