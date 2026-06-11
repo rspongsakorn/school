@@ -103,7 +103,6 @@ export type Database = {
         student_id: string;
         academic_year_id: string;
         semester_id: string;
-        invoice_name: string;
         subtotal: number;
         discount_type: "percent" | "fixed" | null;
         discount_value: number | null;

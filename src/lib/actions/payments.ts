@@ -44,7 +44,7 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
 
   const { data: invoice } = await supabase
     .from("student_invoices")
-    .select("id, invoice_name, total_amount, paid_amount, receipt_type_id, student_id")
+    .select("id, total_amount, paid_amount, receipt_type_id, student_id, receipt_types ( name )")
     .eq("id", input.invoiceId)
     .maybeSingle();
 
@@ -62,7 +62,7 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
   if (!resolved.ok) return { ok: false, error: resolved.error };
 
   const receiptTypeId = invoice.receipt_type_id;
-  if (!receiptTypeId) return { ok: false, error: "ใบแจ้งชำระไม่มีประเภทใบเสร็จ" };
+  if (!receiptTypeId) return { ok: false, error: "ใบแจ้งชำระไม่มีประเภทใบแจ้ง" };
 
   const allocations = [{ invoiceId: invoice.id, amount: resolved.amount }];
 
@@ -90,9 +90,11 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
   const gradeByStudent = await getStudentGradeMap(input.semesterId);
   const gradeClassroom = gradeByStudent.get(input.studentId) ?? "—";
 
+  const invoiceName =
+    (invoice as unknown as { receipt_types: { name: string } | null }).receipt_types?.name ?? "—";
   const allocationDetails = allocations.map((a) => ({
     invoiceId: a.invoiceId,
-    invoiceName: invoice.invoice_name,
+    invoiceName,
     amount: a.amount,
   }));
 
@@ -275,7 +277,7 @@ export async function importPaymentsBackfill(input: {
     getStudentGradeMap(input.semesterId),
   ]);
 
-  if (!receiptTypeId) return { ok: false, error: "ไม่พบประเภทใบเสร็จเริ่มต้น" };
+  if (!receiptTypeId) return { ok: false, error: "ไม่พบประเภทใบแจ้งเริ่มต้น" };
 
   let nextSeq =
     parseMaxSequence(

@@ -33,7 +33,7 @@ type RawPayment = {
   payment_allocations: Array<{
     amount: string;
     student_invoices: {
-      invoice_name: string;
+      receipt_types: { name: string } | null;
       semesters: { number: number } | null;
       invoice_lines: Array<{
         amount: string;
@@ -62,7 +62,7 @@ export async function getReceiptPrintData(
       payment_allocations (
         amount,
         student_invoices (
-          invoice_name,
+          receipt_types ( name ),
           semesters ( number ),
           invoice_lines ( amount, fee_items ( name ) )
         )
@@ -94,7 +94,7 @@ export async function getReceiptPrintData(
     }
 
     // Partial payment — single consolidated line to avoid total mismatch
-    return [{ name: inv.invoice_name, amount: allocAmount }];
+    return [{ name: inv.receipt_types?.name ?? "รายการค่าธรรมเนียม", amount: allocAmount }];
   });
 
   const semesterNumber =

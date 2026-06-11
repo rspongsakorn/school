@@ -146,7 +146,6 @@ export async function fetchAllInvoices(params: {
       `
       id,
       student_id,
-      invoice_name,
       subtotal,
       total_amount,
       paid_amount,
@@ -155,6 +154,7 @@ export async function fetchAllInvoices(params: {
       discount_value,
       is_reimbursable,
       receipt_type_id,
+      receipt_types ( name ),
       created_at,
       students!inner ( student_code, first_name, last_name )
     `,
@@ -168,7 +168,7 @@ export async function fetchAllInvoices(params: {
   type Row = {
     id: string;
     student_id: string;
-    invoice_name: string;
+    receipt_types: { name: string } | null;
     subtotal: number;
     total_amount: number;
     paid_amount: number;
@@ -196,7 +196,7 @@ export async function fetchAllInvoices(params: {
       gradeClassroom: enroll?.gradeClassroom ?? "—",
       gradeLevelId: enroll?.gradeLevelId ?? null,
       classroomId: enroll?.classroomId ?? null,
-      invoiceName: row.invoice_name,
+      invoiceName: row.receipt_types?.name ?? "—",
       subtotal: Number(row.subtotal),
       totalAmount,
       paidAmount,
@@ -282,7 +282,6 @@ export async function fetchInvoicesPaginated(params: {
       `
       id,
       student_id,
-      invoice_name,
       subtotal,
       total_amount,
       paid_amount,
@@ -291,6 +290,7 @@ export async function fetchInvoicesPaginated(params: {
       discount_value,
       is_reimbursable,
       receipt_type_id,
+      receipt_types ( name ),
       created_at,
       students!inner ( student_code, first_name, last_name )
     `,
@@ -329,7 +329,7 @@ export async function fetchInvoicesPaginated(params: {
   type Row = {
     id: string;
     student_id: string;
-    invoice_name: string;
+    receipt_types: { name: string } | null;
     subtotal: number;
     total_amount: number;
     paid_amount: number;
@@ -356,7 +356,7 @@ export async function fetchInvoicesPaginated(params: {
       gradeClassroom: gradeByStudent.get(row.student_id) ?? "—",
       gradeLevelId: null,
       classroomId: null,
-      invoiceName: row.invoice_name,
+      invoiceName: row.receipt_types?.name ?? "—",
       subtotal: Number(row.subtotal),
       totalAmount,
       paidAmount,

@@ -537,7 +537,7 @@ export function InvoicesPanel() {
                     <TableHead>รหัส</TableHead>
                     <TableHead>ชื่อ-นามสกุล</TableHead>
                     <TableHead>ชั้น/ห้อง</TableHead>
-                    <TableHead>ใบแจ้ง</TableHead>
+                    <TableHead>ประเภทใบแจ้ง</TableHead>
                     <TableHead className="text-right">ต้องชำระ</TableHead>
                     <TableHead className="text-right">ค้าง</TableHead>
                     <TableHead>สถานะ</TableHead>

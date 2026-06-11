@@ -23,7 +23,7 @@ export async function createFeeItem(input: {
 
   const name = input.name.trim();
   if (!name) return { ok: false, error: "กรุณาระบุชื่อรายการ" };
-  if (!input.receiptTypeId) return { ok: false, error: "ไม่พบประเภทใบเสร็จ" };
+  if (!input.receiptTypeId) return { ok: false, error: "ไม่พบประเภทใบแจ้ง" };
 
   const supabase = await createClient();
   const { error } = await supabase.from("fee_items").insert({

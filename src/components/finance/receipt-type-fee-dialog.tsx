@@ -41,7 +41,7 @@ export function ReceiptTypeFeeDialog({ receiptType, open, onOpenChange }: Props)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-[calc(100%-2rem)] overflow-y-auto sm:max-w-5xl">
+      <DialogContent className="max-h-[95vh] w-[96vw] max-w-[96vw] overflow-y-auto sm:max-w-[96vw]">
         <DialogHeader>
           <DialogTitle>ตั้งค่าค่าธรรมเนียม — {receiptType?.name}</DialogTitle>
         </DialogHeader>

@@ -31,9 +31,9 @@ export async function createReceiptType(input: {
   });
 
   if (error?.code === "23505") {
-    return { ok: false, error: "รหัสประเภทใบเสร็จนี้มีอยู่แล้ว" };
+    return { ok: false, error: "รหัสประเภทใบแจ้งนี้มีอยู่แล้ว" };
   }
-  if (error) return { ok: false, error: "ไม่สามารถเพิ่มประเภทใบเสร็จได้" };
+  if (error) return { ok: false, error: "ไม่สามารถเพิ่มประเภทใบแจ้งได้" };
 
   revalidateReceiptTypePaths();
   return { ok: true };
@@ -67,9 +67,9 @@ export async function updateReceiptType(
     .eq("id", id);
 
   if (error?.code === "23505") {
-    return { ok: false, error: "รหัสประเภทใบเสร็จนี้มีอยู่แล้ว" };
+    return { ok: false, error: "รหัสประเภทใบแจ้งนี้มีอยู่แล้ว" };
   }
-  if (error) return { ok: false, error: "ไม่สามารถบันทึกประเภทใบเสร็จได้" };
+  if (error) return { ok: false, error: "ไม่สามารถบันทึกประเภทใบแจ้งได้" };
 
   revalidateReceiptTypePaths();
   return { ok: true };

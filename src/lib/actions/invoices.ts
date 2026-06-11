@@ -75,7 +75,7 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
   }
 
   if (!input.receiptTypeId) {
-    return { ok: false, error: "กรุณาเลือกประเภทใบเสร็จ" };
+    return { ok: false, error: "กรุณาเลือกประเภทใบแจ้ง" };
   }
 
   const supabase = await createClient();
@@ -93,7 +93,7 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
     itemTypeRows.every((r) => r.receipt_type_id === input.receiptTypeId);
 
   if (!itemsMatchType) {
-    return { ok: false, error: "รายการค่าใช้จ่ายไม่ตรงกับประเภทใบเสร็จ" };
+    return { ok: false, error: "รายการค่าใช้จ่ายไม่ตรงกับประเภทใบแจ้ง" };
   }
 
   const [enrollments, existingSet] = await Promise.all([
@@ -143,7 +143,6 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
 
   const reimbursableSet = new Set(input.reimbursableStudentIds ?? []);
 
-  const invoiceName = `ภาคเรียนที่ ${input.semesterNumber}/${input.academicYearName}`;
   let created = 0;
   let skipped = 0;
 
@@ -154,7 +153,6 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
     academic_year_id: string;
     semester_id: string;
     receipt_type_id: string;
-    invoice_name: string;
     subtotal: number;
     total_amount: number;
     paid_amount: number;
@@ -214,7 +212,6 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
       academic_year_id: input.academicYearId,
       semester_id: input.semesterId,
       receipt_type_id: input.receiptTypeId,
-      invoice_name: invoiceName,
       subtotal,
       total_amount: totalAmount,
       paid_amount: 0,

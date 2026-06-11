@@ -194,7 +194,7 @@ export function InvoiceGenerateDialog({
   function handleRequestSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!receiptTypeId) {
-      toast.error("กรุณาเลือกประเภทใบเสร็จ");
+      toast.error("กรุณาเลือกประเภทใบแจ้ง");
       return;
     }
     if (selectedFeeItemIds.size === 0) {
@@ -260,7 +260,7 @@ export function InvoiceGenerateDialog({
             <div className="space-y-5">
               {/* Receipt type selector */}
               <div className="space-y-2">
-                <Label className="text-xs font-medium text-muted-foreground">ประเภทใบเสร็จ</Label>
+                <Label className="text-xs font-medium text-muted-foreground">ประเภทใบแจ้ง</Label>
                 <select
                   className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-ring"
                   value={receiptTypeId}

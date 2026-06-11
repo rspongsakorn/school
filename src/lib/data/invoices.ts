@@ -97,7 +97,6 @@ export async function listInvoicesPaginated(params: {
       `
       id,
       student_id,
-      invoice_name,
       subtotal,
       total_amount,
       paid_amount,
@@ -106,6 +105,7 @@ export async function listInvoicesPaginated(params: {
       discount_value,
       is_reimbursable,
       receipt_type_id,
+      receipt_types ( name ),
       created_at,
       students!inner ( student_code, first_name, last_name )
     `,
@@ -140,7 +140,7 @@ export async function listInvoicesPaginated(params: {
   type Row = {
     id: string;
     student_id: string;
-    invoice_name: string;
+    receipt_types: { name: string } | null;
     subtotal: number;
     total_amount: number;
     paid_amount: number;
@@ -165,7 +165,7 @@ export async function listInvoicesPaginated(params: {
       studentCode: row.students.student_code,
       studentName: formatStudentName(row.students.first_name, row.students.last_name),
       gradeClassroom: gradeByStudent.get(row.student_id) ?? "—",
-      invoiceName: row.invoice_name,
+      invoiceName: row.receipt_types?.name ?? "—",
       subtotal: Number(row.subtotal),
       totalAmount,
       paidAmount,
@@ -197,7 +197,7 @@ export async function getStudentOutstandingInvoices(
   const supabase = await createClient();
   const { data } = await supabase
     .from("student_invoices")
-    .select("id, invoice_name, total_amount, paid_amount, created_at, status, invoice_lines(id, description, amount)")
+    .select("id, receipt_types ( name ), total_amount, paid_amount, created_at, status, invoice_lines(id, description, amount)")
     .eq("student_id", studentId)
     .eq("semester_id", semesterId)
     .in("status", ["unpaid", "partial"])
@@ -205,7 +205,7 @@ export async function getStudentOutstandingInvoices(
 
   type Row = {
     id: string;
-    invoice_name: string;
+    receipt_types: { name: string } | null;
     total_amount: number;
     paid_amount: number;
     created_at: string;
@@ -222,7 +222,7 @@ export async function getStudentOutstandingInvoices(
     }));
     return {
       id: row.id,
-      invoiceName: row.invoice_name,
+      invoiceName: row.receipt_types?.name ?? "—",
       totalAmount,
       paidAmount,
       outstanding: Math.max(0, round2(totalAmount - paidAmount)),

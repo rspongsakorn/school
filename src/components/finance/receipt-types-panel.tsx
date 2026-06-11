@@ -91,7 +91,7 @@ export function ReceiptTypesPanel() {
       return;
     }
 
-    toast.success(mode === "create" ? "เพิ่มประเภทใบเสร็จแล้ว" : "บันทึกแล้ว");
+    toast.success(mode === "create" ? "เพิ่มประเภทใบแจ้งแล้ว" : "บันทึกแล้ว");
     setDialogOpen(false);
     queryClient.invalidateQueries({ queryKey: ["receipt-types"] });
   }
@@ -99,7 +99,7 @@ export function ReceiptTypesPanel() {
   if (isLoading) {
     return (
       <>
-        <AppHeader title="ประเภทใบเสร็จ" />
+        <AppHeader title="ประเภทใบแจ้ง" />
         <main className="p-4 lg:p-6">
           <Card className="border-border shadow-sm">
             <CardContent className="p-6">
@@ -117,12 +117,12 @@ export function ReceiptTypesPanel() {
 
   return (
     <>
-      <AppHeader title="ประเภทใบเสร็จ" />
+      <AppHeader title="ประเภทใบแจ้ง" />
       <main className="p-4 lg:p-6">
         <Card className="border-border shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between gap-2">
             <div className="space-y-1">
-              <CardTitle>ประเภทใบเสร็จ</CardTitle>
+              <CardTitle>ประเภทใบแจ้ง</CardTitle>
               <CardDescription>ใช้จัดประเภทรายรับในใบเสร็จ</CardDescription>
             </div>
             <Button type="button" size="sm" onClick={openCreate}>
@@ -183,7 +183,7 @@ export function ReceiptTypesPanel() {
           <form onSubmit={handleSubmit}>
             <DialogHeader>
               <DialogTitle>
-                {mode === "create" ? "เพิ่มประเภทใบเสร็จ" : "แก้ไขประเภทใบเสร็จ"}
+                {mode === "create" ? "เพิ่มประเภทใบแจ้ง" : "แก้ไขประเภทใบแจ้ง"}
               </DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
