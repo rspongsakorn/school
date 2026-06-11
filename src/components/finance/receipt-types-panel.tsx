@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil, Plus, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ import { useRequireRole } from "@/components/providers/auth-provider";
 import { AppHeader } from "@/components/app-header";
 import { createReceiptType, updateReceiptType } from "@/lib/actions/receipt-types";
 import { fetchReceiptTypes } from "@/lib/queries/receipt-types";
+import { ReceiptTypeFeeDialog } from "@/components/finance/receipt-type-fee-dialog";
 import type { ReceiptTypeRow } from "@/lib/data/receipt-types";
 
 export function ReceiptTypesPanel() {
@@ -38,6 +39,14 @@ export function ReceiptTypesPanel() {
     queryKey: ["receipt-types"],
     queryFn: fetchReceiptTypes,
   });
+
+  const [feeDialogOpen, setFeeDialogOpen] = useState(false);
+  const [feeTarget, setFeeTarget] = useState<ReceiptTypeRow | null>(null);
+
+  function openFeeConfig(row: ReceiptTypeRow) {
+    setFeeTarget(row);
+    setFeeDialogOpen(true);
+  }
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mode, setMode] = useState<"create" | "edit">("create");
@@ -146,16 +155,28 @@ export function ReceiptTypesPanel() {
                   )}
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button type="button" size="sm" variant="outline" onClick={() => openEdit(row)}>
-                    <Pencil className="mr-1 h-4 w-4" />
-                    แก้ไข
-                  </Button>
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" size="sm" variant="outline" onClick={() => openFeeConfig(row)}>
+                      <SlidersHorizontal className="mr-1 h-4 w-4" />
+                      ตั้งค่าค่าธรรมเนียม
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => openEdit(row)}>
+                      <Pencil className="mr-1 h-4 w-4" />
+                      แก้ไข
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </CardContent>
+
+      <ReceiptTypeFeeDialog
+        receiptType={feeTarget}
+        open={feeDialogOpen}
+        onOpenChange={setFeeDialogOpen}
+      />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>

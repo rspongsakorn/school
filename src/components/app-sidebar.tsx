@@ -12,7 +12,6 @@ import {
   LayoutDashboard,
   Receipt,
   Settings2,
-  SlidersHorizontal,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -28,7 +27,6 @@ const basicNav = [
 ];
 
 const financeNav = [
-  { href: "/fee-rates", label: "ตั้งค่าค่าธรรมเนียม", icon: SlidersHorizontal },
   { href: "/receipt-types", label: "ประเภทใบเสร็จ", icon: Receipt },
   { href: "/invoices", label: "ใบแจ้งชำระ", icon: FileText },
   { href: "/payments", label: "บันทึกการจ่าย", icon: CreditCard },
