@@ -7,6 +7,13 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -317,442 +324,452 @@ export function InvoicesPanel() {
     <>
       <AppHeader title="ใบแจ้งชำระ" basePath="/invoices" />
       <main className="p-4 lg:p-6">
-        {!ctx && !ctxLoading ? (
-          <p className="text-sm text-muted-foreground">ยังไม่มีปีการศึกษา/ภาคเรียนในระบบ</p>
-        ) : isLoading ? (
-          <div className="space-y-4">
-            <Skeleton className="h-10 w-full max-w-2xl" />
-            <TableSkeleton rows={8} />
-          </div>
-        ) : ctx ? (
-          <div className={cn("space-y-4 transition-opacity", isNavigating && "pointer-events-none opacity-60")}>
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex flex-1 flex-wrap gap-2">
-                <StudentSearchInput
-                  initialQuery={qParam}
-                  onDebouncedChange={(q) => pushParams({ q, page: 1 })}
-                />
-                <Select
-                  value={statusParam}
-                  onValueChange={(v) => pushParams({ status: v ?? "all", page: 1 })}
-                  items={STATUS_FILTER_ITEMS}
-                >
-                  <SelectTrigger className="w-[160px]">
-                    <SelectValue placeholder="สถานะ" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUS_FILTER_ITEMS.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={reimbursableParam}
-                  onValueChange={(v) => pushParams({ reimbursable: v ?? "all", page: 1 })}
-                  items={REIMBURSABLE_FILTER_ITEMS}
-                >
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue placeholder="ประเภท" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {REIMBURSABLE_FILTER_ITEMS.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={gradeParam}
-                  onValueChange={(v) => pushParams({ grade: v ?? "all", classroom: "all", page: 1 })}
-                  items={gradeItems}
-                >
-                  <SelectTrigger className="w-[120px]">
-                    <SelectValue placeholder="ชั้น" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {gradeItems.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={classroomParam}
-                  onValueChange={(v) => pushParams({ classroom: v ?? "all", page: 1 })}
-                  items={classroomItems}
-                >
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue placeholder="ห้อง" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {classroomItems.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+        <Card className="border-border shadow-sm">
+          <CardHeader>
+            <CardTitle>รายการใบแจ้งชำระ</CardTitle>
+            <CardDescription>
+              {ctx ? `${data.total} ใบ` : "ยังไม่มีปีการศึกษา/ภาคเรียน"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!ctx && !ctxLoading ? (
+              <p className="text-sm text-muted-foreground">ยังไม่มีปีการศึกษา/ภาคเรียนในระบบ</p>
+            ) : isLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-10 w-full max-w-2xl" />
+                <TableSkeleton rows={8} />
               </div>
-              <div className="flex flex-wrap gap-2">
-                {bulkDeleteCount > 0 ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="text-destructive"
-                    onClick={() => setDeleteTargetIds([...selectedIds])}
-                  >
-                    ลบที่เลือก ({bulkDeleteCount})
-                  </Button>
-                ) : null}
-                <Button type="button" onClick={() => setGenerateOpen(true)}>
-                  สร้างใบแจ้งชำระ
-                </Button>
-              </div>
-            </div>
+            ) : ctx ? (
+              <div className={cn("space-y-4 transition-opacity", isNavigating && "pointer-events-none opacity-60")}>
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex flex-1 flex-wrap gap-2">
+                    <StudentSearchInput
+                      initialQuery={qParam}
+                      onDebouncedChange={(q) => pushParams({ q, page: 1 })}
+                    />
+                    <Select
+                      value={statusParam}
+                      onValueChange={(v) => pushParams({ status: v ?? "all", page: 1 })}
+                      items={STATUS_FILTER_ITEMS}
+                    >
+                      <SelectTrigger className="w-[160px]">
+                        <SelectValue placeholder="สถานะ" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUS_FILTER_ITEMS.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={reimbursableParam}
+                      onValueChange={(v) => pushParams({ reimbursable: v ?? "all", page: 1 })}
+                      items={REIMBURSABLE_FILTER_ITEMS}
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue placeholder="ประเภท" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {REIMBURSABLE_FILTER_ITEMS.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={gradeParam}
+                      onValueChange={(v) => pushParams({ grade: v ?? "all", classroom: "all", page: 1 })}
+                      items={gradeItems}
+                    >
+                      <SelectTrigger className="w-[120px]">
+                        <SelectValue placeholder="ชั้น" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {gradeItems.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={classroomParam}
+                      onValueChange={(v) => pushParams({ classroom: v ?? "all", page: 1 })}
+                      items={classroomItems}
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue placeholder="ห้อง" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {classroomItems.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {bulkDeleteCount > 0 ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="text-destructive"
+                        onClick={() => setDeleteTargetIds([...selectedIds])}
+                      >
+                        ลบที่เลือก ({bulkDeleteCount})
+                      </Button>
+                    ) : null}
+                    <Button type="button" onClick={() => setGenerateOpen(true)}>
+                      สร้างใบแจ้งชำระ
+                    </Button>
+                  </div>
+                </div>
 
-            {/* Mobile stacked cards */}
-            {filteredRows.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground sm:hidden">
-                ไม่พบใบแจ้งชำระ
-              </p>
-            ) : (
-              <div className="sm:hidden divide-y divide-border rounded-lg border border-border">
-                {data.rows.map((row) => {
-                  const deleteCtx = deleteContextFor(row);
-                  const deletable = canDeleteInvoice(deleteCtx);
-                  const blockedReason = invoiceDeleteBlockedReason(deleteCtx);
-                  return (
-                    <div key={row.id} className="space-y-2 px-4 py-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="truncate font-medium">{row.studentName}</p>
-                            {row.isReimbursable ? (
-                              <Badge className="bg-sky-50 text-sky-700 hover:bg-sky-50">เบิกได้</Badge>
-                            ) : null}
-                          </div>
-                          <p className="mt-0.5 text-sm text-muted-foreground">
-                            {row.studentCode} · {row.gradeClassroom}
-                          </p>
-                          <p className="mt-0.5 max-w-[200px] truncate text-sm text-muted-foreground">
-                            {row.invoiceName}
-                          </p>
-                        </div>
-                        <Badge className={statusBadgeClass(row.status)}>
-                          {INVOICE_STATUS_LABELS[row.status]}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">
-                          ต้องชำระ{" "}
-                          <span className="tabular-nums text-foreground">
-                            {formatBaht(row.totalAmount)}
-                          </span>
-                        </span>
-                        {row.outstanding > 0 ? (
-                          <span className="text-amber-700 tabular-nums">
-                            ค้าง {formatBaht(row.outstanding)}
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="flex justify-end gap-2">
-                        {row.status !== "paid" ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => { setPaymentTarget(row); setPaymentOpen(true); }}
-                          >
-                            ชำระเงิน
-                          </Button>
-                        ) : null}
-                        {row.paidAmount > 0 ? (
-                          <a href={paymentsHref(row.studentCode)}>
-                            <Button type="button" size="sm" variant="outline">
-                              ดูการชำระ
-                            </Button>
-                          </a>
-                        ) : null}
-                        {row.paidAmount === 0 ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setReimbursableTarget(row)}
-                          >
-                            {row.isReimbursable ? "เปลี่ยนเป็นเบิกไม่ได้" : "เปลี่ยนเป็นเบิกได้"}
-                          </Button>
-                        ) : null}
-                        {row.paidAmount === 0 ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setDiscountTarget(row)}
-                          >
-                            ส่วนลด
-                          </Button>
-                        ) : null}
-                        {deletable ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="text-destructive"
-                            onClick={() => setDeleteTargetIds([row.id])}
-                          >
-                            ลบ
-                          </Button>
-                        ) : blockedReason ? (
-                          <span className="text-xs text-muted-foreground" title={blockedReason}>
-                            ลบไม่ได้
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Desktop table */}
-            <div className="hidden sm:block">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-10">
-                      <input
-                        type="checkbox"
-                        className="size-4 rounded border-border"
-                        checked={allDeletableSelected}
-                        disabled={deletableRows.length === 0}
-                        aria-label="เลือกทั้งหมดที่ลบได้"
-                        onChange={(e) => toggleSelectAll(e.target.checked)}
-                      />
-                    </TableHead>
-                    <TableHead>รหัส</TableHead>
-                    <TableHead>ชื่อ-นามสกุล</TableHead>
-                    <TableHead>ชั้น/ห้อง</TableHead>
-                    <TableHead>ประเภทใบแจ้ง</TableHead>
-                    <TableHead className="text-right">ต้องชำระ</TableHead>
-                    <TableHead className="text-right">ค้าง</TableHead>
-                    <TableHead>สถานะ</TableHead>
-                    <TableHead className="w-[140px]" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredRows.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={9} className="py-6 text-center text-muted-foreground">
-                        ไม่พบใบแจ้งชำระ
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    data.rows.map((row) => {
+                {/* Mobile stacked cards */}
+                {filteredRows.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-muted-foreground sm:hidden">
+                    ไม่พบใบแจ้งชำระ
+                  </p>
+                ) : (
+                  <div className="sm:hidden divide-y divide-border rounded-lg border border-border">
+                    {data.rows.map((row) => {
                       const deleteCtx = deleteContextFor(row);
                       const deletable = canDeleteInvoice(deleteCtx);
                       const blockedReason = invoiceDeleteBlockedReason(deleteCtx);
                       return (
-                        <TableRow key={row.id}>
-                          <TableCell>
-                            <input
-                              type="checkbox"
-                              className="size-4 rounded border-border"
-                              checked={selectedIds.has(row.id)}
-                              disabled={!deletable}
-                              title={blockedReason ?? undefined}
-                              aria-label={`เลือก ${row.studentCode}`}
-                              onChange={(e) => toggleRow(row.id, e.target.checked)}
-                            />
-                          </TableCell>
-                          <TableCell className="tabular-nums">{row.studentCode}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <span>{row.studentName}</span>
-                              {row.isReimbursable ? (
-                                <Badge className="bg-sky-50 text-sky-700 hover:bg-sky-50">เบิกได้</Badge>
-                              ) : null}
+                        <div key={row.id} className="space-y-2 px-4 py-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="truncate font-medium">{row.studentName}</p>
+                                {row.isReimbursable ? (
+                                  <Badge className="bg-sky-50 text-sky-700 hover:bg-sky-50">เบิกได้</Badge>
+                                ) : null}
+                              </div>
+                              <p className="mt-0.5 text-sm text-muted-foreground">
+                                {row.studentCode} · {row.gradeClassroom}
+                              </p>
+                              <p className="mt-0.5 max-w-[200px] truncate text-sm text-muted-foreground">
+                                {row.invoiceName}
+                              </p>
                             </div>
-                          </TableCell>
-                          <TableCell>{row.gradeClassroom}</TableCell>
-                          <TableCell className="max-w-[180px] truncate">{row.invoiceName}</TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {formatBaht(row.totalAmount)}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {formatBaht(row.outstanding)}
-                          </TableCell>
-                          <TableCell>
                             <Badge className={statusBadgeClass(row.status)}>
                               {INVOICE_STATUS_LABELS[row.status]}
                             </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center justify-end gap-1">
-                              {row.status !== "paid" ? (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => { setPaymentTarget(row); setPaymentOpen(true); }}
-                                >
-                                  ชำระเงิน
-                                </Button>
-                              ) : null}
-                              {row.paidAmount > 0 ? (
-                                <a
-                                  href={paymentsHref(row.studentCode)}
-                                  className={buttonVariants({ size: "sm", variant: "outline" })}
-                                >
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">
+                              ต้องชำระ{" "}
+                              <span className="tabular-nums text-foreground">
+                                {formatBaht(row.totalAmount)}
+                              </span>
+                            </span>
+                            {row.outstanding > 0 ? (
+                              <span className="text-amber-700 tabular-nums">
+                                ค้าง {formatBaht(row.outstanding)}
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            {row.status !== "paid" ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => { setPaymentTarget(row); setPaymentOpen(true); }}
+                              >
+                                ชำระเงิน
+                              </Button>
+                            ) : null}
+                            {row.paidAmount > 0 ? (
+                              <a href={paymentsHref(row.studentCode)}>
+                                <Button type="button" size="sm" variant="outline">
                                   ดูการชำระ
-                                </a>
-                              ) : null}
-                              {row.paidAmount === 0 ? (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  className={row.isReimbursable ? "text-sky-600 border-sky-200" : ""}
-                                  onClick={() => setReimbursableTarget(row)}
-                                >
-                                  {row.isReimbursable ? "เบิกได้ ✓" : "เบิกได้"}
                                 </Button>
-                              ) : null}
-                              {row.paidAmount === 0 ? (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => setDiscountTarget(row)}
-                                >
-                                  ส่วนลด
-                                </Button>
-                              ) : null}
-                              {deletable ? (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-destructive"
-                                  onClick={() => setDeleteTargetIds([row.id])}
-                                >
-                                  ลบ
-                                </Button>
-                              ) : blockedReason ? (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  disabled
-                                  title={blockedReason}
-                                >
-                                  ลบไม่ได้
-                                </Button>
-                              ) : null}
-                            </div>
+                              </a>
+                            ) : null}
+                            {row.paidAmount === 0 ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setReimbursableTarget(row)}
+                              >
+                                {row.isReimbursable ? "เปลี่ยนเป็นเบิกไม่ได้" : "เปลี่ยนเป็นเบิกได้"}
+                              </Button>
+                            ) : null}
+                            {row.paidAmount === 0 ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setDiscountTarget(row)}
+                              >
+                                ส่วนลด
+                              </Button>
+                            ) : null}
+                            {deletable ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="text-destructive"
+                                onClick={() => setDeleteTargetIds([row.id])}
+                              >
+                                ลบ
+                              </Button>
+                            ) : blockedReason ? (
+                              <span className="text-xs text-muted-foreground" title={blockedReason}>
+                                ลบไม่ได้
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Desktop table */}
+                <div className="hidden sm:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10">
+                          <input
+                            type="checkbox"
+                            className="size-4 rounded border-border"
+                            checked={allDeletableSelected}
+                            disabled={deletableRows.length === 0}
+                            aria-label="เลือกทั้งหมดที่ลบได้"
+                            onChange={(e) => toggleSelectAll(e.target.checked)}
+                          />
+                        </TableHead>
+                        <TableHead>รหัส</TableHead>
+                        <TableHead>ชื่อ-นามสกุล</TableHead>
+                        <TableHead>ชั้น/ห้อง</TableHead>
+                        <TableHead>ประเภทใบแจ้ง</TableHead>
+                        <TableHead className="text-right">ต้องชำระ</TableHead>
+                        <TableHead className="text-right">ค้าง</TableHead>
+                        <TableHead>สถานะ</TableHead>
+                        <TableHead className="w-[140px]" />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredRows.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={9} className="py-6 text-center text-muted-foreground">
+                            ไม่พบใบแจ้งชำระ
                           </TableCell>
                         </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                      ) : (
+                        data.rows.map((row) => {
+                          const deleteCtx = deleteContextFor(row);
+                          const deletable = canDeleteInvoice(deleteCtx);
+                          const blockedReason = invoiceDeleteBlockedReason(deleteCtx);
+                          return (
+                            <TableRow key={row.id}>
+                              <TableCell>
+                                <input
+                                  type="checkbox"
+                                  className="size-4 rounded border-border"
+                                  checked={selectedIds.has(row.id)}
+                                  disabled={!deletable}
+                                  title={blockedReason ?? undefined}
+                                  aria-label={`เลือก ${row.studentCode}`}
+                                  onChange={(e) => toggleRow(row.id, e.target.checked)}
+                                />
+                              </TableCell>
+                              <TableCell className="tabular-nums">{row.studentCode}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <span>{row.studentName}</span>
+                                  {row.isReimbursable ? (
+                                    <Badge className="bg-sky-50 text-sky-700 hover:bg-sky-50">เบิกได้</Badge>
+                                  ) : null}
+                                </div>
+                              </TableCell>
+                              <TableCell>{row.gradeClassroom}</TableCell>
+                              <TableCell className="max-w-[180px] truncate">{row.invoiceName}</TableCell>
+                              <TableCell className="text-right tabular-nums">
+                                {formatBaht(row.totalAmount)}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">
+                                {formatBaht(row.outstanding)}
+                              </TableCell>
+                              <TableCell>
+                                <Badge className={statusBadgeClass(row.status)}>
+                                  {INVOICE_STATUS_LABELS[row.status]}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center justify-end gap-1">
+                                  {row.status !== "paid" ? (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => { setPaymentTarget(row); setPaymentOpen(true); }}
+                                    >
+                                      ชำระเงิน
+                                    </Button>
+                                  ) : null}
+                                  {row.paidAmount > 0 ? (
+                                    <a
+                                      href={paymentsHref(row.studentCode)}
+                                      className={buttonVariants({ size: "sm", variant: "outline" })}
+                                    >
+                                      ดูการชำระ
+                                    </a>
+                                  ) : null}
+                                  {row.paidAmount === 0 ? (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      className={row.isReimbursable ? "text-sky-600 border-sky-200" : ""}
+                                      onClick={() => setReimbursableTarget(row)}
+                                    >
+                                      {row.isReimbursable ? "เบิกได้ ✓" : "เบิกได้"}
+                                    </Button>
+                                  ) : null}
+                                  {row.paidAmount === 0 ? (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => setDiscountTarget(row)}
+                                    >
+                                      ส่วนลด
+                                    </Button>
+                                  ) : null}
+                                  {deletable ? (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-destructive"
+                                      onClick={() => setDeleteTargetIds([row.id])}
+                                    >
+                                      ลบ
+                                    </Button>
+                                  ) : blockedReason ? (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      disabled
+                                      title={blockedReason}
+                                    >
+                                      ลบไม่ได้
+                                    </Button>
+                                  ) : null}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
 
-            <div className="flex items-center justify-between text-sm">
-              <p className="text-muted-foreground">
-                {data.total > 0
-                  ? `หน้า ${data.page} จาก ${Math.max(data.totalPages, 1)} (${data.total} ใบ)`
-                  : "0 ใบ"}
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={data.page <= 1}
-                  onClick={() => pushParams({ page: data.page - 1 })}
+                <div className="flex items-center justify-between text-sm">
+                  <p className="text-muted-foreground">
+                    {data.total > 0
+                      ? `หน้า ${data.page} จาก ${Math.max(data.totalPages, 1)} (${data.total} ใบ)`
+                      : "0 ใบ"}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={data.page <= 1}
+                      onClick={() => pushParams({ page: data.page - 1 })}
+                    >
+                      ก่อนหน้า
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={data.page >= data.totalPages}
+                      onClick={() => pushParams({ page: data.page + 1 })}
+                    >
+                      ถัดไป
+                    </Button>
+                  </div>
+                </div>
+
+                <InvoiceGenerateDialog
+                  open={generateOpen}
+                  onOpenChange={setGenerateOpen}
+                  semesterId={ctx.semesterId}
+                  academicYearId={ctx.academicYearId}
+                  academicYearName={ctx.academicYearName}
+                  semesterNumber={ctx.semesterNumber}
+                  feeItems={feeItems}
+                  candidates={candidates}
+                />
+
+                <InvoicePaymentDialog
+                  invoice={paymentTarget}
+                  open={paymentOpen}
+                  onOpenChange={(open) => {
+                    setPaymentOpen(open);
+                    if (!open) setPaymentTarget(null);
+                  }}
+                />
+
+                <InvoiceDiscountDialog
+                  open={Boolean(discountTarget)}
+                  onOpenChange={(open) => !open && setDiscountTarget(null)}
+                  invoice={discountTarget}
+                />
+
+                <InvoiceReimbursableDialog
+                  open={Boolean(reimbursableTarget)}
+                  onOpenChange={(open) => !open && setReimbursableTarget(null)}
+                  invoice={reimbursableTarget}
+                />
+
+                <AlertDialog
+                  open={Boolean(deleteTargetIds)}
+                  onOpenChange={(open) => !open && !deleting && setDeleteTargetIds(null)}
                 >
-                  ก่อนหน้า
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={data.page >= data.totalPages}
-                  onClick={() => pushParams({ page: data.page + 1 })}
-                >
-                  ถัดไป
-                </Button>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>ลบใบแจ้งชำระ</AlertDialogTitle>
+                      <AlertDialogDescription className="space-y-2">
+                        <span>
+                          {deleteTargetIds && deleteTargetIds.length > 1
+                            ? `ยืนยันลบ ${deleteTargetIds.length} ใบ — เฉพาะใบที่ยกเลิกใบเสร็จครบแล้วจะถูกลบ`
+                            : "ยืนยันลบใบแจ้งชำระนี้ — การลบไม่สามารถย้อนกลับได้"}
+                        </span>
+                        <span className="block text-muted-foreground">
+                          ประวัติใบเสร็จที่ยกเลิกแล้วจะยังอยู่ในระบบ
+                        </span>
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={deleting}>ยกเลิก</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-white hover:bg-destructive/90"
+                        onClick={confirmDelete}
+                        disabled={deleting}
+                      >
+                        {deleting ? "กำลังลบ..." : "ยืนยันลบ"}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
-            </div>
-
-            <InvoiceGenerateDialog
-              open={generateOpen}
-              onOpenChange={setGenerateOpen}
-              semesterId={ctx.semesterId}
-              academicYearId={ctx.academicYearId}
-              academicYearName={ctx.academicYearName}
-              semesterNumber={ctx.semesterNumber}
-              feeItems={feeItems}
-              candidates={candidates}
-            />
-
-            <InvoicePaymentDialog
-              invoice={paymentTarget}
-              open={paymentOpen}
-              onOpenChange={(open) => {
-                setPaymentOpen(open);
-                if (!open) setPaymentTarget(null);
-              }}
-            />
-
-            <InvoiceDiscountDialog
-              open={Boolean(discountTarget)}
-              onOpenChange={(open) => !open && setDiscountTarget(null)}
-              invoice={discountTarget}
-            />
-
-            <InvoiceReimbursableDialog
-              open={Boolean(reimbursableTarget)}
-              onOpenChange={(open) => !open && setReimbursableTarget(null)}
-              invoice={reimbursableTarget}
-            />
-
-            <AlertDialog
-              open={Boolean(deleteTargetIds)}
-              onOpenChange={(open) => !open && !deleting && setDeleteTargetIds(null)}
-            >
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>ลบใบแจ้งชำระ</AlertDialogTitle>
-                  <AlertDialogDescription className="space-y-2">
-                    <span>
-                      {deleteTargetIds && deleteTargetIds.length > 1
-                        ? `ยืนยันลบ ${deleteTargetIds.length} ใบ — เฉพาะใบที่ยกเลิกใบเสร็จครบแล้วจะถูกลบ`
-                        : "ยืนยันลบใบแจ้งชำระนี้ — การลบไม่สามารถย้อนกลับได้"}
-                    </span>
-                    <span className="block text-muted-foreground">
-                      ประวัติใบเสร็จที่ยกเลิกแล้วจะยังอยู่ในระบบ
-                    </span>
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel disabled={deleting}>ยกเลิก</AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-destructive text-white hover:bg-destructive/90"
-                    onClick={confirmDelete}
-                    disabled={deleting}
-                  >
-                    {deleting ? "กำลังลบ..." : "ยืนยันลบ"}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        ) : null}
+            ) : null}
+          </CardContent>
+        </Card>
       </main>
     </>
   );

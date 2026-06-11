@@ -1,7 +1,7 @@
 export type EnrollmentStatus = "enrolled" | "transferred" | "withdrawn";
 
 export const ENROLLMENT_STATUS_LABELS: Record<EnrollmentStatus, string> = {
-  enrolled: "กำลังเรียน",
+  enrolled: "กำลังศึกษา",
   transferred: "ย้ายออก",
   withdrawn: "ลาออก",
 };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { ArrowRightLeft, Copy, GraduationCap, Loader2, Pencil, Plus, Trash2, UserX } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { copySemesterStructure } from "@/lib/actions/semester-structure";
-import { ENROLLMENT_STATUS_LABELS } from "@/lib/enrollment/constants";
+import { ENROLLMENT_STATUS_LABELS, type EnrollmentStatus } from "@/lib/enrollment/constants";
 import {
   Select,
   SelectContent,
@@ -59,6 +59,13 @@ import {
 } from "@/lib/queries/registration";
 import { fetchGradeLevels, type GradeLevel } from "@/lib/queries/classrooms";
 import { AppHeader } from "@/components/app-header";
+
+// Status badge colors mirror the students page for a consistent look across pages
+const ENROLLMENT_STATUS_BADGE_CLASS: Record<EnrollmentStatus, string> = {
+  enrolled: "bg-emerald-50 text-emerald-700 hover:bg-emerald-50",
+  transferred: "bg-amber-50 text-amber-700 hover:bg-amber-50",
+  withdrawn: "bg-slate-100 text-slate-700 hover:bg-slate-100",
+};
 
 export function RegistrationPanel() {
   useRequireRole(["admin", "finance"]);
@@ -275,7 +282,7 @@ export function RegistrationPanel() {
                 href="/registration/promote"
                 className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-2")}
               >
-                <GraduationCap className="h-4 w-4" /> เลื่อนชั้นขึ้นปีการศึกษา
+                เลื่อนชั้นขึ้นปีการศึกษา
               </Link>
             </div>
           )}
@@ -307,7 +314,6 @@ export function RegistrationPanel() {
                 disabled={copyPending || !copySourceId}
                 onClick={() => handleCopyStructure(false)}
               >
-                <Copy className="mr-1 h-4 w-4" />
                 {copyPending ? "กำลังคัดลอก..." : "คัดลอกแต่โครงสร้าง"}
               </Button>
               <Button
@@ -316,19 +322,17 @@ export function RegistrationPanel() {
                 disabled={copyPending || !copySourceId}
                 onClick={() => setConfirmCopyStudentsOpen(true)}
               >
-                <Copy className="mr-1 h-4 w-4" />
                 {copyPending ? "กำลังคัดลอก..." : "คัดลอกพร้อมนักเรียน"}
               </Button>
             </div>
           )}
 
-          <div className="grid gap-4 lg:grid-cols-[200px_200px_1fr]">
+          <div className="grid gap-4 lg:grid-cols-[260px_260px_1fr]">
             <Card className="border-border shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
                 <CardTitle className="text-base">ชั้นเรียน</CardTitle>
                 {isAdmin && (
                   <Button size="sm" variant="outline" onClick={() => setGradeCreateOpen(true)}>
-                    <Plus className="mr-1 h-4 w-4" />
                     เพิ่ม
                   </Button>
                 )}
@@ -360,32 +364,31 @@ export function RegistrationPanel() {
                             {grade.name}
                           </button>
                           {isAdmin && (
-                            <div className="mr-1 flex shrink-0 gap-0.5">
+                            <div className="mr-1 flex shrink-0 gap-1">
                               <Button
                                 type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
+                                variant="outline"
+                                size="sm"
                                 title="แก้ไขชั้นเรียน"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setEditingGrade(grade);
                                 }}
                               >
-                                <Pencil className="h-4 w-4" />
+                                แก้ไข
                               </Button>
                               <Button
                                 type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-destructive"
+                                variant="outline"
+                                size="sm"
+                                className="text-destructive"
                                 title="ลบชั้นเรียน"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setDeleteTarget({ type: "grade", id: grade.id, name: grade.name });
                                 }}
                               >
-                                <Trash2 className="h-4 w-4" />
+                                ลบ
                               </Button>
                             </div>
                           )}
@@ -402,7 +405,6 @@ export function RegistrationPanel() {
                 <CardTitle className="text-base">ห้องเรียน</CardTitle>
                 {isAdmin && selectedGradeId && (
                   <Button size="sm" variant="outline" onClick={() => setClassroomCreateOpen(true)}>
-                    <Plus className="mr-1 h-4 w-4" />
                     เพิ่ม
                   </Button>
                 )}
@@ -446,25 +448,24 @@ export function RegistrationPanel() {
                             </Badge>
                           </button>
                           {isAdmin && (
-                            <div className="mr-1 flex shrink-0 gap-0.5">
+                            <div className="mr-1 flex shrink-0 gap-1">
                               <Button
                                 type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
+                                variant="outline"
+                                size="sm"
                                 title="แก้ไขห้องเรียน"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setEditingClassroom(classroom);
                                 }}
                               >
-                                <Pencil className="h-4 w-4" />
+                                แก้ไข
                               </Button>
                               <Button
                                 type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-destructive"
+                                variant="outline"
+                                size="sm"
+                                className="text-destructive"
                                 title="ลบห้องเรียน"
                                 disabled={classroom.enrolled_count > 0}
                                 onClick={(e) => {
@@ -476,7 +477,7 @@ export function RegistrationPanel() {
                                   });
                                 }}
                               >
-                                <Trash2 className="h-4 w-4" />
+                                ลบ
                               </Button>
                             </div>
                           )}
@@ -498,7 +499,6 @@ export function RegistrationPanel() {
                 </div>
                 {isAdmin && selectedClassroomId && (
                   <Button size="sm" onClick={() => setEnrollOpen(true)}>
-                    <Plus className="mr-1 h-4 w-4" />
                     เพิ่มนักเรียน
                   </Button>
                 )}
@@ -523,7 +523,7 @@ export function RegistrationPanel() {
                         <TableHead>รหัส</TableHead>
                         <TableHead>ชื่อ-นามสกุล</TableHead>
                         <TableHead>สถานะ</TableHead>
-                        {isAdmin && <TableHead className="w-[168px]">จัดการ</TableHead>}
+                        {isAdmin && <TableHead className="w-[300px]">จัดการ</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -537,44 +537,42 @@ export function RegistrationPanel() {
                             <TableCell className="font-mono text-sm">{row.studentCode}</TableCell>
                             <TableCell>{row.name}</TableCell>
                             <TableCell>
-                              <Badge variant="outline">
+                              <Badge className={ENROLLMENT_STATUS_BADGE_CLASS[row.status]}>
                                 {ENROLLMENT_STATUS_LABELS[row.status]}
                               </Badge>
                             </TableCell>
                             {isAdmin && (
                               <TableCell>
-                                <div className="flex gap-1">
+                                <div className="flex flex-wrap gap-1">
                                   <Button
                                     type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8"
+                                    variant="outline"
+                                    size="sm"
                                     title="ย้ายห้อง"
                                     onClick={() => setMoveTarget(row)}
                                   >
-                                    <ArrowRightLeft className="h-4 w-4" />
+                                    ย้ายห้อง
                                   </Button>
                                   {row.deletable ? (
                                     <Button
                                       type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-destructive"
+                                      variant="outline"
+                                      size="sm"
+                                      className="text-destructive"
                                       title="ลบออกจากห้อง"
                                       onClick={() => setEnrollmentRemoveTarget(row)}
                                     >
-                                      <Trash2 className="h-4 w-4" />
+                                      ลบ
                                     </Button>
                                   ) : null}
                                   <Button
                                     type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-destructive"
+                                    variant="outline"
+                                    size="sm"
                                     title={blockedReason ?? "เปลี่ยนสถานะ"}
                                     onClick={() => setStatusTarget(row)}
                                   >
-                                    <UserX className="h-4 w-4" />
+                                    เปลี่ยนสถานะ
                                   </Button>
                                 </div>
                               </TableCell>

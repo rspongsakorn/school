@@ -757,7 +757,7 @@ export function PaymentsPanel() {
                                 ปกติ
                               </Badge>
                             ) : (
-                              <Badge variant="outline">ยกเลิก</Badge>
+                              <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100">ยกเลิก</Badge>
                             )}
                           </div>
                         </div>
@@ -827,7 +827,7 @@ export function PaymentsPanel() {
                                   ปกติ
                                 </Badge>
                               ) : (
-                                <Badge variant="outline">ยกเลิก</Badge>
+                                <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100">ยกเลิก</Badge>
                               )}
                             </TableCell>
                             <TableCell className="text-right">
