@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { GripVertical, Lock, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
 import { Badge } from "@/components/ui/badge";
@@ -44,9 +44,10 @@ import type { FeeItemRow } from "@/lib/data/fee-items";
 type FeeItemsSectionProps = {
   items: FeeItemRow[];
   invoiceTypeId: string;
+  lockedItemIds: Set<string>;
 };
 
-export function FeeItemsSection({ items, invoiceTypeId }: FeeItemsSectionProps) {
+export function FeeItemsSection({ items, invoiceTypeId, lockedItemIds }: FeeItemsSectionProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [localItems, setLocalItems] = useState<FeeItemRow[]>(items);
@@ -211,6 +212,7 @@ export function FeeItemsSection({ items, invoiceTypeId }: FeeItemsSectionProps) 
 
   const allSelected = localItems.length > 0 && selectedIds.size === localItems.length;
   const someSelected = selectedIds.size > 0 && selectedIds.size < localItems.length;
+  const editLocked = editTarget ? lockedItemIds.has(editTarget.id) : false;
 
   return (
     <Card className="border-border shadow-sm">
@@ -298,13 +300,21 @@ export function FeeItemsSection({ items, invoiceTypeId }: FeeItemsSectionProps) 
                             </TableCell>
                             <TableCell className="font-medium">{item.name}</TableCell>
                             <TableCell>
-                              {item.isActive ? (
-                                <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50">
-                                  ใช้งาน
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline">ปิดใช้งาน</Badge>
-                              )}
+                              <div className="flex items-center gap-2">
+                                {item.isActive ? (
+                                  <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50">
+                                    ใช้งาน
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline">ปิดใช้งาน</Badge>
+                                )}
+                                {lockedItemIds.has(item.id) ? (
+                                  <Badge variant="outline" className="gap-1 text-muted-foreground">
+                                    <Lock className="h-3 w-3" />
+                                    ออกบิลแล้ว
+                                  </Badge>
+                                ) : null}
+                              </div>
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
@@ -353,6 +363,11 @@ export function FeeItemsSection({ items, invoiceTypeId }: FeeItemsSectionProps) 
               </DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
+              {editLocked ? (
+                <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+                  ออกใบแจ้งชำระแล้ว — แก้ไขได้เฉพาะสถานะใช้งาน
+                </p>
+              ) : null}
               <div className="grid gap-2">
                 <Label htmlFor="fee-item-name">ชื่อรายการ</Label>
                 <Input
@@ -360,6 +375,7 @@ export function FeeItemsSection({ items, invoiceTypeId }: FeeItemsSectionProps) 
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="เช่น ค่าเทอม"
+                  disabled={editLocked}
                 />
               </div>
               <div className="grid gap-2">
@@ -368,14 +384,16 @@ export function FeeItemsSection({ items, invoiceTypeId }: FeeItemsSectionProps) 
                   id="fee-item-desc"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
+                  disabled={editLocked}
                 />
               </div>
-              <Label className="flex w-fit cursor-pointer items-center gap-3">
+              <Label className="flex w-fit items-center gap-3 has-[:disabled]:cursor-not-allowed has-[:enabled]:cursor-pointer">
                 <input
                   type="checkbox"
                   className="size-4 rounded border-border accent-primary"
                   checked={hasReimbursableVariant}
                   onChange={(e) => setHasReimbursableVariant(e.target.checked)}
+                  disabled={editLocked}
                 />
                 มีราคาเบิกได้แยก
               </Label>
