@@ -48,7 +48,7 @@ import {
 } from "@/lib/finance/invoice-delete-eligibility";
 import { fetchAllInvoices, fetchInvoiceCandidates } from "@/lib/queries/invoices";
 import { fetchGradeLevels, fetchClassroomsBySemester } from "@/lib/queries/classrooms";
-import { fetchFeeItems } from "@/lib/queries/fee-rates";
+import { fetchAllFeeItems } from "@/lib/queries/fee-rates";
 import type { InvoiceListRow, InvoiceStatus } from "@/lib/queries/invoices";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
@@ -117,8 +117,8 @@ export function InvoicesPanel() {
   });
 
   const { data: feeItems = [] } = useQuery({
-    queryKey: ["fee-items"],
-    queryFn: fetchFeeItems,
+    queryKey: ["fee-items", "all"],
+    queryFn: fetchAllFeeItems,
     staleTime: 60_000,
   });
 

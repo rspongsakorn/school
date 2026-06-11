@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchReceiptTypes } from "@/lib/queries/receipt-types";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -52,7 +53,15 @@ export function InvoiceGenerateDialog({
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const activeItems = feeItems.filter((i) => i.isActive);
+  const { data: receiptTypes = [] } = useQuery({
+    queryKey: ["receipt-types"],
+    queryFn: fetchReceiptTypes,
+  });
+  const [receiptTypeId, setReceiptTypeId] = useState<string>("");
+
+  const activeItems = feeItems.filter(
+    (i) => i.isActive && (!receiptTypeId || i.receiptTypeId === receiptTypeId),
+  );
   const selectableCandidates = useMemo(
     () => candidates.filter((c) => !c.hasInvoice),
     [candidates],
@@ -73,12 +82,17 @@ export function InvoiceGenerateDialog({
   useEffect(() => {
     if (!open) return;
     setMode("all");
+    setReceiptTypeId("");
     setSelectedFeeItemIds(new Set(activeItems.map((i) => i.id)));
     setSelectedStudentIds(new Set());
     setReimbursableStudentIds(new Set());
     setClassroomFilter("all");
     setSearch("");
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    setSelectedFeeItemIds(new Set(activeItems.map((i) => i.id))); // eslint-disable-line react-hooks/set-state-in-effect
+  }, [receiptTypeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Unique classrooms sorted by grade sort_order defined in the system
   const classrooms = useMemo(() => {
@@ -179,6 +193,10 @@ export function InvoiceGenerateDialog({
 
   function handleRequestSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!receiptTypeId) {
+      toast.error("กรุณาเลือกประเภทใบเสร็จ");
+      return;
+    }
     if (selectedFeeItemIds.size === 0) {
       toast.error("กรุณาเลือกรายการค่าใช้จ่าย");
       return;
@@ -200,6 +218,7 @@ export function InvoiceGenerateDialog({
       academicYearId,
       academicYearName,
       semesterNumber,
+      receiptTypeId,
       feeItemIds,
       studentIds,
       reimbursableStudentIds: [...reimbursableStudentIds],
@@ -239,6 +258,25 @@ export function InvoiceGenerateDialog({
 
             {/* LEFT — mode + fee items */}
             <div className="space-y-5">
+              {/* Receipt type selector */}
+              <div className="space-y-2">
+                <Label className="text-xs font-medium text-muted-foreground">ประเภทใบเสร็จ</Label>
+                <select
+                  className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-ring"
+                  value={receiptTypeId}
+                  onChange={(e) => setReceiptTypeId(e.target.value)}
+                >
+                  <option value="">— เลือกประเภท —</option>
+                  {receiptTypes
+                    .filter((t) => t.isActive)
+                    .map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
               {/* Mode */}
               <div className="space-y-2">
                 <Label className="text-xs font-medium text-muted-foreground">สร้างให้ใคร</Label>
@@ -534,7 +572,7 @@ export function InvoiceGenerateDialog({
               </Button>
               <Button
                 type="submit"
-                disabled={submitting || targetCount === 0 || selectedFeeItemIds.size === 0}
+                disabled={submitting || targetCount === 0 || selectedFeeItemIds.size === 0 || !receiptTypeId}
               >
                 {submitting
                   ? "กำลังสร้าง..."

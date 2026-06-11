@@ -29,6 +29,31 @@ export async function fetchFeeItems(receiptTypeId: string): Promise<FeeItemRow[]
   }));
 }
 
+export async function fetchAllFeeItems(): Promise<FeeItemRow[]> {
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from("fee_items")
+    .select(
+      "id, name, description, is_tuition, is_active, sort_order, has_reimbursable_variant, receipt_type_id",
+    )
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+
+  if (error || !data) return [];
+
+  return data.map((row) => ({
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    isTuition: row.is_tuition,
+    isActive: row.is_active,
+    sortOrder: row.sort_order,
+    hasReimbursableVariant: row.has_reimbursable_variant,
+    receiptTypeId: row.receipt_type_id,
+  }));
+}
+
 export async function fetchFeeRateMatrix(
   semesterId: string,
   receiptTypeId: string,

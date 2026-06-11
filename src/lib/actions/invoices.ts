@@ -18,6 +18,7 @@ type GenerateInput = {
   academicYearId: string;
   academicYearName: string;
   semesterNumber: number;
+  receiptTypeId: string;
   feeItemIds: string[];
   studentIds?: string[];
   reimbursableStudentIds?: string[];
@@ -71,6 +72,10 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
 
   if (input.feeItemIds.length === 0) {
     return { ok: false, error: "กรุณาเลือกรายการค่าใช้จ่ายอย่างน้อย 1 รายการ" };
+  }
+
+  if (!input.receiptTypeId) {
+    return { ok: false, error: "กรุณาเลือกประเภทใบเสร็จ" };
   }
 
   const supabase = await createClient();
@@ -131,6 +136,7 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
     student_id: string;
     academic_year_id: string;
     semester_id: string;
+    receipt_type_id: string;
     invoice_name: string;
     subtotal: number;
     total_amount: number;
@@ -190,6 +196,7 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
       student_id: enrollment.studentId,
       academic_year_id: input.academicYearId,
       semester_id: input.semesterId,
+      receipt_type_id: input.receiptTypeId,
       invoice_name: invoiceName,
       subtotal,
       total_amount: totalAmount,
