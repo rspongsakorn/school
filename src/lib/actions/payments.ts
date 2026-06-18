@@ -11,6 +11,7 @@ import { formatReceiptNumber, parseMaxSequence } from "@/lib/finance/receipt-num
 import { getStudentOutstandingInvoices } from "@/lib/data/invoices";
 import { getDefaultInvoiceTypeId } from "@/lib/data/invoice-types";
 import { resolveSingleInvoicePayment } from "@/lib/finance/single-invoice-allocation";
+import { resolvePaymentDiscounts } from "@/lib/finance/payment-discount";
 import { createClient } from "@/lib/supabase/server";
 import { formatStudentName } from "@/lib/format";
 import { searchStudentsForPayment } from "@/lib/data/payments";
@@ -30,6 +31,11 @@ type RecordPaymentInput = {
   paymentMethod: "cash" | "transfer";
   transferReference?: string;
   note?: string;
+  discounts?: {
+    invoiceLineId: string;
+    discountType: "percent" | "fixed";
+    discountValue: number;
+  }[];
 };
 
 export async function recordPayment(input: RecordPaymentInput): Promise<RecordPaymentResult> {
@@ -44,16 +50,20 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
 
   type InvoiceRow = {
     id: string;
+    subtotal: number;
     total_amount: number;
     paid_amount: number;
     invoice_type_id: string | null;
     student_id: string;
     invoice_types: { name: string } | null;
+    invoice_lines: { id: string; fee_item_id: string; amount: number }[];
   };
 
   const { data: invoice } = await supabase
     .from("student_invoices")
-    .select("id, total_amount, paid_amount, invoice_type_id, student_id, invoice_types ( name )")
+    .select(
+      "id, subtotal, total_amount, paid_amount, invoice_type_id, student_id, invoice_types ( name ), invoice_lines ( id, fee_item_id, amount )",
+    )
     .eq("id", input.invoiceId)
     .maybeSingle() as unknown as { data: InvoiceRow | null };
 
@@ -62,9 +72,31 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
     return { ok: false, error: "ใบแจ้งชำระไม่ตรงกับนักเรียน" };
   }
 
+  const discountInput = input.discounts ?? [];
+  let resolvedDiscounts: { invoiceLineId: string; feeItemId: string; discountType: "percent" | "fixed"; discountValue: number; amount: number }[] = [];
+  let netTotal = Number(invoice.total_amount);
+
+  if (discountInput.length > 0) {
+    if (Number(invoice.paid_amount) > 0) {
+      return { ok: false, error: "ให้ส่วนลดได้เฉพาะใบแจ้งที่ยังไม่ชำระ" };
+    }
+    const discountResult = resolvePaymentDiscounts(
+      Number(invoice.subtotal),
+      (invoice.invoice_lines ?? []).map((l) => ({ id: l.id, feeItemId: l.fee_item_id, amount: Number(l.amount) })),
+      discountInput,
+    );
+    if (!discountResult.ok) return { ok: false, error: discountResult.error };
+    resolvedDiscounts = discountResult.rows;
+    netTotal = discountResult.netDue;
+  }
+
+  if (resolvedDiscounts.length > 0 && round2(input.amount) !== round2(netTotal)) {
+    return { ok: false, error: "เมื่อมีส่วนลด ต้องชำระเต็มยอดสุทธิ" };
+  }
+
   const outstanding = Math.max(
     0,
-    Math.round((Number(invoice.total_amount) - Number(invoice.paid_amount)) * 100) / 100,
+    Math.round((netTotal - Number(invoice.paid_amount)) * 100) / 100,
   );
 
   const resolved = resolveSingleInvoicePayment({ amount: input.amount, outstanding });
@@ -154,6 +186,24 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
     return { ok: false, error: "ไม่สามารถจัดสรรเงินเข้าใบแจ้งได้" };
   }
 
+  if (resolvedDiscounts.length > 0) {
+    const { error: discountError } = await supabase.from("payment_discounts").insert(
+      resolvedDiscounts.map((d) => ({
+        payment_id: payment.id,
+        invoice_line_id: d.invoiceLineId,
+        fee_item_id: d.feeItemId,
+        discount_type: d.discountType,
+        discount_value: d.discountValue,
+        amount: d.amount,
+      })),
+    );
+    if (discountError) {
+      await supabase.from("payment_allocations").delete().eq("payment_id", payment.id);
+      await supabase.from("payments").delete().eq("id", payment.id);
+      return { ok: false, error: "ไม่สามารถบันทึกส่วนลดได้" };
+    }
+  }
+
   const { error: receiptError } = await supabase.from("receipts").insert({
     payment_id: payment.id,
     receipt_number: receiptNumber,
@@ -162,6 +212,7 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
   });
 
   if (receiptError) {
+    await supabase.from("payment_discounts").delete().eq("payment_id", payment.id);
     await supabase.from("payment_allocations").delete().eq("payment_id", payment.id);
     await supabase.from("payments").delete().eq("id", payment.id);
     return { ok: false, error: "ไม่สามารถออกใบเสร็จได้" };
@@ -169,11 +220,11 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
 
   for (const alloc of allocations) {
     const newPaid = round2(Number(invoice.paid_amount) + alloc.amount);
-    const newStatus = deriveInvoiceStatus(newPaid, Number(invoice.total_amount));
+    const newStatus = deriveInvoiceStatus(newPaid, netTotal);
 
     const { error: updateError } = await supabase
       .from("student_invoices")
-      .update({ paid_amount: newPaid, status: newStatus })
+      .update({ paid_amount: newPaid, total_amount: netTotal, status: newStatus })
       .eq("id", alloc.invoiceId);
 
     if (updateError) {
