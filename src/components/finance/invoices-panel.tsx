@@ -39,7 +39,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AppHeader } from "@/components/app-header";
-import { InvoiceDiscountDialog } from "@/components/finance/invoice-discount-dialog";
 import { InvoicePaymentDialog } from "@/components/finance/invoice-payment-dialog";
 import { InvoiceReimbursableDialog } from "@/components/finance/invoice-reimbursable-dialog";
 import { InvoiceGenerateDialog } from "@/components/finance/invoice-generate-dialog";
@@ -102,7 +101,6 @@ export function InvoicesPanel() {
       : "all";
 
   const [generateOpen, setGenerateOpen] = useState(false);
-  const [discountTarget, setDiscountTarget] = useState<InvoiceListRow | null>(null);
   const [reimbursableTarget, setReimbursableTarget] = useState<InvoiceListRow | null>(null);
   const [paymentTarget, setPaymentTarget] = useState<InvoiceListRow | null>(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
@@ -502,16 +500,6 @@ export function InvoicesPanel() {
                                 {row.isReimbursable ? "เปลี่ยนเป็นเบิกไม่ได้" : "เปลี่ยนเป็นเบิกได้"}
                               </Button>
                             ) : null}
-                            {row.paidAmount === 0 ? (
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setDiscountTarget(row)}
-                              >
-                                ส่วนลด
-                              </Button>
-                            ) : null}
                             {deletable ? (
                               <Button
                                 type="button"
@@ -637,16 +625,6 @@ export function InvoicesPanel() {
                                       {row.isReimbursable ? "เบิกได้ ✓" : "เบิกได้"}
                                     </Button>
                                   ) : null}
-                                  {row.paidAmount === 0 ? (
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => setDiscountTarget(row)}
-                                    >
-                                      ส่วนลด
-                                    </Button>
-                                  ) : null}
                                   {deletable ? (
                                     <Button
                                       type="button"
@@ -722,12 +700,6 @@ export function InvoicesPanel() {
                     setPaymentOpen(open);
                     if (!open) setPaymentTarget(null);
                   }}
-                />
-
-                <InvoiceDiscountDialog
-                  open={Boolean(discountTarget)}
-                  onOpenChange={(open) => !open && setDiscountTarget(null)}
-                  invoice={discountTarget}
                 />
 
                 <InvoiceReimbursableDialog

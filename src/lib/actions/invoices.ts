@@ -249,51 +249,6 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
   return { ok: true, created, skipped };
 }
 
-export async function updateInvoiceDiscount(
-  invoiceId: string,
-  input: {
-    discountType: "percent" | "fixed" | null;
-    discountValue: number | null;
-  },
-): Promise<ActionState> {
-  const auth = await requireAdminAction();
-  if (!auth.ok) return auth;
-
-  const supabase = await createClient();
-  const { data: invoice } = await supabase
-    .from("student_invoices")
-    .select("subtotal, paid_amount")
-    .eq("id", invoiceId)
-    .maybeSingle();
-
-  if (!invoice) return { ok: false, error: "ไม่พบใบแจ้งชำระ" };
-  if (Number(invoice.paid_amount) > 0) {
-    return { ok: false, error: "ไม่สามารถแก้ส่วนลดหลังมีการชำระแล้ว" };
-  }
-
-  const subtotal = Number(invoice.subtotal);
-  const totalAmount = computeInvoiceTotal(
-    subtotal,
-    input.discountType,
-    input.discountValue,
-  );
-
-  const { error } = await supabase
-    .from("student_invoices")
-    .update({
-      discount_type: input.discountType,
-      discount_value: input.discountValue,
-      total_amount: totalAmount,
-      status: "unpaid",
-    })
-    .eq("id", invoiceId);
-
-  if (error) return { ok: false, error: "ไม่สามารถบันทึกส่วนลดได้" };
-
-  revalidateFinancePaths();
-  return { ok: true };
-}
-
 export type DeleteInvoicesResult =
   | { ok: true; deleted: number; skipped: number }
   | { ok: false; error: string };

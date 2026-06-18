@@ -18,8 +18,6 @@ export type InvoiceListRow = {
   paidAmount: number;
   outstanding: number;
   status: InvoiceStatus;
-  discountType: "percent" | "fixed" | null;
-  discountValue: number | null;
   isReimbursable: boolean;
   invoiceTypeId: string;
   createdAt: string;
@@ -151,8 +149,6 @@ export async function fetchAllInvoices(params: {
       total_amount,
       paid_amount,
       status,
-      discount_type,
-      discount_value,
       is_reimbursable,
       invoice_type_id,
       invoice_types ( name ),
@@ -174,8 +170,6 @@ export async function fetchAllInvoices(params: {
     total_amount: number;
     paid_amount: number;
     status: InvoiceStatus;
-    discount_type: "percent" | "fixed" | null;
-    discount_value: number | null;
     is_reimbursable: boolean;
     invoice_type_id: string;
     created_at: string;
@@ -203,8 +197,6 @@ export async function fetchAllInvoices(params: {
       paidAmount,
       outstanding: Math.max(0, round2(totalAmount - paidAmount)),
       status: row.status,
-      discountType: row.discount_type,
-      discountValue: row.discount_value != null ? Number(row.discount_value) : null,
       isReimbursable: row.is_reimbursable,
       invoiceTypeId: row.invoice_type_id,
       createdAt: row.created_at,
@@ -299,8 +291,6 @@ export async function fetchInvoicesPaginated(params: {
       total_amount,
       paid_amount,
       status,
-      discount_type,
-      discount_value,
       is_reimbursable,
       invoice_type_id,
       invoice_types ( name ),
@@ -347,8 +337,6 @@ export async function fetchInvoicesPaginated(params: {
     total_amount: number;
     paid_amount: number;
     status: InvoiceStatus;
-    discount_type: "percent" | "fixed" | null;
-    discount_value: number | null;
     is_reimbursable: boolean;
     invoice_type_id: string;
     created_at: string;
@@ -375,8 +363,6 @@ export async function fetchInvoicesPaginated(params: {
       paidAmount,
       outstanding: Math.max(0, round2(totalAmount - paidAmount)),
       status: row.status,
-      discountType: row.discount_type,
-      discountValue: row.discount_value != null ? Number(row.discount_value) : null,
       isReimbursable: row.is_reimbursable,
       invoiceTypeId: row.invoice_type_id,
       createdAt: row.created_at,
