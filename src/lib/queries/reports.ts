@@ -9,7 +9,6 @@ export type OutstandingReportRow = {
   studentName: string;
   gradeClassroom: string;
   subtotal: number;
-  discountLabel: string;
   totalAmount: number;
   paidAmount: number;
   outstanding: number;
@@ -24,15 +23,6 @@ export type CollectionsReportRow = {
   totalPaid: number;
   ratePercent: number;
 };
-
-function discountLabel(
-  discountType: "percent" | "fixed" | null,
-  discountValue: number | null,
-): string {
-  if (!discountType || discountValue == null) return "—";
-  if (discountType === "percent") return `${discountValue}%`;
-  return `฿${discountValue.toLocaleString("th-TH")}`;
-}
 
 /** Inline browser-client version of getStudentGradeMap (avoids server-only import) */
 async function getStudentGradeMap(semesterId: string): Promise<Map<string, string>> {
@@ -132,8 +122,6 @@ export async function fetchOutstandingReport(params: {
       `
       student_id,
       subtotal,
-      discount_type,
-      discount_value,
       total_amount,
       paid_amount,
       status,
@@ -166,8 +154,6 @@ export async function fetchOutstandingReport(params: {
   type Row = {
     student_id: string;
     subtotal: number;
-    discount_type: "percent" | "fixed" | null;
-    discount_value: number | null;
     total_amount: number;
     paid_amount: number;
     status: "unpaid" | "partial" | "paid";
@@ -185,7 +171,6 @@ export async function fetchOutstandingReport(params: {
       studentName: formatStudentName(row.students.first_name, row.students.last_name),
       gradeClassroom: gradeByStudent.get(row.student_id) ?? "—",
       subtotal,
-      discountLabel: discountLabel(row.discount_type, row.discount_value),
       totalAmount,
       paidAmount,
       outstanding: Math.max(0, round2(totalAmount - paidAmount)),
@@ -633,6 +618,45 @@ export async function fetchStudentStatement(
     totalPaid: round2(totalPaid),
     outstanding: Math.max(0, round2(totalDue - totalPaid)),
   };
+}
+
+export type DiscountReportItemRow = {
+  feeItemId: string;
+  feeItemName: string;
+  count: number;
+  totalDiscount: number;
+};
+export type DiscountReportResult = { rows: DiscountReportItemRow[]; grandTotal: number };
+
+export async function fetchDiscountReport(params: {
+  academicYearId: string;
+  dateFrom: string;
+  dateTo: string;
+}): Promise<DiscountReportResult> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("payment_discounts")
+    .select("amount, fee_item_id, fee_items ( name ), payments!inner ( status, academic_year_id, paid_at )")
+    .eq("payments.status", "active")
+    .eq("payments.academic_year_id", params.academicYearId)
+    .gte("payments.paid_at", `${params.dateFrom}T00:00:00+07:00`)
+    .lte("payments.paid_at", `${params.dateTo}T23:59:59+07:00`);
+
+  type Row = { amount: string; fee_item_id: string; fee_items: { name: string } | null };
+  const byItem = new Map<string, DiscountReportItemRow>();
+  let grandTotal = 0;
+  for (const r of (data ?? []) as unknown as Row[]) {
+    const amount = Number(r.amount);
+    grandTotal += amount;
+    const e = byItem.get(r.fee_item_id);
+    if (e) {
+      e.count += 1;
+      e.totalDiscount = Math.round((e.totalDiscount + amount) * 100) / 100;
+    } else {
+      byItem.set(r.fee_item_id, { feeItemId: r.fee_item_id, feeItemName: r.fee_items?.name ?? "—", count: 1, totalDiscount: amount });
+    }
+  }
+  return { rows: [...byItem.values()].sort((a, b) => b.totalDiscount - a.totalDiscount), grandTotal: Math.round(grandTotal * 100) / 100 };
 }
 
 export async function fetchStudentStatementAllYears(

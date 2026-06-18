@@ -8,7 +8,6 @@ export type OutstandingReportRow = {
   studentName: string;
   gradeClassroom: string;
   subtotal: number;
-  discountLabel: string;
   totalAmount: number;
   paidAmount: number;
   outstanding: number;
@@ -23,15 +22,6 @@ export type CollectionsReportRow = {
   totalPaid: number;
   ratePercent: number;
 };
-
-function discountLabel(
-  discountType: "percent" | "fixed" | null,
-  discountValue: number | null,
-): string {
-  if (!discountType || discountValue == null) return "—";
-  if (discountType === "percent") return `${discountValue}%`;
-  return `฿${discountValue.toLocaleString("th-TH")}`;
-}
 
 export async function listOutstandingReport(params: {
   semesterId: string;
@@ -96,8 +86,6 @@ export async function listOutstandingReport(params: {
       `
       student_id,
       subtotal,
-      discount_type,
-      discount_value,
       total_amount,
       paid_amount,
       status,
@@ -130,8 +118,6 @@ export async function listOutstandingReport(params: {
   type Row = {
     student_id: string;
     subtotal: number;
-    discount_type: "percent" | "fixed" | null;
-    discount_value: number | null;
     total_amount: number;
     paid_amount: number;
     status: "unpaid" | "partial" | "paid";
@@ -149,7 +135,6 @@ export async function listOutstandingReport(params: {
       studentName: formatStudentName(row.students.first_name, row.students.last_name),
       gradeClassroom: gradeByStudent.get(row.student_id) ?? "—",
       subtotal,
-      discountLabel: discountLabel(row.discount_type, row.discount_value),
       totalAmount,
       paidAmount,
       outstanding: Math.max(0, round2(totalAmount - paidAmount)),

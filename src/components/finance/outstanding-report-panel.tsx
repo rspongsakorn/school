@@ -354,7 +354,6 @@ export function OutstandingReportPanel() {
                   <TableHead>ชื่อ-นามสกุล</TableHead>
                   <TableHead>ชั้น/ห้อง</TableHead>
                   <TableHead className="text-right">ค่าใช้จ่าย</TableHead>
-                  <TableHead className="text-right">ส่วนลด</TableHead>
                   <TableHead className="text-right">ต้องชำระ</TableHead>
                   <TableHead className="text-right">ชำระแล้ว</TableHead>
                   <TableHead className="text-right">ค้าง</TableHead>
@@ -364,13 +363,13 @@ export function OutstandingReportPanel() {
               <TableBody>
                 {rowsLoading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="py-6 text-center text-muted-foreground">
+                    <TableCell colSpan={8} className="py-6 text-center text-muted-foreground">
                       กำลังโหลด...
                     </TableCell>
                   </TableRow>
                 ) : rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="py-6 text-center text-muted-foreground">
+                    <TableCell colSpan={8} className="py-6 text-center text-muted-foreground">
                       ไม่พบรายการค้างชำระ
                     </TableCell>
                   </TableRow>
@@ -388,7 +387,6 @@ export function OutstandingReportPanel() {
                       </TableCell>
                       <TableCell>{row.gradeClassroom}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatBaht(row.subtotal)}</TableCell>
-                      <TableCell className="text-right">{row.discountLabel}</TableCell>
                       <TableCell className="text-right tabular-nums">
                         {formatBaht(row.totalAmount)}
                       </TableCell>

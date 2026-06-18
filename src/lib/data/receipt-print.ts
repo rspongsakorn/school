@@ -13,6 +13,8 @@ export type ReceiptPrintData = {
   gradeClassroom: string;
   recordedBy: string;
   lineItems: { name: string; amount: number }[];
+  subtotal: number;
+  discounts: { name: string; amount: number }[];
 };
 
 type SnapshotData = {
@@ -41,6 +43,7 @@ type RawPayment = {
       }>;
     } | null;
   }>;
+  payment_discounts: Array<{ amount: string; fee_items: { name: string } | null }>;
 };
 
 export async function getReceiptPrintData(
@@ -66,6 +69,10 @@ export async function getReceiptPrintData(
           semesters ( number ),
           invoice_lines ( amount, fee_items ( name ) )
         )
+      ),
+      payment_discounts (
+        amount,
+        fee_items ( name )
       )
     `,
     )
@@ -85,8 +92,9 @@ export async function getReceiptPrintData(
     const linesTotal =
       Math.round(lines.reduce((sum, l) => sum + Number(l.amount), 0) * 100) / 100;
 
-    // Full payment of this invoice — expand to individual fee line items
-    if (Math.round(allocAmount * 100) / 100 === linesTotal) {
+    const hasDiscount = (payment.payment_discounts ?? []).length > 0;
+    // Full payment of this invoice (or discounted) — expand to individual fee line items
+    if (hasDiscount || Math.round(allocAmount * 100) / 100 === linesTotal) {
       return lines.map((line) => ({
         name: line.fee_items?.name ?? "รายการค่าธรรมเนียม",
         amount: Number(line.amount),
@@ -96,6 +104,14 @@ export async function getReceiptPrintData(
     // Partial payment — single consolidated line to avoid total mismatch
     return [{ name: inv.invoice_types?.name ?? "รายการค่าธรรมเนียม", amount: allocAmount }];
   });
+
+  const discounts = (payment.payment_discounts ?? []).map((d) => ({
+    name: d.fee_items?.name ?? "ส่วนลด",
+    amount: Number(d.amount),
+  }));
+
+  const subtotal =
+    Math.round(lineItems.reduce((sum, li) => sum + li.amount, 0) * 100) / 100;
 
   const semesterNumber =
     (payment.payment_allocations ?? [])
@@ -115,5 +131,7 @@ export async function getReceiptPrintData(
     gradeClassroom: snapshot.gradeClassroom ?? "—",
     recordedBy: snapshot.recordedBy ?? "—",
     lineItems,
+    subtotal,
+    discounts,
   };
 }

@@ -192,45 +192,36 @@ export default async function ReceiptPrintPage({
             ))}
           </tbody>
           <tfoot>
+            {data.discounts.length > 0 ? (
+              <>
+                <tr>
+                  <td style={{ padding: "5px 8px", border: "1px solid #d1d5db", textAlign: "right" }}>รวม</td>
+                  <td style={{ textAlign: "right", padding: "5px 8px", border: "1px solid #d1d5db", fontVariantNumeric: "tabular-nums" }}>
+                    {data.subtotal.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                </tr>
+                {data.discounts.map((d, i) => (
+                  <tr key={i}>
+                    <td style={{ padding: "5px 8px", border: "1px solid #e5e7eb", color: "#b91c1c" }}>
+                      หัก ส่วนลด ({d.name})
+                    </td>
+                    <td style={{ textAlign: "right", padding: "5px 8px", border: "1px solid #e5e7eb", color: "#b91c1c", fontVariantNumeric: "tabular-nums" }}>
+                      −{d.amount.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                ))}
+              </>
+            ) : null}
             <tr style={{ background: "#f0fdf4" }}>
-              <td
-                style={{
-                  padding: "6px 8px",
-                  border: "1px solid #d1d5db",
-                  fontWeight: 800,
-                  fontSize: "12px",
-                }}
-              >
-                รวมทั้งสิ้น
+              <td style={{ padding: "6px 8px", border: "1px solid #d1d5db", fontWeight: 800, fontSize: "12px" }}>
+                รวมสุทธิ
               </td>
-              <td
-                style={{
-                  textAlign: "right",
-                  padding: "6px 8px",
-                  border: "1px solid #d1d5db",
-                  fontWeight: 800,
-                  fontSize: "13px",
-                  color: "#166534",
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
-                {data.amount.toLocaleString("th-TH", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}{" "}
-                บาท
+              <td style={{ textAlign: "right", padding: "6px 8px", border: "1px solid #d1d5db", fontWeight: 800, fontSize: "13px", color: "#166534", fontVariantNumeric: "tabular-nums" }}>
+                {data.amount.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
               </td>
             </tr>
             <tr>
-              <td
-                colSpan={2}
-                style={{
-                  padding: "5px 8px",
-                  border: "1px solid #d1d5db",
-                  fontSize: "11px",
-                  color: "#374151",
-                }}
-              >
+              <td colSpan={2} style={{ padding: "5px 8px", border: "1px solid #d1d5db", fontSize: "11px", color: "#374151" }}>
                 <span style={{ color: "#6b7280" }}>จำนวนเงินเป็นอักษร: </span>
                 <strong>{bahtText(data.amount)}</strong>
               </td>

@@ -69,6 +69,10 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // invoiceLineId -> { value: string; unit: "fixed" | "percent" }
+  const [lineDiscounts, setLineDiscounts] = useState<
+    Record<string, { value: string; unit: "fixed" | "percent" }>
+  >({});
 
   const { data: lines = [] } = useQuery({
     queryKey: ["invoice-lines", invoice?.id],
@@ -76,13 +80,35 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
     enabled: !!invoice?.id && open,
   });
 
+  function resolveOne(lineAmount: number, raw?: { value: string; unit: "fixed" | "percent" }) {
+    if (!raw) return 0;
+    const v = Number.parseFloat(raw.value);
+    if (!Number.isFinite(v) || v <= 0) return 0;
+    const amt = raw.unit === "percent" ? (lineAmount * v) / 100 : v;
+    return Math.min(Math.round(amt * 100) / 100, lineAmount);
+  }
+
+  const totalDiscount =
+    Math.round(
+      lines.reduce((sum, l) => sum + resolveOne(l.amount, lineDiscounts[l.id]), 0) * 100,
+    ) / 100;
+  const hasDiscount = totalDiscount > 0;
+  const subtotal = invoice ? invoice.outstanding : 0;
+  const netDue = Math.round((subtotal - totalDiscount) * 100) / 100;
+
   useEffect(() => {
     if (!open || !invoice) return;
     setMethod("cash");
     setTransferRef("");
     setNote("");
     setAmount(invoice.outstanding > 0 ? String(invoice.outstanding) : "");
+    setLineDiscounts({});
   }, [open, invoice]);
+
+  // When discounting, the effective amount is always netDue (computed from
+  // the discount inputs). We derive it here so the submission path reads a
+  // consistent value regardless of the controlled-input state.
+  const effectiveAmount = hasDiscount ? (netDue > 0 ? String(netDue) : "") : amount;
 
   function printReceipt(paymentId: string) {
     if (iframeRef.current) {
@@ -96,7 +122,7 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
     e.preventDefault();
     if (!invoice || !ctx) return;
 
-    const parsed = Number.parseFloat(amount);
+    const parsed = Number.parseFloat(effectiveAmount);
     if (!Number.isFinite(parsed) || parsed <= 0) {
       toast.error("กรุณาระบุจำนวนเงิน");
       return;
@@ -109,12 +135,26 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
       toast.error("กรุณาระบุเลขอ้างอิงการโอน");
       return;
     }
+    if (hasDiscount && netDue <= 0) {
+      toast.error("ยอดสุทธิหลังหักส่วนลดต้องมากกว่า 0");
+      return;
+    }
 
     setConfirmOpen(true);
   }
 
   async function handleConfirm() {
     if (!invoice || !ctx) return;
+
+    const discounts = lines
+      .map((l) => {
+        const d = lineDiscounts[l.id];
+        if (!d) return null;
+        const v = Number.parseFloat(d.value);
+        if (!Number.isFinite(v) || v <= 0) return null;
+        return { invoiceLineId: l.id, discountType: d.unit, discountValue: v };
+      })
+      .filter((x): x is { invoiceLineId: string; discountType: "fixed" | "percent"; discountValue: number } => x != null);
 
     setSubmitting(true);
     const result = await recordPayment({
@@ -123,10 +163,11 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
       academicYearId: ctx.academicYearId,
       academicYearName: ctx.academicYearName,
       semesterId: ctx.semesterId,
-      amount: Number.parseFloat(amount),
+      amount: Number.parseFloat(effectiveAmount),
       paymentMethod: method,
       transferReference: method === "transfer" ? transferRef.trim() : undefined,
       note: note.trim() || undefined,
+      discounts: discounts.length > 0 ? discounts : undefined,
     });
     setSubmitting(false);
 
@@ -180,19 +221,58 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
                           {formatBaht(invoice.outstanding)}
                         </TableCell>
                       </TableRow>
-                      {lines.map((line) => (
-                        <TableRow key={line.id} className="border-0">
-                          <TableCell className="py-0.5 pl-5 text-xs text-muted-foreground">
-                            · {line.description}
-                          </TableCell>
-                          <TableCell className="py-0.5 text-right text-xs tabular-nums text-muted-foreground">
-                            {formatBaht(line.amount)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {lines.map((line) => {
+                        const d = lineDiscounts[line.id] ?? { value: "", unit: "fixed" as const };
+                        const resolved = resolveOne(line.amount, d);
+                        return (
+                          <TableRow key={line.id} className="border-0">
+                            <TableCell className="py-0.5 pl-5 text-xs text-muted-foreground">
+                              · {line.description}
+                            </TableCell>
+                            <TableCell className="py-0.5 text-right text-xs tabular-nums text-muted-foreground">
+                              <div className="flex items-center justify-end gap-1">
+                                {resolved > 0 ? (
+                                  <span className="text-[10px] text-green-700">−{formatBaht(resolved)}</span>
+                                ) : null}
+                                <Input
+                                  value={d.value}
+                                  onChange={(e) =>
+                                    setLineDiscounts((prev) => ({
+                                      ...prev,
+                                      [line.id]: { value: e.target.value, unit: d.unit },
+                                    }))
+                                  }
+                                  placeholder="ส่วนลด"
+                                  className="h-6 w-16 text-right text-xs"
+                                />
+                                <button
+                                  type="button"
+                                  className="text-[10px] text-primary hover:underline w-7"
+                                  onClick={() =>
+                                    setLineDiscounts((prev) => ({
+                                      ...prev,
+                                      [line.id]: { value: d.value, unit: d.unit === "fixed" ? "percent" : "fixed" },
+                                    }))
+                                  }
+                                >
+                                  {d.unit === "fixed" ? "บาท" : "%"}
+                                </button>
+                                <span className="w-16 text-right tabular-nums">{formatBaht(line.amount)}</span>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </Fragment>
                   </TableBody>
                 </Table>
+
+                {hasDiscount ? (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">ส่วนลดรวม</span>
+                    <span className="tabular-nums text-green-700">−{formatBaht(totalDiscount)}</span>
+                  </div>
+                ) : null}
 
                 {/* Form fields — amount + method side by side. Shared-row grid
                     so the input and select always align regardless of label
@@ -227,9 +307,10 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
                     min={0.01}
                     max={invoice.outstanding}
                     step="0.01"
-                    value={amount}
+                    value={effectiveAmount}
                     onChange={(e) => setAmount(e.target.value)}
                     className="tabular-nums"
+                    readOnly={hasDiscount}
                     required
                   />
                   <Select
@@ -298,7 +379,7 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle>ยืนยันการชำระเงิน</AlertDialogTitle>
             <AlertDialogDescription>
-              {invoice?.studentName} — ชำระ {formatBaht(Number.parseFloat(amount) || 0)}{" "}
+              {invoice?.studentName} — ชำระ {formatBaht(Number.parseFloat(effectiveAmount) || 0)}{" "}
               ({method === "cash" ? "เงินสด" : `โอน ref: ${transferRef}`})
             </AlertDialogDescription>
           </AlertDialogHeader>
