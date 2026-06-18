@@ -140,6 +140,15 @@ export type Database = {
         invoice_id: string;
         amount: number;
       }>;
+      payment_discounts: TableDef<{
+        id: string;
+        payment_id: string;
+        invoice_line_id: string;
+        fee_item_id: string;
+        discount_type: "percent" | "fixed";
+        discount_value: number;
+        amount: number;
+      }>;
       receipts: TableDef<{
         id: string;
         payment_id: string;
