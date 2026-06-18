@@ -539,21 +539,28 @@ export async function voidPayment(paymentId: string, reason: string): Promise<Ac
     .select("invoice_id, amount")
     .eq("payment_id", paymentId);
 
+  const { data: discountRows } = await supabase
+    .from("payment_discounts")
+    .select("id")
+    .eq("payment_id", paymentId);
+  const hadDiscount = (discountRows ?? []).length > 0;
+
   for (const alloc of allocations ?? []) {
     const { data: invoice } = await supabase
       .from("student_invoices")
-      .select("paid_amount, total_amount")
+      .select("paid_amount, total_amount, subtotal")
       .eq("id", alloc.invoice_id)
       .maybeSingle();
 
     if (!invoice) continue;
 
+    const restoredTotal = hadDiscount ? Number(invoice.subtotal) : Number(invoice.total_amount);
     const newPaid = round2(Math.max(0, Number(invoice.paid_amount) - Number(alloc.amount)));
-    const newStatus = deriveInvoiceStatus(newPaid, Number(invoice.total_amount));
+    const newStatus = deriveInvoiceStatus(newPaid, restoredTotal);
 
     await supabase
       .from("student_invoices")
-      .update({ paid_amount: newPaid, status: newStatus })
+      .update({ paid_amount: newPaid, total_amount: restoredTotal, status: newStatus })
       .eq("id", alloc.invoice_id);
   }
 
