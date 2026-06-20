@@ -4,6 +4,7 @@
 
 # dependencies
 /node_modules
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -48,3 +49,13 @@ vendor/
 
 # Brainstorming visual companion sessions
 .superpowers/
+
+# Local DB backups (contain prod data)
+backups/
+
+# Generated deliverables & build toolchains — kept local, not tracked
+manual/
+presentation/
+quotation/
+assets/hootdesk-logo.png
+*.docx
