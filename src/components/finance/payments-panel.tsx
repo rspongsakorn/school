@@ -57,6 +57,15 @@ const methodItems = [
   { value: "transfer", label: PAYMENT_METHOD_LABELS.transfer },
 ];
 
+// Resolve a single line's discount amount, capped at the line amount.
+function resolveOne(lineAmount: number, raw?: { value: string; unit: "fixed" | "percent" }) {
+  if (!raw) return 0;
+  const v = Number.parseFloat(raw.value);
+  if (!Number.isFinite(v) || v <= 0) return 0;
+  const amt = raw.unit === "percent" ? (lineAmount * v) / 100 : v;
+  return Math.min(Math.round(amt * 100) / 100, lineAmount);
+}
+
 
 export function PaymentsPanel() {
   useRequireRole(["admin", "finance"]);
@@ -89,6 +98,10 @@ export function PaymentsPanel() {
   const [method, setMethod] = useState<"cash" | "transfer">("cash");
   const [transferRef, setTransferRef] = useState("");
   const [note, setNote] = useState("");
+  // invoiceLineId -> { value: string; unit: "fixed" | "percent" } — applies to the selected invoice's lines
+  const [lineDiscounts, setLineDiscounts] = useState<
+    Record<string, { value: string; unit: "fixed" | "percent" }>
+  >({});
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -223,6 +236,7 @@ export function PaymentsPanel() {
     setLastPayment(null);
     setSelectedStudent(student);
     setSelectedInvoice(null);
+    setLineDiscounts({});
     setSearchQuery("");
     setSearchResults([]);
 
@@ -242,13 +256,17 @@ export function PaymentsPanel() {
       toast.error("เลือกใบแจ้งที่จะชำระ");
       return;
     }
-    const parsedAmount = Number.parseFloat(amount);
-    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+    const parsed = Number.parseFloat(effectiveAmount);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
       toast.error("กรุณาระบุจำนวนเงิน");
       return;
     }
-    if (parsedAmount > selectedInvoice.outstanding) {
+    if (parsed > selectedInvoice.outstanding) {
       toast.error(`จำนวนเงินเกินยอดค้าง (${formatBaht(selectedInvoice.outstanding)})`);
+      return;
+    }
+    if (hasDiscount && netDue <= 0) {
+      toast.error("ยอดสุทธิหลังหักส่วนลดต้องมากกว่า 0");
       return;
     }
 
@@ -257,7 +275,20 @@ export function PaymentsPanel() {
 
   async function handleRecord() {
     if (!selectedInvoice || !selectedStudent || !ctx) return;
-    const parsedAmount = Number.parseFloat(amount);
+    const parsedAmount = Number.parseFloat(effectiveAmount);
+
+    const discounts = selectedInvoice.lines
+      .map((l) => {
+        const d = lineDiscounts[l.id];
+        if (!d) return null;
+        const v = Number.parseFloat(d.value);
+        if (!Number.isFinite(v) || v <= 0) return null;
+        return { invoiceLineId: l.id, discountType: d.unit, discountValue: v };
+      })
+      .filter(
+        (x): x is { invoiceLineId: string; discountType: "fixed" | "percent"; discountValue: number } =>
+          x != null,
+      );
 
     setSubmitting(true);
     const result = await recordPayment({
@@ -270,6 +301,7 @@ export function PaymentsPanel() {
       paymentMethod: method,
       transferReference: method === "transfer" ? transferRef : undefined,
       note,
+      discounts: discounts.length > 0 ? discounts : undefined,
     });
     setSubmitting(false);
 
@@ -288,6 +320,7 @@ export function PaymentsPanel() {
     setAmount("");
     setNote("");
     setTransferRef("");
+    setLineDiscounts({});
     void queryClient.invalidateQueries({ queryKey: ["payments"] });
     void queryClient.invalidateQueries({ queryKey: ["invoices"] });
     void queryClient.invalidateQueries({ queryKey: ["invoice-candidates"] });
@@ -352,7 +385,17 @@ export function PaymentsPanel() {
   }
 
   const selectedOutstanding = selectedInvoice?.outstanding ?? 0;
-  const parsedAmount = Number.parseFloat(amount);
+  const selectedLines = selectedInvoice?.lines ?? [];
+  const totalDiscount =
+    Math.round(
+      selectedLines.reduce((sum, l) => sum + resolveOne(l.amount, lineDiscounts[l.id]), 0) * 100,
+    ) / 100;
+  const hasDiscount = totalDiscount > 0;
+  const netDue = Math.round((selectedOutstanding - totalDiscount) * 100) / 100;
+  // When discounting, the amount is derived from the discount inputs (netDue),
+  // so the submission path reads a consistent value regardless of the input state.
+  const effectiveAmount = hasDiscount ? (netDue > 0 ? String(netDue) : "") : amount;
+  const parsedAmount = Number.parseFloat(effectiveAmount);
   const amountExceeds = Number.isFinite(parsedAmount) && parsedAmount > selectedOutstanding;
 
   return (
@@ -546,6 +589,7 @@ export function PaymentsPanel() {
                                     variant={selectedInvoice?.id === inv.id ? "default" : "outline"}
                                     onClick={() => {
                                       setSelectedInvoice(inv);
+                                      setLineDiscounts({});
                                       setAmount(String(inv.outstanding));
                                       setTimeout(() => {
                                         amountInputRef.current?.focus();
@@ -557,22 +601,73 @@ export function PaymentsPanel() {
                                   </Button>
                                 </TableCell>
                               </TableRow>
-                              {inv.lines.map((line) => (
-                                <TableRow key={line.id} className="border-0">
-                                  <TableCell className="py-0.5 pl-5 text-xs text-muted-foreground">
-                                    · {line.description}
-                                  </TableCell>
-                                  <TableCell className="py-0.5 text-right text-xs tabular-nums text-muted-foreground">
-                                    {formatBaht(line.amount)}
-                                  </TableCell>
-                                  <TableCell />
-                                </TableRow>
-                              ))}
+                              {inv.lines.map((line) => {
+                                const isSelected = selectedInvoice?.id === inv.id;
+                                const d = lineDiscounts[line.id] ?? { value: "", unit: "fixed" as const };
+                                const resolved = isSelected ? resolveOne(line.amount, d) : 0;
+                                return (
+                                  <TableRow key={line.id} className="border-0">
+                                    <TableCell className="py-0.5 pl-5 text-xs break-words text-muted-foreground">
+                                      · {line.description}
+                                    </TableCell>
+                                    <TableCell className="py-0.5 text-right text-xs tabular-nums text-muted-foreground">
+                                      {isSelected ? (
+                                        <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+                                          {resolved > 0 ? (
+                                            <span className="shrink-0 text-[10px] text-green-700">
+                                              −{formatBaht(resolved)}
+                                            </span>
+                                          ) : null}
+                                          <Input
+                                            value={d.value}
+                                            onChange={(e) =>
+                                              setLineDiscounts((prev) => ({
+                                                ...prev,
+                                                [line.id]: { value: e.target.value, unit: d.unit },
+                                              }))
+                                            }
+                                            placeholder="ส่วนลด"
+                                            className="h-6 w-24 shrink-0 text-right text-xs"
+                                          />
+                                          <button
+                                            type="button"
+                                            className="w-6 shrink-0 text-[10px] text-primary hover:underline"
+                                            onClick={() =>
+                                              setLineDiscounts((prev) => ({
+                                                ...prev,
+                                                [line.id]: {
+                                                  value: d.value,
+                                                  unit: d.unit === "fixed" ? "percent" : "fixed",
+                                                },
+                                              }))
+                                            }
+                                          >
+                                            {d.unit === "fixed" ? "บาท" : "%"}
+                                          </button>
+                                          <span className="w-16 shrink-0 text-right tabular-nums">
+                                            {formatBaht(line.amount)}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        formatBaht(line.amount)
+                                      )}
+                                    </TableCell>
+                                    <TableCell />
+                                  </TableRow>
+                                );
+                              })}
                             </Fragment>
                           ))
                         )}
                       </TableBody>
                     </Table>
+
+                    {hasDiscount ? (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">ส่วนลดรวม</span>
+                        <span className="tabular-nums text-green-700">−{formatBaht(totalDiscount)}</span>
+                      </div>
+                    ) : null}
 
                     {selectedInvoice ? (
                       <p className="text-sm">
@@ -592,7 +687,7 @@ export function PaymentsPanel() {
                         <button
                           type="button"
                           className="text-xs text-primary hover:underline disabled:opacity-50"
-                          disabled={!selectedInvoice || selectedOutstanding <= 0}
+                          disabled={!selectedInvoice || selectedOutstanding <= 0 || hasDiscount}
                           onClick={() => setAmount(String(selectedOutstanding))}
                         >
                           ชำระเต็มจำนวน
@@ -609,8 +704,9 @@ export function PaymentsPanel() {
                         type="number"
                         min={0}
                         step="0.01"
-                        value={amount}
+                        value={effectiveAmount}
                         onChange={(e) => setAmount(e.target.value)}
+                        readOnly={hasDiscount}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
                             e.preventDefault();
@@ -868,10 +964,16 @@ export function PaymentsPanel() {
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <div className="space-y-1 rounded-lg border border-border bg-muted/30 p-3 text-sm">
+                {hasDiscount ? (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">ส่วนลด</span>
+                    <span className="tabular-nums text-green-700">−{formatBaht(totalDiscount)}</span>
+                  </div>
+                ) : null}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">จำนวนเงิน</span>
                   <span className="font-semibold tabular-nums">
-                    {formatBaht(Number.parseFloat(amount) || 0)}
+                    {formatBaht(Number.parseFloat(effectiveAmount) || 0)}
                   </span>
                 </div>
                 <div className="flex justify-between">

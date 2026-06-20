@@ -192,8 +192,8 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
     <>
       <iframe ref={iframeRef} className="hidden" title="receipt" />
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-xl">
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <DialogContent className="sm:max-w-2xl">
+          <form onSubmit={handleSubmit} className="min-w-0 space-y-4">
             <DialogHeader>
               <DialogTitle>ชำระเงิน</DialogTitle>
               <DialogDescription>
@@ -226,13 +226,13 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
                         const resolved = resolveOne(line.amount, d);
                         return (
                           <TableRow key={line.id} className="border-0">
-                            <TableCell className="py-0.5 pl-5 text-xs text-muted-foreground">
+                            <TableCell className="py-0.5 pl-5 text-xs break-words text-muted-foreground">
                               · {line.description}
                             </TableCell>
                             <TableCell className="py-0.5 text-right text-xs tabular-nums text-muted-foreground">
-                              <div className="flex items-center justify-end gap-1">
+                              <div className="flex items-center justify-end gap-1 whitespace-nowrap">
                                 {resolved > 0 ? (
-                                  <span className="text-[10px] text-green-700">−{formatBaht(resolved)}</span>
+                                  <span className="shrink-0 text-[10px] text-green-700">−{formatBaht(resolved)}</span>
                                 ) : null}
                                 <Input
                                   value={d.value}
@@ -243,11 +243,11 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
                                     }))
                                   }
                                   placeholder="ส่วนลด"
-                                  className="h-6 w-16 text-right text-xs"
+                                  className="h-6 w-24 shrink-0 text-right text-xs"
                                 />
                                 <button
                                   type="button"
-                                  className="text-[10px] text-primary hover:underline w-7"
+                                  className="w-6 shrink-0 text-[10px] text-primary hover:underline"
                                   onClick={() =>
                                     setLineDiscounts((prev) => ({
                                       ...prev,
@@ -257,7 +257,7 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
                                 >
                                   {d.unit === "fixed" ? "บาท" : "%"}
                                 </button>
-                                <span className="w-16 text-right tabular-nums">{formatBaht(line.amount)}</span>
+                                <span className="w-16 shrink-0 text-right tabular-nums">{formatBaht(line.amount)}</span>
                               </div>
                             </TableCell>
                           </TableRow>
