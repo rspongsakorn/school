@@ -7,7 +7,6 @@ import {
   allocatePaymentFifo,
   deriveInvoiceStatus,
 } from "@/lib/finance/amounts";
-import { formatReceiptNumber, parseMaxSequence } from "@/lib/finance/receipt-number";
 import { getStudentOutstandingInvoices } from "@/lib/data/invoices";
 import { getDefaultInvoiceTypeId } from "@/lib/data/invoice-types";
 import { resolveSingleInvoicePayment } from "@/lib/finance/single-invoice-allocation";
@@ -272,19 +271,12 @@ export async function importPaymentsBackfill(input: {
     a.paidDateIso.localeCompare(b.paidDateIso),
   );
 
-  const [{ data: existingReceipts }, invoiceTypeId, gradeByStudent] = await Promise.all([
-    supabase.from("payments").select("receipt_number").eq("academic_year_id", input.academicYearId),
+  const [invoiceTypeId, gradeByStudent] = await Promise.all([
     getDefaultInvoiceTypeId(),
     getStudentGradeMap(input.semesterId),
   ]);
 
   if (!invoiceTypeId) return { ok: false, error: "ไม่พบประเภทใบแจ้งเริ่มต้น" };
-
-  let nextSeq =
-    parseMaxSequence(
-      (existingReceipts ?? []).map((r) => r.receipt_number),
-      input.academicYearName,
-    ) + 1;
 
   // Resolve all student codes up front.
   const codes = [...new Set(rows.map((r) => r.studentCode))];
@@ -331,7 +323,6 @@ export async function importPaymentsBackfill(input: {
       continue;
     }
 
-    const receiptNumber = formatReceiptNumber(input.academicYearName, nextSeq);
     const paidTotal = allocations.reduce((sum, a) => sum + a.amount, 0);
     const paidAt = `${row.paidDateIso}T12:00:00+07:00`;
     const gradeClassroom = gradeByStudent.get(student.id) ?? "—";
@@ -345,8 +336,10 @@ export async function importPaymentsBackfill(input: {
       .maybeSingle();
     const rowInvoiceTypeId = primaryInvoice?.invoice_type_id ?? invoiceTypeId;
 
+    // The receipt number is issued inside the RPC (under an advisory lock) and
+    // stamped into the snapshot there; the placeholder here is overwritten.
     const snapshot: Record<string, unknown> = {
-      receiptNumber,
+      receiptNumber: "",
       paidAt,
       studentCode: student.student_code,
       studentName: formatStudentName(student.first_name, student.last_name),
@@ -361,79 +354,28 @@ export async function importPaymentsBackfill(input: {
       recordedBy: auth.profile.display_name ?? "เจ้าหน้าที่",
     };
 
-    const { data: payment, error: paymentError } = await supabase
-      .from("payments")
-      .insert({
-        receipt_number: receiptNumber,
-        student_id: student.id,
-        academic_year_id: input.academicYearId,
-        amount: paidTotal,
-        payment_method: "cash",
-        transfer_reference: null,
-        paid_at: paidAt,
-        recorded_by: auth.profile.id,
-        note: "นำเข้าย้อนหลัง",
-        status: "active",
-      })
-      .select("id")
-      .single();
+    // One transaction per row: payment + allocations + receipt + invoice
+    // balance updates all commit together (or not at all), with the receipt
+    // number issued under the per-year advisory lock so concurrent imports
+    // can't collide.
+    const { error: rpcError } = await supabase.rpc("record_backfill_payment", {
+      p_student_id: student.id,
+      p_academic_year_id: input.academicYearId,
+      p_academic_year_name: input.academicYearName,
+      p_amount: paidTotal,
+      p_paid_at: paidAt,
+      p_recorded_by: auth.profile.id,
+      p_note: "นำเข้าย้อนหลัง",
+      p_invoice_type_id: rowInvoiceTypeId,
+      p_snapshot: snapshot,
+      p_allocations: allocations.map((a) => ({ invoiceId: a.invoiceId, amount: a.amount })),
+    });
 
-    if (paymentError || !payment) {
+    if (rpcError) {
       failed.push({ lineNumber: row.lineNumber, studentCode: row.studentCode, reason: "บันทึกการชำระไม่ได้" });
       continue;
     }
 
-    const { error: allocError } = await supabase.from("payment_allocations").insert(
-      allocations.map((a) => ({ payment_id: payment.id, invoice_id: a.invoiceId, amount: a.amount })),
-    );
-    if (allocError) {
-      await supabase.from("payments").delete().eq("id", payment.id);
-      failed.push({ lineNumber: row.lineNumber, studentCode: row.studentCode, reason: "จัดสรรเข้าใบแจ้งไม่ได้" });
-      continue;
-    }
-
-    const { error: receiptError } = await supabase.from("receipts").insert({
-      payment_id: payment.id,
-      receipt_number: receiptNumber,
-      invoice_type_id: rowInvoiceTypeId,
-      snapshot_data: snapshot,
-    });
-    if (receiptError) {
-      await supabase.from("payment_allocations").delete().eq("payment_id", payment.id);
-      await supabase.from("payments").delete().eq("id", payment.id);
-      failed.push({ lineNumber: row.lineNumber, studentCode: row.studentCode, reason: "ออกใบเสร็จไม่ได้" });
-      continue;
-    }
-
-    let invoiceUpdateError = false;
-    for (const alloc of allocations) {
-      const inv = outstanding.find((i) => i.id === alloc.invoiceId)!;
-      const newPaid = round2(inv.paidAmount + alloc.amount);
-      const { error: updateError } = await supabase
-        .from("student_invoices")
-        .update({ paid_amount: newPaid, status: deriveInvoiceStatus(newPaid, inv.totalAmount) })
-        .eq("id", alloc.invoiceId);
-      if (updateError) {
-        invoiceUpdateError = true;
-        break;
-      }
-    }
-
-    // The payment + receipt are already committed at this point. If the invoice
-    // balance update failed, surface the row so the operator can reconcile by
-    // hand rather than silently leaving outstanding stale (which would also
-    // defeat the re-import guard that relies on outstanding reaching 0).
-    if (invoiceUpdateError) {
-      failed.push({
-        lineNumber: row.lineNumber,
-        studentCode: row.studentCode,
-        reason: "อัปเดตยอดใบแจ้งไม่ได้ (ออกใบเสร็จแล้ว ตรวจสอบด้วยตนเอง)",
-      });
-      nextSeq += 1;
-      continue;
-    }
-
-    nextSeq += 1;
     imported += 1;
   }
 

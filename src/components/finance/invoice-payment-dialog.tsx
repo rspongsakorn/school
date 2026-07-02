@@ -94,7 +94,11 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
       lines.reduce((sum, l) => sum + resolveOne(l.amount, lineDiscounts[l.id]), 0) * 100,
     ) / 100;
   const hasDiscount = totalDiscount > 0;
-  const subtotal = invoice ? invoice.outstanding : 0;
+  // Base the discount net-due on the sum of line amounts (the invoice
+  // subtotal), matching how the server resolves discounts. Using `outstanding`
+  // here only coincidentally agrees while no invoice-level discount is ever
+  // written; deriving from the lines keeps client and server in lock-step.
+  const subtotal = Math.round(lines.reduce((sum, l) => sum + l.amount, 0) * 100) / 100;
   const netDue = Math.round((subtotal - totalDiscount) * 100) / 100;
 
   useEffect(() => {

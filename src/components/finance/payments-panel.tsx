@@ -110,6 +110,7 @@ export function PaymentsPanel() {
   const [voidTarget, setVoidTarget] = useState<PaymentListRow | null>(null);
   const [voidReason, setVoidReason] = useState("");
   const [paymentSearch, setPaymentSearch] = useState(qParam);
+  const [prevQParam, setPrevQParam] = useState(qParam);
   const [voiding, setVoiding] = useState(false);
   const [isNavigating, startTransition] = useTransition();
 
@@ -220,17 +221,34 @@ export function PaymentsPanel() {
       return;
     }
 
+    // Guard against out-of-order responses: if the inputs change (or the
+    // component unmounts) before this request resolves, drop its result so a
+    // slower earlier request can't overwrite fresher results.
+    let cancelled = false;
     const timer = setTimeout(async () => {
       const result = await searchStudentsForPaymentAction(ctx.semesterId, {
         query: q.length >= 2 ? q : undefined,
         gradeLevelId: searchGrade !== "all" ? searchGrade : undefined,
         classroomId: searchClassroom !== "all" ? searchClassroom : undefined,
       });
-      if (result.ok) setSearchResults(result.students);
+      if (!cancelled && result.ok) setSearchResults(result.students);
     }, 300);
 
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [searchQuery, searchGrade, searchClassroom, ctx?.semesterId]);
+
+  // Keep the payment-history filter in sync with the `q` URL param. Deep links
+  // like /payments?q=<studentCode> update the param via client navigation
+  // without remounting, so the filter must follow the param, not just its
+  // initial value. Adjusting during render (rather than in an effect) is the
+  // React-recommended way to reset state when a prop changes.
+  if (qParam !== prevQParam) {
+    setPrevQParam(qParam);
+    setPaymentSearch(qParam);
+  }
 
   async function selectStudent(student: (typeof searchResults)[number]) {
     if (!ctx?.semesterId) return;
@@ -388,7 +406,13 @@ export function PaymentsPanel() {
       selectedLines.reduce((sum, l) => sum + resolveOne(l.amount, lineDiscounts[l.id]), 0) * 100,
     ) / 100;
   const hasDiscount = totalDiscount > 0;
-  const netDue = Math.round((selectedOutstanding - totalDiscount) * 100) / 100;
+  // Base the discount net-due on the sum of line amounts (the invoice
+  // subtotal), matching the server's discount resolution. Using
+  // `selectedOutstanding` only coincidentally agrees while no invoice-level
+  // discount is ever written.
+  const linesSubtotal =
+    Math.round(selectedLines.reduce((sum, l) => sum + l.amount, 0) * 100) / 100;
+  const netDue = Math.round((linesSubtotal - totalDiscount) * 100) / 100;
   // When discounting, the amount is derived from the discount inputs (netDue),
   // so the submission path reads a consistent value regardless of the input state.
   const effectiveAmount = hasDiscount ? (netDue > 0 ? String(netDue) : "") : amount;
@@ -1013,7 +1037,7 @@ export function PaymentsPanel() {
                 <AlertDialogAction
                   className="bg-destructive text-white hover:bg-destructive/90"
                   onClick={handleVoid}
-                  disabled={voiding}
+                  disabled={voiding || !voidReason.trim()}
                 >
                   {voiding ? "กำลังยกเลิก..." : "ยืนยันยกเลิก"}
                 </AlertDialogAction>

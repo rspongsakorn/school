@@ -214,6 +214,21 @@ export type Database = {
         };
         Returns: { payment_id: string; receipt_number: string }[];
       };
+      record_backfill_payment: {
+        Args: {
+          p_student_id: string;
+          p_academic_year_id: string;
+          p_academic_year_name: string;
+          p_amount: number;
+          p_paid_at: string;
+          p_recorded_by: string;
+          p_note: string | null;
+          p_invoice_type_id: string;
+          p_snapshot: Record<string, unknown>;
+          p_allocations: Record<string, unknown>[];
+        };
+        Returns: { payment_id: string; receipt_number: string }[];
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

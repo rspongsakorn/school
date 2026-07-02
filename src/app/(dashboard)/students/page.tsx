@@ -1,5 +1,7 @@
+import { requireFinancePage } from "@/lib/auth/require-finance";
 import { StudentsPanel } from "@/components/students/students-panel";
 
-export default function StudentsPage() {
+export default async function StudentsPage() {
+  await requireFinancePage();
   return <StudentsPanel />;
 }
