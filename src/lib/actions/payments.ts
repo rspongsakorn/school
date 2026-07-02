@@ -105,43 +105,26 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
   const invoiceTypeId = invoice.invoice_type_id;
   if (!invoiceTypeId) return { ok: false, error: "ใบแจ้งชำระไม่มีประเภทใบแจ้ง" };
 
-  const allocations = [{ invoiceId: invoice.id, amount: resolved.amount }];
+  const paidTotal = resolved.amount;
+  const newPaid = round2(Number(invoice.paid_amount) + paidTotal);
 
-  const [{ data: existingReceipts }, { data: student }] = await Promise.all([
-    supabase
-      .from("payments")
-      .select("receipt_number")
-      .eq("academic_year_id", input.academicYearId),
-    supabase
-      .from("students")
-      .select("student_code, first_name, last_name")
-      .eq("id", input.studentId)
-      .maybeSingle(),
-  ]);
+  const { data: student } = await supabase
+    .from("students")
+    .select("student_code, first_name, last_name")
+    .eq("id", input.studentId)
+    .maybeSingle();
 
   if (!student) return { ok: false, error: "ไม่พบนักเรียน" };
-
-  const nextSeq =
-    parseMaxSequence(
-      (existingReceipts ?? []).map((r) => r.receipt_number),
-      input.academicYearName,
-    ) + 1;
-  const receiptNumber = formatReceiptNumber(input.academicYearName, nextSeq);
 
   const gradeByStudent = await getStudentGradeMap(input.semesterId);
   const gradeClassroom = gradeByStudent.get(input.studentId) ?? "—";
 
   const invoiceName = invoice.invoice_types?.name ?? "—";
-  const allocationDetails = allocations.map((a) => ({
-    invoiceId: a.invoiceId,
-    invoiceName,
-    amount: a.amount,
-  }));
 
-  const paidTotal = allocations.reduce((sum, a) => sum + a.amount, 0);
-
+  // The receipt number is assigned inside the RPC (under an advisory lock) and
+  // stamped back into the snapshot there; the placeholder here is overwritten.
   const snapshot: Record<string, unknown> = {
-    receiptNumber,
+    receiptNumber: "",
     paidAt: new Date().toISOString(),
     studentCode: student.student_code,
     studentName: formatStudentName(student.first_name, student.last_name),
@@ -149,91 +132,50 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
     paymentMethod: input.paymentMethod,
     transferReference: input.transferReference?.trim() || null,
     amount: paidTotal,
-    allocations: allocationDetails,
+    allocations: [{ invoiceId: invoice.id, invoiceName, amount: paidTotal }],
     recordedBy: auth.profile.display_name ?? "เจ้าหน้าที่",
   };
 
-  const { data: payment, error: paymentError } = await supabase
-    .from("payments")
-    .insert({
-      receipt_number: receiptNumber,
-      student_id: input.studentId,
-      academic_year_id: input.academicYearId,
-      amount: paidTotal,
-      payment_method: input.paymentMethod,
-      transfer_reference: input.transferReference?.trim() || null,
-      recorded_by: auth.profile.id,
-      note: input.note?.trim() || null,
-      status: "active",
-    })
-    .select("id")
-    .single();
+  // Record everything (payment, allocation, discounts, receipt, invoice update)
+  // atomically in one transaction so a mid-way failure can't leave a committed
+  // receipt against an un-updated invoice balance.
+  const { data: rpcRows, error: rpcError } = await supabase.rpc("record_payment", {
+    p_invoice_id: invoice.id,
+    p_student_id: input.studentId,
+    p_academic_year_id: input.academicYearId,
+    p_academic_year_name: input.academicYearName,
+    p_amount: paidTotal,
+    p_net_total: netTotal,
+    p_new_paid: newPaid,
+    p_payment_method: input.paymentMethod,
+    p_transfer_reference: input.transferReference?.trim() || null,
+    p_note: input.note?.trim() || null,
+    p_recorded_by: auth.profile.id,
+    p_invoice_type_id: invoiceTypeId,
+    p_snapshot: snapshot,
+    p_discounts: resolvedDiscounts.map((d) => ({
+      invoiceLineId: d.invoiceLineId,
+      feeItemId: d.feeItemId,
+      discountType: d.discountType,
+      discountValue: d.discountValue,
+      amount: d.amount,
+    })),
+  });
 
-  if (paymentError || !payment) {
+  const result = rpcRows?.[0];
+  if (rpcError || !result) {
     return { ok: false, error: "ไม่สามารถบันทึกการชำระได้" };
   }
 
-  const { error: allocError } = await supabase.from("payment_allocations").insert(
-    allocations.map((a) => ({
-      payment_id: payment.id,
-      invoice_id: a.invoiceId,
-      amount: a.amount,
-    })),
-  );
-
-  if (allocError) {
-    await supabase.from("payments").delete().eq("id", payment.id);
-    return { ok: false, error: "ไม่สามารถจัดสรรเงินเข้าใบแจ้งได้" };
-  }
-
-  if (resolvedDiscounts.length > 0) {
-    const { error: discountError } = await supabase.from("payment_discounts").insert(
-      resolvedDiscounts.map((d) => ({
-        payment_id: payment.id,
-        invoice_line_id: d.invoiceLineId,
-        fee_item_id: d.feeItemId,
-        discount_type: d.discountType,
-        discount_value: d.discountValue,
-        amount: d.amount,
-      })),
-    );
-    if (discountError) {
-      await supabase.from("payment_allocations").delete().eq("payment_id", payment.id);
-      await supabase.from("payments").delete().eq("id", payment.id);
-      return { ok: false, error: "ไม่สามารถบันทึกส่วนลดได้" };
-    }
-  }
-
-  const { error: receiptError } = await supabase.from("receipts").insert({
-    payment_id: payment.id,
-    receipt_number: receiptNumber,
-    invoice_type_id: invoiceTypeId,
-    snapshot_data: snapshot,
-  });
-
-  if (receiptError) {
-    await supabase.from("payment_discounts").delete().eq("payment_id", payment.id);
-    await supabase.from("payment_allocations").delete().eq("payment_id", payment.id);
-    await supabase.from("payments").delete().eq("id", payment.id);
-    return { ok: false, error: "ไม่สามารถออกใบเสร็จได้" };
-  }
-
-  for (const alloc of allocations) {
-    const newPaid = round2(Number(invoice.paid_amount) + alloc.amount);
-    const newStatus = deriveInvoiceStatus(newPaid, netTotal);
-
-    const { error: updateError } = await supabase
-      .from("student_invoices")
-      .update({ paid_amount: newPaid, total_amount: netTotal, status: newStatus })
-      .eq("id", alloc.invoiceId);
-
-    if (updateError) {
-      return { ok: false, error: "ไม่สามารถอัปเดตยอดใบแจ้งได้" };
-    }
-  }
+  snapshot.receiptNumber = result.receipt_number;
 
   revalidateFinancePaths();
-  return { ok: true, paymentId: payment.id, receiptNumber, snapshot };
+  return {
+    ok: true,
+    paymentId: result.payment_id,
+    receiptNumber: result.receipt_number,
+    snapshot,
+  };
 }
 
 export async function getStudentOutstandingAction(studentId: string, semesterId: string) {

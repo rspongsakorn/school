@@ -195,6 +195,25 @@ export type Database = {
         };
         Returns: undefined;
       };
+      record_payment: {
+        Args: {
+          p_invoice_id: string;
+          p_student_id: string;
+          p_academic_year_id: string;
+          p_academic_year_name: string;
+          p_amount: number;
+          p_net_total: number;
+          p_new_paid: number;
+          p_payment_method: "cash" | "transfer";
+          p_transfer_reference: string | null;
+          p_note: string | null;
+          p_recorded_by: string;
+          p_invoice_type_id: string;
+          p_snapshot: Record<string, unknown>;
+          p_discounts: Record<string, unknown>[];
+        };
+        Returns: { payment_id: string; receipt_number: string }[];
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

@@ -151,88 +151,80 @@ export async function listCollectionsByGrade(
 ): Promise<CollectionsReportRow[]> {
   const supabase = await createClient();
 
-  let gradeQuery = supabase
+  const { data: grades } = await supabase
     .from("grade_levels")
     .select("id, name, sort_order")
     .eq("semester_id", semesterId)
     .order("sort_order", { ascending: true });
-
-  const { data: grades } = await gradeQuery;
   if (!grades || grades.length === 0) return [];
 
-  const results: CollectionsReportRow[] = [];
+  // Pull the whole semester up front, then aggregate in memory. Avoids the
+  // previous per-grade N+1 (2–3 round-trips × every grade).
+  const { data: classrooms } = await supabase
+    .from("classrooms")
+    .select("id, grade_level_id")
+    .eq("semester_id", semesterId);
 
-  for (const grade of grades) {
-    const { data: classrooms } = await supabase
-      .from("classrooms")
-      .select("id")
-      .eq("grade_level_id", grade.id)
+  // Restrict to a teacher's assigned classrooms when scoped.
+  let allowedClassroomIds: Set<string> | null = null;
+  if (teacherProfileId) {
+    const { data: assignments } = await supabase
+      .from("teacher_assignments")
+      .select("classroom_id")
+      .eq("profile_id", teacherProfileId)
       .eq("semester_id", semesterId);
-
-    let classroomIds = (classrooms ?? []).map((c) => c.id);
-
-    if (teacherProfileId) {
-      const { data: assignments } = await supabase
-        .from("teacher_assignments")
-        .select("classroom_id")
-        .eq("profile_id", teacherProfileId)
-        .eq("semester_id", semesterId)
-        .in("classroom_id", classroomIds);
-
-      classroomIds = (assignments ?? []).map((a) => a.classroom_id);
-    }
-
-    if (classroomIds.length === 0) {
-      results.push({
-        gradeName: grade.name,
-        studentCount: 0,
-        totalDue: 0,
-        totalPaid: 0,
-        ratePercent: 0,
-      });
-      continue;
-    }
-
-    const { data: enrollments } = await supabase
-      .from("student_enrollments")
-      .select("student_id")
-      .eq("semester_id", semesterId)
-      .eq("status", "enrolled")
-      .in("classroom_id", classroomIds);
-
-    const studentIds = (enrollments ?? []).map((e) => e.student_id);
-    if (studentIds.length === 0) {
-      results.push({
-        gradeName: grade.name,
-        studentCount: 0,
-        totalDue: 0,
-        totalPaid: 0,
-        ratePercent: 0,
-      });
-      continue;
-    }
-
-    const { data: invoices } = await supabase
-      .from("student_invoices")
-      .select("total_amount, paid_amount")
-      .eq("academic_year_id", academicYearId)
-      .eq("semester_id", semesterId)
-      .in("student_id", studentIds);
-
-    const totalDue = (invoices ?? []).reduce((sum, i) => sum + Number(i.total_amount), 0);
-    const totalPaid = (invoices ?? []).reduce((sum, i) => sum + Number(i.paid_amount), 0);
-    const ratePercent = totalDue > 0 ? round2((totalPaid / totalDue) * 100) : 0;
-
-    results.push({
-      gradeName: grade.name,
-      studentCount: studentIds.length,
-      totalDue: round2(totalDue),
-      totalPaid: round2(totalPaid),
-      ratePercent,
-    });
+    allowedClassroomIds = new Set((assignments ?? []).map((a) => a.classroom_id));
   }
 
-  return results;
+  const gradeByClassroom = new Map<string, string>();
+  for (const c of classrooms ?? []) {
+    if (allowedClassroomIds && !allowedClassroomIds.has(c.id)) continue;
+    gradeByClassroom.set(c.id, c.grade_level_id);
+  }
+
+  const { data: enrollments } = await supabase
+    .from("student_enrollments")
+    .select("student_id, classroom_id")
+    .eq("semester_id", semesterId)
+    .eq("status", "enrolled");
+
+  const gradeByStudent = new Map<string, string>();
+  const studentCountByGrade = new Map<string, number>();
+  for (const e of enrollments ?? []) {
+    const gradeId = gradeByClassroom.get(e.classroom_id);
+    if (!gradeId) continue;
+    gradeByStudent.set(e.student_id, gradeId);
+    studentCountByGrade.set(gradeId, (studentCountByGrade.get(gradeId) ?? 0) + 1);
+  }
+
+  // RLS scopes teachers to their own students, so no explicit student filter
+  // is needed here — invoices for other students simply won't be returned.
+  const { data: invoices } = await supabase
+    .from("student_invoices")
+    .select("student_id, total_amount, paid_amount")
+    .eq("academic_year_id", academicYearId)
+    .eq("semester_id", semesterId);
+
+  const dueByGrade = new Map<string, number>();
+  const paidByGrade = new Map<string, number>();
+  for (const inv of invoices ?? []) {
+    const gradeId = gradeByStudent.get(inv.student_id);
+    if (!gradeId) continue;
+    dueByGrade.set(gradeId, (dueByGrade.get(gradeId) ?? 0) + Number(inv.total_amount));
+    paidByGrade.set(gradeId, (paidByGrade.get(gradeId) ?? 0) + Number(inv.paid_amount));
+  }
+
+  return grades.map((grade) => {
+    const totalDue = round2(dueByGrade.get(grade.id) ?? 0);
+    const totalPaid = round2(paidByGrade.get(grade.id) ?? 0);
+    return {
+      gradeName: grade.name,
+      studentCount: studentCountByGrade.get(grade.id) ?? 0,
+      totalDue,
+      totalPaid,
+      ratePercent: totalDue > 0 ? round2((totalPaid / totalDue) * 100) : 0,
+    };
+  });
 }
 
 function round2(n: number) {
