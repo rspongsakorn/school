@@ -52,6 +52,7 @@ import {
   canDeleteInvoice,
   invoiceDeleteBlockedReason,
 } from "@/lib/finance/invoice-delete-eligibility";
+import { invalidateFinanceQueries } from "@/lib/queries/invalidate";
 import { fetchAllInvoices, fetchInvoiceCandidates } from "@/lib/queries/invoices";
 import { fetchGradeLevels, fetchClassroomsBySemester } from "@/lib/queries/classrooms";
 import { fetchAllFeeItems } from "@/lib/queries/fee-rates";
@@ -302,8 +303,7 @@ export function InvoicesPanel() {
     } else {
       toast.success(`ลบใบแจ้งชำระแล้ว ${result.deleted} ใบ`);
     }
-    queryClient.invalidateQueries({ queryKey: ["invoices"] });
-    queryClient.invalidateQueries({ queryKey: ["invoice-candidates"] });
+    invalidateFinanceQueries(queryClient);
     router.refresh();
   }
 

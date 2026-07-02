@@ -1,20 +1,11 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { type NextRequest } from "next/server";
+import { updateSession } from "@/lib/supabase/session";
 
 export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/auth");
-
-  if (!isAuthRoute) {
-    // Check for any Supabase session cookie (cookie name starts with sb-)
-    const hasSession = request.cookies.getAll().some((c) => c.name.startsWith("sb-"));
-    if (!hasSession) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/login";
-      return NextResponse.redirect(url);
-    }
-  }
-
-  return NextResponse.next();
+  // Validate the session at the edge: refreshes the auth token, redirects
+  // unauthenticated requests to /login, and force-signs-out inactive users.
+  // (A mere cookie-presence check is not real authentication.)
+  return updateSession(request);
 }
 
 export const config = {

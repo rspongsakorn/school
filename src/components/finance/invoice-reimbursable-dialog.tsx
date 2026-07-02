@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
+import { invalidateFinanceQueries } from "@/lib/queries/invalidate";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,7 +45,7 @@ export function InvoiceReimbursableDialog({ open, onOpenChange, invoice }: Props
 
     toast.success(`เปลี่ยนเป็นราคา ${targetLabel} แล้ว`);
     onOpenChange(false);
-    queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    invalidateFinanceQueries(queryClient);
     router.refresh();
   }
 

@@ -2,6 +2,7 @@ const thaiDateFormatter = new Intl.DateTimeFormat("th-TH", {
   day: "numeric",
   month: "short",
   year: "numeric",
+  timeZone: "Asia/Bangkok",
 });
 
 const thaiDateFormatterLong = new Intl.DateTimeFormat("th-TH", {

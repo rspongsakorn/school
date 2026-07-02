@@ -42,6 +42,7 @@ import {
 import { useSemesterContext } from "@/hooks/use-semester-context";
 import { recordPayment } from "@/lib/actions/payments";
 import { formatBaht } from "@/lib/format";
+import { invalidateFinanceQueries } from "@/lib/queries/invalidate";
 import { fetchInvoiceLines } from "@/lib/queries/invoices";
 import type { InvoiceListRow } from "@/lib/queries/invoices";
 
@@ -180,9 +181,7 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
     printReceipt(result.paymentId);
     setConfirmOpen(false);
     onOpenChange(false);
-    void queryClient.invalidateQueries({ queryKey: ["invoices"] });
-    void queryClient.invalidateQueries({ queryKey: ["invoice-candidates"] });
-    void queryClient.invalidateQueries({ queryKey: ["payments"] });
+    invalidateFinanceQueries(queryClient);
     router.refresh();
   }
 

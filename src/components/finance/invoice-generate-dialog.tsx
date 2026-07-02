@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { invalidateFinanceQueries } from "@/lib/queries/invalidate";
 import { fetchInvoiceTypes } from "@/lib/queries/invoice-types";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -236,8 +237,7 @@ export function InvoiceGenerateDialog({
     toast.success(`สร้างใบแจ้ง ${result.created} รายการ (ข้าม ${result.skipped})`);
     setConfirmOpen(false);
     onOpenChange(false);
-    queryClient.invalidateQueries({ queryKey: ["invoices"] });
-    queryClient.invalidateQueries({ queryKey: ["invoice-candidates"] });
+    invalidateFinanceQueries(queryClient);
     router.refresh();
   }
 

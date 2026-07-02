@@ -46,6 +46,7 @@ import {
   searchStudentsForPaymentAction,
   voidPayment,
 } from "@/lib/actions/payments";
+import { invalidateFinanceQueries } from "@/lib/queries/invalidate";
 import { fetchPaymentsFiltered } from "@/lib/queries/payments";
 import { fetchGradeLevels, fetchClassroomsBySemester } from "@/lib/queries/classrooms";
 import type { OutstandingInvoiceRow } from "@/lib/data/invoices";
@@ -321,9 +322,7 @@ export function PaymentsPanel() {
     setNote("");
     setTransferRef("");
     setLineDiscounts({});
-    void queryClient.invalidateQueries({ queryKey: ["payments"] });
-    void queryClient.invalidateQueries({ queryKey: ["invoices"] });
-    void queryClient.invalidateQueries({ queryKey: ["invoice-candidates"] });
+    invalidateFinanceQueries(queryClient);
     router.refresh();
 
     // Ready for the next parent: focus search again
@@ -344,9 +343,7 @@ export function PaymentsPanel() {
     }
 
     toast.success("ยกเลิกใบเสร็จแล้ว");
-    void queryClient.invalidateQueries({ queryKey: ["payments"] });
-    void queryClient.invalidateQueries({ queryKey: ["invoices"] });
-    void queryClient.invalidateQueries({ queryKey: ["invoice-candidates"] });
+    invalidateFinanceQueries(queryClient);
     router.refresh();
   }
 
@@ -1032,9 +1029,7 @@ export function PaymentsPanel() {
               academicYearName={ctx.academicYearName}
               semesterId={ctx.semesterId}
               onImported={() => {
-                void queryClient.invalidateQueries({ queryKey: ["payments"] });
-                void queryClient.invalidateQueries({ queryKey: ["invoices"] });
-                void queryClient.invalidateQueries({ queryKey: ["invoice-candidates"] });
+                invalidateFinanceQueries(queryClient);
                 router.refresh();
               }}
             />
