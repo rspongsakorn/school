@@ -346,6 +346,11 @@ export function StudentsPanel() {
                           <Badge className={statusBadgeClass(student.statusRaw)}>
                             {student.status}
                           </Badge>
+                          {student.isReimbursable && (
+                            <Badge className="bg-sky-50 text-sky-700 hover:bg-sky-50">
+                              เบิกได้
+                            </Badge>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -416,6 +421,11 @@ export function StudentsPanel() {
                                   <Badge className={statusBadgeClass(student.statusRaw)}>
                                     {student.status}
                                   </Badge>
+                                  {student.isReimbursable && (
+                                    <Badge className="ml-1 bg-sky-50 text-sky-700 hover:bg-sky-50">
+                                      เบิกได้
+                                    </Badge>
+                                  )}
                                 </TableCell>
                                 {isAdmin ? (
                                   <TableCell onClick={(e) => e.stopPropagation()}>
