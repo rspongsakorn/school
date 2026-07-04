@@ -17,6 +17,7 @@ export type CsvStudentInputRow = {
   last_name?: string;
   birthdate?: string;
   classroom?: string;
+  reimbursable?: string;
 };
 
 export type ImportStudentRow = {
@@ -27,6 +28,7 @@ export type ImportStudentRow = {
   dateOfBirth: string;
   idCard: string | null;
   classroom: { gradeName: string; classroomNumber: string } | null;
+  isReimbursable: boolean;
 };
 
 export type ImportRowError = {
@@ -106,6 +108,7 @@ export function csvRowsToObjects(header: string[], dataRows: string[][]): CsvStu
       else if (key === "last_name") row.last_name = (cells[colIndex] ?? "").trim();
       else if (key === "birthdate") row.birthdate = (cells[colIndex] ?? "").trim();
       else if (key === "classroom") row.classroom = (cells[colIndex] ?? "").trim();
+      else if (key === "reimbursable") row.reimbursable = (cells[colIndex] ?? "").trim();
     });
     return row;
   });
@@ -115,6 +118,14 @@ export function mapGenderLabel(label: string): StudentGender | null {
   const value = label.trim();
   if (value === "เด็กชาย" || value === "นาย") return "male";
   if (value === "เด็กหญิง" || value === "นาง" || value === "นางสาว") return "female";
+  return null;
+}
+
+export function mapReimbursableLabel(label: string): boolean | null {
+  const value = label.trim();
+  if (!value) return false;
+  if (value === "เบิกได้") return true;
+  if (value === "เบิกไม่ได้") return false;
   return null;
 }
 
@@ -207,6 +218,12 @@ export function validateAndBuildImportRows(
           classroomNumber: classroomParsed.classroomNumber,
         };
 
+    const isReimbursable = mapReimbursableLabel(row.reimbursable ?? "");
+    if (isReimbursable === null) {
+      pushError("สถานะเบิกไม่ถูกต้อง (ต้องเป็น เบิกได้ หรือ เบิกไม่ได้)");
+      continue;
+    }
+
     seenInFile.add(code);
     ready.push({
       studentCode: code,
@@ -216,6 +233,7 @@ export function validateAndBuildImportRows(
       dateOfBirth,
       idCard: row.id_card?.trim() || null,
       classroom,
+      isReimbursable,
     });
   }
 
@@ -234,6 +252,7 @@ export function importRowToCsvInput(row: ImportStudentRow, rowNumber: number): C
     classroom: row.classroom
       ? `${row.classroom.gradeName}/${row.classroom.classroomNumber}`
       : "",
+    reimbursable: row.isReimbursable ? "เบิกได้" : "เบิกไม่ได้",
   };
 }
 

@@ -365,6 +365,7 @@ export function StudentImportDialog({
                               <TableHead>เพศ</TableHead>
                               <TableHead>วันเกิด</TableHead>
                               <TableHead>ห้องเรียน</TableHead>
+                              <TableHead>สถานะเบิก</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -380,6 +381,7 @@ export function StudentImportDialog({
                                 <TableCell>{row.genderLabel}</TableCell>
                                 <TableCell>{row.birthDateLabel}</TableCell>
                                 <TableCell>{row.classroomLabel ?? "—"}</TableCell>
+                                <TableCell>{row.reimbursableLabel}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>

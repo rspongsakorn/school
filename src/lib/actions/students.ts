@@ -54,6 +54,7 @@ export type ImportStudentPreview = {
   genderLabel: string;
   birthDateLabel: string;
   classroomLabel: string | null;
+  reimbursableLabel: string;
 };
 
 export type ConfirmStudentCsvImportResult =
@@ -165,6 +166,7 @@ export async function previewStudentCsvImport(
       classroomLabel: row.classroom
         ? `${row.classroom.gradeName}/${row.classroom.classroomNumber}`
         : null,
+      reimbursableLabel: row.isReimbursable ? "เบิกได้" : "เบิกไม่ได้",
     }));
 
     return {
@@ -371,6 +373,7 @@ export async function confirmStudentCsvImport(
       date_of_birth: row.dateOfBirth,
       id_card: row.idCard,
       status: "active" as const,
+      is_reimbursable: row.isReimbursable,
     }));
 
     const studentCodeToId = new Map<string, string>();

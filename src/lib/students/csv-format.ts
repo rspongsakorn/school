@@ -44,12 +44,17 @@ export const CSV_FORMAT_TABLE = [
     description: "ห้องเรียน — ชั้น/เลขห้อง (ไม่บังคับ; ถ้าระบุจะลงทะเบียนให้อัตโนมัติ)",
     example: "ม.2/1",
   },
+  {
+    key: "reimbursable",
+    description: "สถานะเบิก — เบิกได้ / เบิกไม่ได้ (ไม่บังคับ; ค่าเริ่มต้นคือเบิกไม่ได้)",
+    example: "เบิกได้",
+  },
 ] as const;
 
 export const SAMPLE_CSV_CONTENT = [
-  "id_card,student_code,gender,first_name,last_name,birthdate,classroom",
-  '1101000391474,12390,เด็กหญิง,สุพิชชานันท์,เจิมกลาง,"21 เม.ย. 55",ม.2/1',
-  ',12391,เด็กชาย,สมชาย,ทดสอบ,"15 พ.ค. 55",',
+  "id_card,student_code,gender,first_name,last_name,birthdate,classroom,reimbursable",
+  '1101000391474,12390,เด็กหญิง,สุพิชชานันท์,เจิมกลาง,"21 เม.ย. 55",ม.2/1,เบิกได้',
+  ',12391,เด็กชาย,สมชาย,ทดสอบ,"15 พ.ค. 55",,เบิกไม่ได้',
 ].join("\n");
 
 export const SAMPLE_CSV_FILENAME = "student-import-sample.csv";

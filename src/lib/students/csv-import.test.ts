@@ -3,6 +3,7 @@ import {
   assertRequiredHeaders,
   importRowToCsvInput,
   mapGenderLabel,
+  mapReimbursableLabel,
   parseCsvText,
   parseThaiBirthdateShort,
   validateAndBuildImportRows,
@@ -49,6 +50,24 @@ describe("mapGenderLabel", () => {
   });
 });
 
+describe("mapReimbursableLabel", () => {
+  it("maps เบิกได้ to true", () => {
+    expect(mapReimbursableLabel("เบิกได้")).toBe(true);
+  });
+
+  it("maps เบิกไม่ได้ to false", () => {
+    expect(mapReimbursableLabel("เบิกไม่ได้")).toBe(false);
+  });
+
+  it("treats empty string as false (default)", () => {
+    expect(mapReimbursableLabel("")).toBe(false);
+  });
+
+  it("returns null for unknown text", () => {
+    expect(mapReimbursableLabel("unknown")).toBeNull();
+  });
+});
+
 describe("parseThaiBirthdateShort", () => {
   it("parses 21 เม.ย. 55 to 2012-04-21", () => {
     expect(parseThaiBirthdateShort("21 เม.ย. 55")).toBe("2012-04-21");
@@ -75,7 +94,25 @@ describe("validateAndBuildImportRows", () => {
     expect(result.ready).toHaveLength(1);
     expect(result.ready[0].studentCode).toBe("12390");
     expect(result.ready[0].classroom).toBeNull();
+    expect(result.ready[0].isReimbursable).toBe(false);
     expect(result.errors).toHaveLength(0);
+  });
+
+  it("reads reimbursable column as true", () => {
+    const result = validateAndBuildImportRows(
+      [{ ...baseRow, reimbursable: "เบิกได้" }],
+      new Set(),
+    );
+    expect(result.ready[0].isReimbursable).toBe(true);
+  });
+
+  it("errors on invalid reimbursable value", () => {
+    const result = validateAndBuildImportRows(
+      [{ ...baseRow, reimbursable: "ไม่ทราบ" }],
+      new Set(),
+    );
+    expect(result.ready).toHaveLength(0);
+    expect(result.errors[0].message).toMatch(/สถานะเบิก/);
   });
 
   it("errors when student_code exists in DB", () => {
@@ -93,6 +130,7 @@ describe("validateAndBuildImportRows", () => {
       dateOfBirth: "2012-04-21",
       idCard: null,
       classroom: null,
+      isReimbursable: false,
     };
     const csvRow = importRowToCsvInput(row, 2);
     const result = validateAndBuildImportRows([csvRow], new Set());
@@ -154,9 +192,11 @@ describe("validateAndBuildImportRows", () => {
       dateOfBirth: "2012-04-21",
       idCard: null,
       classroom: { gradeName: "ม.2", classroomNumber: "1" },
+      isReimbursable: true,
     };
     const csvRow = importRowToCsvInput(row, 2);
     expect(csvRow.classroom).toBe("ม.2/1");
+    expect(csvRow.reimbursable).toBe("เบิกได้");
     const result = validateAndBuildImportRows([csvRow], new Set());
     expect(result.ready[0].classroom).toEqual({
       gradeName: "ม.2",
