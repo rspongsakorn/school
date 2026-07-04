@@ -452,7 +452,6 @@ export async function createStudent(input: StudentFormInput): Promise<ActionStat
     gender: input.gender || null,
     date_of_birth: input.dateOfBirth.trim() || null,
     status: input.status,
-    is_reimbursable: input.isReimbursable,
   });
 
   if (error?.code === "23505") {
@@ -496,7 +495,6 @@ export async function updateStudent(id: string, input: StudentFormInput): Promis
       gender: input.gender || null,
       date_of_birth: input.dateOfBirth.trim() || null,
       status: input.status,
-      is_reimbursable: input.isReimbursable,
     })
     .eq("id", id);
 

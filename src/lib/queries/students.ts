@@ -72,12 +72,9 @@ export async function fetchStudentsPaginated(params: StudentListParams): Promise
   const studentsPromise = (async () => {
     let query = supabase
       .from("students")
-      .select(
-        "id, student_code, first_name, last_name, id_card, gender, date_of_birth, status, is_reimbursable",
-        {
-          count: "exact",
-        },
-      )
+      .select("id, student_code, first_name, last_name, id_card, gender, date_of_birth, status", {
+        count: "exact",
+      })
       .order("student_code", { ascending: true });
     if (searchFilter) query = query.or(searchFilter);
     if (params.status && params.status !== "all") query = query.eq("status", params.status);
@@ -108,7 +105,6 @@ export async function fetchStudentsPaginated(params: StudentListParams): Promise
       lastName: s.last_name,
       gender: (s.gender as StudentGender | null) ?? null,
       dateOfBirth: s.date_of_birth ?? null,
-      isReimbursable: s.is_reimbursable,
       deletable: !blockedStudentIds.has(s.id),
     };
   });
