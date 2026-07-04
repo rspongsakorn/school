@@ -3,9 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import {
   Calendar,
   ChartColumn,
+  ChevronDown,
   ClipboardList,
   CreditCard,
   FileText,
@@ -16,12 +18,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useSidebarContext } from "@/hooks/use-sidebar";
 import { useAuth } from "@/components/providers/auth-provider";
 
@@ -96,10 +92,14 @@ function NavReportsDropdown() {
   const active = reportsNav.some(
     (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
   );
+  const [open, setOpen] = useState(active);
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        aria-expanded={open}
         className={cn(
           "relative flex h-11 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
           active
@@ -109,15 +109,42 @@ function NavReportsDropdown() {
       >
         <ChartColumn className="h-5 w-5 shrink-0" />
         รายงาน
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56">
-        {reportsNav.map((item) => (
-          <DropdownMenuItem key={item.href} render={<Link href={item.href} />}>
-            {item.label}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+        <ChevronDown
+          className={cn(
+            "ml-auto h-4 w-4 shrink-0 transition-transform",
+            open && "rotate-180",
+          )}
+        />
+      </button>
+      <div
+        className={cn(
+          "grid overflow-hidden transition-all duration-200 ease-in-out",
+          open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+        )}
+      >
+        <ul className="min-h-0 space-y-1 py-1 pl-8">
+          {reportsNav.map((item) => {
+            const itemActive =
+              pathname === item.href || pathname.startsWith(`${item.href}/`);
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className={cn(
+                    "flex h-10 items-center rounded-lg px-3 text-sm font-medium transition-colors",
+                    itemActive
+                      ? "bg-sidebar-primary font-semibold text-sidebar-primary-foreground"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent",
+                  )}
+                >
+                  {item.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </div>
   );
 }
 
