@@ -22,6 +22,7 @@ export type StudentListRow = {
   lastName: string;
   gender: StudentGender | null;
   dateOfBirth: string | null;
+  isReimbursable: boolean;
   deletable: boolean;
 };
 
@@ -50,6 +51,7 @@ function mapStudentRow(
     gender: string | null;
     date_of_birth: string | null;
     status: string;
+    is_reimbursable: boolean;
   },
   gradeByStudent: Map<string, string>,
   blockedStudentIds: Set<string>,
@@ -67,6 +69,7 @@ function mapStudentRow(
     lastName: s.last_name,
     gender: (s.gender as StudentGender | null) ?? null,
     dateOfBirth: s.date_of_birth ?? null,
+    isReimbursable: s.is_reimbursable,
     deletable: !blockedStudentIds.has(s.id),
   };
 }
@@ -135,7 +138,9 @@ export async function listStudents(semesterId: string | null): Promise<StudentLi
 
   const { data: students, error } = await supabase
     .from("students")
-    .select("id, student_code, first_name, last_name, id_card, gender, date_of_birth, status")
+    .select(
+      "id, student_code, first_name, last_name, id_card, gender, date_of_birth, status, is_reimbursable",
+    )
     .order("student_code", { ascending: true });
 
   if (error || !students) return [];
@@ -169,7 +174,7 @@ export async function listStudentsPaginated(
     let query = supabase
       .from("students")
       .select(
-        "id, student_code, first_name, last_name, id_card, gender, date_of_birth, status",
+        "id, student_code, first_name, last_name, id_card, gender, date_of_birth, status, is_reimbursable",
         { count: "exact" },
       )
       .order("student_code", { ascending: true });

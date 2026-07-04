@@ -232,6 +232,8 @@ export type InvoiceCandidateRow = {
   gradeSortOrder: number;
   /** Invoice type ids the student already has an invoice for this semester. */
   invoiceTypeIds: string[];
+  /** Student-level default: pre-tick as reimbursable when generating. */
+  defaultReimbursable: boolean;
 };
 
 export async function listInvoiceCandidates(semesterId: string): Promise<InvoiceCandidateRow[]> {
@@ -247,7 +249,7 @@ export async function listInvoiceCandidates(semesterId: string): Promise<Invoice
     .select(
       `
       student_id,
-      students!inner ( student_code, first_name, last_name )
+      students!inner ( student_code, first_name, last_name, is_reimbursable )
     `,
     )
     .eq("semester_id", semesterId)
@@ -256,7 +258,12 @@ export async function listInvoiceCandidates(semesterId: string): Promise<Invoice
 
   type Row = {
     student_id: string;
-    students: { student_code: string; first_name: string; last_name: string };
+    students: {
+      student_code: string;
+      first_name: string;
+      last_name: string;
+      is_reimbursable: boolean;
+    };
   };
 
   return ((data ?? []) as unknown as Row[]).map((row) => ({
@@ -266,6 +273,7 @@ export async function listInvoiceCandidates(semesterId: string): Promise<Invoice
     gradeClassroom: gradeByStudent.get(row.student_id) ?? "—",
     gradeSortOrder: gradeSortByStudent.get(row.student_id) ?? 0,
     invoiceTypeIds: [...(typesByStudent.get(row.student_id) ?? [])],
+    defaultReimbursable: row.students.is_reimbursable,
   }));
 }
 

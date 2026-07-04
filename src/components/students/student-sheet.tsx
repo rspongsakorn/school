@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field-error";
 import { Input } from "@/components/ui/input";
@@ -67,6 +68,7 @@ type StudentSheetProps = {
     gender: StudentGender | null;
     dateOfBirth: string | null;
     status: StudentStatus;
+    isReimbursable: boolean;
     deletable?: boolean;
   };
 };
@@ -85,6 +87,7 @@ const initialForm: StudentFormState = {
   gender: "",
   dateOfBirth: "",
   status: "active",
+  isReimbursable: false,
 };
 
 function buildInitialForm(
@@ -100,6 +103,7 @@ function buildInitialForm(
       gender: initial.gender ?? "",
       dateOfBirth: initial.dateOfBirth ?? "",
       status: initial.status,
+      isReimbursable: initial.isReimbursable,
     };
   }
   return initialForm;
@@ -351,6 +355,39 @@ function StudentSheetBody({
               ))}
             </SelectContent>
           </Select>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="student-reimbursable">การเบิก</Label>
+          {readOnly ? (
+            <p id="student-reimbursable" className="text-sm">
+              {form.isReimbursable ? "เบิกได้" : "เบิกไม่ได้"}
+            </p>
+          ) : (
+            <button
+              id="student-reimbursable"
+              type="button"
+              role="switch"
+              aria-checked={form.isReimbursable}
+              onClick={() => updateField("isReimbursable", !form.isReimbursable)}
+              disabled={submitting}
+              className="flex items-center justify-between rounded-md border px-3 py-2 text-sm disabled:opacity-50"
+            >
+              <span>{form.isReimbursable ? "เบิกได้" : "เบิกไม่ได้"}</span>
+              <span
+                className={cn(
+                  "relative h-6 w-[54px] shrink-0 rounded-full transition-colors",
+                  form.isReimbursable ? "bg-primary" : "bg-muted",
+                )}
+              >
+                <span
+                  className={cn(
+                    "absolute top-[3px] size-[18px] rounded-full bg-white shadow-sm transition-all",
+                    form.isReimbursable ? "left-[33px]" : "left-[3px]",
+                  )}
+                />
+              </span>
+            </button>
+          )}
         </div>
       </div>
 

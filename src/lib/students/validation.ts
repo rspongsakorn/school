@@ -9,6 +9,7 @@ export type StudentFormInput = {
   status: StudentStatus;
   gender: "" | StudentGender;
   dateOfBirth: string;
+  isReimbursable: boolean;
 };
 
 export type StudentFormErrors = Partial<
