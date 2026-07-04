@@ -9,6 +9,7 @@ const base = {
   status: "active" as const,
   gender: "" as const,
   dateOfBirth: "",
+  isReimbursable: false,
 };
 
 describe("validateStudentForm", () => {
@@ -31,6 +32,7 @@ describe("validateStudentForm", () => {
         status: "active",
         gender: "",
         dateOfBirth: "",
+        isReimbursable: false,
       },
       { mode: "create" },
     );
