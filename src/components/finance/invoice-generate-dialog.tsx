@@ -28,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import { generateInvoices } from "@/lib/actions/invoices";
 import type { InvoiceCandidateRow } from "@/lib/data/invoices";
 import type { FeeItemRow } from "@/lib/data/fee-items";
+import { defaultReimbursableIds } from "@/lib/finance/reimbursable-selection";
 import { cn } from "@/lib/utils";
 
 type InvoiceGenerateDialogProps = {
@@ -78,7 +79,9 @@ export function InvoiceGenerateDialog({
     () => new Set(activeItems.map((i) => i.id)),
   );
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
-  const [reimbursableStudentIds, setReimbursableStudentIds] = useState<Set<string>>(new Set());
+  const [reimbursableStudentIds, setReimbursableStudentIds] = useState<Set<string>>(
+    () => defaultReimbursableIds(candidates),
+  );
   const [classroomFilter, setClassroomFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -91,7 +94,7 @@ export function InvoiceGenerateDialog({
     setInvoiceTypeId("");
     setSelectedFeeItemIds(new Set(activeItems.map((i) => i.id)));
     setSelectedStudentIds(new Set());
-    setReimbursableStudentIds(new Set());
+    setReimbursableStudentIds(defaultReimbursableIds(candidates));
     setClassroomFilter("all");
     setSearch("");
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
