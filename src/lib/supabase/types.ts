@@ -40,6 +40,7 @@ export type Database = {
         gender: "male" | "female" | null;
         date_of_birth: string | null;
         status: "active" | "graduated" | "transferred" | "withdrawn";
+        is_reimbursable: boolean;
       }>;
       grade_levels: TableDef<{
         id: string;
