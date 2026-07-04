@@ -241,6 +241,7 @@ export function StudentsPanel() {
       gender: selectedStudent.gender,
       dateOfBirth: selectedStudent.dateOfBirth,
       status: selectedStudent.statusRaw,
+      isReimbursable: selectedStudent.isReimbursable,
       deletable: selectedStudent.deletable,
     };
   }, [selectedStudent]);
