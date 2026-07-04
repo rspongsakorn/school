@@ -16,6 +16,12 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useSidebarContext } from "@/hooks/use-sidebar";
 import { useAuth } from "@/components/providers/auth-provider";
 
@@ -30,11 +36,14 @@ const financeNav = [
   { href: "/invoice-types", label: "ประเภทใบแจ้ง", icon: Receipt },
   { href: "/invoices", label: "ใบแจ้งชำระ", icon: FileText },
   { href: "/payments", label: "บันทึกการจ่าย", icon: CreditCard },
-  { href: "/reports/daily", label: "รายรับรายวัน", icon: ChartColumn },
-  { href: "/reports/discounts", label: "รายงานส่วนลด", icon: ChartColumn },
-  { href: "/reports/outstanding", label: "รายงานค้างชำระ", icon: ChartColumn },
-  { href: "/reports/collections", label: "สถิติการเก็บ", icon: ChartColumn },
-  { href: "/reports/students", label: "รายบุคคล", icon: ChartColumn },
+];
+
+const reportsNav = [
+  { href: "/reports/daily", label: "รายรับรายวัน" },
+  { href: "/reports/discounts", label: "รายงานส่วนลด" },
+  { href: "/reports/outstanding", label: "รายงานค้างชำระ" },
+  { href: "/reports/collections", label: "สถิติการเก็บ" },
+  { href: "/reports/students", label: "รายบุคคล" },
 ];
 
 const systemNav = [
@@ -82,15 +91,40 @@ function NavSection({
   );
 }
 
-const teacherNav = [
-  { href: "/reports/outstanding", label: "รายงานค้างชำระ", icon: ChartColumn },
-  { href: "/reports/collections", label: "สถิติการเก็บ", icon: ChartColumn },
-  { href: "/reports/students", label: "รายบุคคล", icon: ChartColumn },
-];
+function NavReportsDropdown() {
+  const pathname = usePathname();
+  const active = reportsNav.some(
+    (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
+  );
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        className={cn(
+          "relative flex h-11 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
+          active
+            ? "bg-sidebar-primary font-semibold text-sidebar-primary-foreground before:absolute before:left-0 before:top-1/2 before:h-5 before:w-1 before:-translate-y-1/2 before:rounded-r-full before:bg-brand-accent before:content-['']"
+            : "text-sidebar-foreground hover:bg-sidebar-accent",
+        )}
+      >
+        <ChartColumn className="h-5 w-5 shrink-0" />
+        รายงาน
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-56">
+        {reportsNav.map((item) => (
+          <DropdownMenuItem key={item.href} render={<Link href={item.href} />}>
+            {item.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 function SidebarContent() {
   const { profile } = useAuth();
   const role = profile?.role;
+  const pathname = usePathname();
 
   return (
     <>
@@ -114,11 +148,46 @@ function SidebarContent() {
       </div>
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         {role === "teacher" ? (
-          <NavSection title="รายงาน" items={teacherNav} />
+          <div className="mb-6">
+            <h3 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
+              รายงาน
+            </h3>
+            <NavReportsDropdown />
+          </div>
         ) : (
           <>
             <NavSection title="ข้อมูลพื้นฐาน" items={basicNav} />
-            <NavSection title="การเงิน" items={financeNav} />
+            <div className="mb-6">
+              <h3 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
+                การเงิน
+              </h3>
+              <ul className="space-y-1">
+                {financeNav.map((item) => {
+                  const itemActive =
+                    pathname === item.href || pathname.startsWith(`${item.href}/`);
+                  const Icon = item.icon;
+                  return (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        className={cn(
+                          "relative flex h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
+                          itemActive
+                            ? "bg-sidebar-primary font-semibold text-sidebar-primary-foreground before:absolute before:left-0 before:top-1/2 before:h-5 before:w-1 before:-translate-y-1/2 before:rounded-r-full before:bg-brand-accent before:content-['']"
+                            : "text-sidebar-foreground hover:bg-sidebar-accent",
+                        )}
+                      >
+                        <Icon className="h-5 w-5 shrink-0" />
+                        {item.label}
+                      </Link>
+                    </li>
+                  );
+                })}
+                <li>
+                  <NavReportsDropdown />
+                </li>
+              </ul>
+            </div>
             {role === "admin" && (
               <NavSection title="ระบบ" items={systemNav} />
             )}
