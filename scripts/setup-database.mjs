@@ -96,7 +96,7 @@ async function bootstrapExistingDatabase(client, migrationFiles) {
   if (applied.size > 0) return;
 
   const { rows } = await client.query(
-    "SELECT 1 FROM pg_type WHERE typname = 'student_status' LIMIT 1",
+    "SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'academic_years' LIMIT 1",
   );
   if (rows.length === 0) return;
 
