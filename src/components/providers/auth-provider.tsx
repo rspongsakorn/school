@@ -7,7 +7,7 @@ import {
   useEffect,
   useState,
 } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { SessionProfile } from "@/lib/auth/session-profile";
 
@@ -20,6 +20,7 @@ const AuthContext = createContext<AuthState>({ profile: null, isLoading: true })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [state, setState] = useState<AuthState>({ profile: null, isLoading: true });
 
   const loadProfile = useCallback(async () => {
@@ -61,8 +62,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   useEffect(() => {
+    // Re-checks the session on every route change so a server-side sign-in
+    // (which redirects here without remounting AuthProvider) picks up the
+    // new session immediately instead of showing stale/empty profile data.
     void loadProfile();
+  }, [pathname, loadProfile]);
 
+  useEffect(() => {
     const supabase = createClient();
     const {
       data: { subscription },
