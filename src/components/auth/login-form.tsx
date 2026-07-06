@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState } from "react";
 import { signIn, type LoginState } from "@/app/login/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,12 +9,6 @@ const initialState: LoginState = {};
 
 export function LoginForm() {
   const [state, formAction, pending] = useActionState(signIn, initialState);
-
-  useEffect(() => {
-    if (state.success) {
-      window.location.href = "/";
-    }
-  }, [state.success]);
 
   return (
     <Card className="border-border shadow-sm">
@@ -55,7 +49,11 @@ export function LoginForm() {
               {state.error}
             </p>
           ) : null}
-          <Button type="submit" className="h-11 w-full" disabled={pending}>
+          <Button
+            type="submit"
+            className="h-11 w-full cursor-pointer hover:bg-primary/80"
+            disabled={pending}
+          >
             {pending ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบ"}
           </Button>
         </form>

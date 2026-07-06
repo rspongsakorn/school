@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/server";
 
 export type LoginState = {
   error?: string;
-  success?: boolean;
 };
 
 export async function signIn(
@@ -48,7 +47,7 @@ export async function signIn(
     return { error: "บัญชียังไม่ได้รับการเปิดใช้งาน กรุณาติดต่อผู้ดูแลระบบ" };
   }
 
-  return { success: true };
+  redirect("/");
 }
 
 export async function signOut() {
