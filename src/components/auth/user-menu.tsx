@@ -22,7 +22,7 @@ export function UserMenu() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium hover:bg-muted">
+      <DropdownMenuTrigger className="flex h-10 cursor-pointer items-center gap-2 rounded-lg px-3 text-sm font-medium hover:bg-muted">
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary">
           <User className="h-4 w-4 text-primary-foreground" />
         </div>
@@ -30,7 +30,10 @@ export function UserMenu() {
         <ChevronDown className="h-4 w-4 text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => void handleSignOut()}>
+        <DropdownMenuItem
+          className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
+          onClick={() => void handleSignOut()}
+        >
           ออกจากระบบ
         </DropdownMenuItem>
       </DropdownMenuContent>
