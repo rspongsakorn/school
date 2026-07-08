@@ -60,3 +60,4 @@ presentation/
 quotation/
 assets/hootdesk-logo.png
 *.docx
+.superpowers/
