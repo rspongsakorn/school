@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { LoginForm } from "@/components/auth/login-form";
+import { SCHOOL_CONFIG } from "@/lib/school-config";
 
 export default async function LoginPage({
   searchParams,
@@ -14,8 +15,8 @@ export default async function LoginPage({
       <div className="w-full max-w-md space-y-8">
         <div className="flex flex-col items-center gap-3 text-center">
           <Image
-            src="/school-logo.png"
-            alt="โลโก้โรงเรียนบัวใหญ่วิทยา"
+            src={SCHOOL_CONFIG.logoPath}
+            alt={`โลโก้${SCHOOL_CONFIG.name}`}
             width={80}
             height={80}
             className="rounded-full object-cover"
