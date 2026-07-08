@@ -17,7 +17,7 @@ export function ReportLetterhead({
 }: ReportLetterheadProps) {
   return (
     <div className="report-letterhead hidden mb-4 pb-3 print:block">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-4 border-b-2 border-[#1f7a52] pb-3">
         <div className="flex items-center gap-3">
           <Image
             src={SCHOOL_CONFIG.logoPath}
@@ -43,11 +43,7 @@ export function ReportLetterhead({
           {subtitle ? <p className="text-[10px] text-gray-400">{subtitle}</p> : null}
         </div>
       </div>
-      <div
-        className="mt-3 h-0.5 rounded-full"
-        style={{ background: "linear-gradient(90deg, #1f7a52, #34aa79)" }}
-      />
-      <p className="mt-1 text-[10px] text-gray-500">พิมพ์เมื่อ {formatThaiDateLong(new Date())}</p>
+      <p className="mt-2 text-[10px] text-gray-500">พิมพ์เมื่อ {formatThaiDateLong(new Date())}</p>
     </div>
   );
 }
