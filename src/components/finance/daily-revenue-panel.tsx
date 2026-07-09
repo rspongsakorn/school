@@ -53,10 +53,11 @@ export function DailyRevenuePanel() {
   const [openDate, setOpenDate] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["daily-revenue", ctx?.academicYearId, dateFrom, dateTo, method],
+    queryKey: ["daily-revenue", ctx?.academicYearId, ctx?.semesterId, dateFrom, dateTo, method],
     queryFn: () =>
       fetchDailyRevenue({
         academicYearId: ctx!.academicYearId,
+        semesterId: ctx!.semesterId,
         dateFrom,
         dateTo,
         method,
