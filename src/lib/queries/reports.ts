@@ -679,6 +679,70 @@ export async function fetchDiscountReport(params: {
   return { rows: [...byItem.values()].sort((a, b) => b.totalDiscount - a.totalDiscount), grandTotal: Math.round(grandTotal * 100) / 100 };
 }
 
+export type DailyRemittanceItem = {
+  receiptTypeId: string;
+  code: string;
+  name: string;
+  amount: number;
+};
+
+export async function fetchDailyRemittanceItems(params: {
+  academicYearId: string;
+  dateFrom: string;
+  dateTo: string;
+  method?: "all" | "cash" | "transfer";
+}): Promise<DailyRemittanceItem[]> {
+  const supabase = createClient();
+
+  let query = supabase
+    .from("payment_allocations")
+    .select(
+      `
+      amount,
+      payments!inner ( status, academic_year_id, paid_at, payment_method ),
+      student_invoices!inner ( invoice_type_id, invoice_types ( code, name ) )
+    `,
+    )
+    .eq("payments.status", "active")
+    .eq("payments.academic_year_id", params.academicYearId)
+    .gte("payments.paid_at", `${params.dateFrom}T00:00:00+07:00`)
+    .lte("payments.paid_at", `${params.dateTo}T23:59:59.999+07:00`);
+
+  if (params.method && params.method !== "all") {
+    query = query.eq("payments.payment_method", params.method);
+  }
+
+  type Row = {
+    amount: string;
+    student_invoices: {
+      invoice_type_id: string;
+      invoice_types: { code: string; name: string } | null;
+    };
+  };
+
+  const { data } = await query;
+  const rows = (data ?? []) as unknown as Row[];
+
+  const byType = new Map<string, DailyRemittanceItem>();
+  for (const r of rows) {
+    const amount = Number(r.amount);
+    const receiptTypeId = r.student_invoices.invoice_type_id;
+    const existing = byType.get(receiptTypeId);
+    if (existing) {
+      existing.amount = Math.round((existing.amount + amount) * 100) / 100;
+    } else {
+      byType.set(receiptTypeId, {
+        receiptTypeId,
+        code: r.student_invoices.invoice_types?.code ?? "—",
+        name: r.student_invoices.invoice_types?.name ?? "—",
+        amount,
+      });
+    }
+  }
+
+  return [...byType.values()].sort((a, b) => a.code.localeCompare(b.code));
+}
+
 export async function fetchStudentStatementAllYears(
   studentId: string,
 ): Promise<StudentStatement | null> {
