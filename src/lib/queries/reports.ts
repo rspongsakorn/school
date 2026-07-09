@@ -700,7 +700,7 @@ export async function fetchDailyRemittanceItems(params: {
       `
       amount,
       payments!inner ( status, academic_year_id, paid_at, payment_method ),
-      student_invoices!inner ( receipt_type_id, receipt_types ( code, name ) )
+      student_invoices!inner ( invoice_type_id, invoice_types ( code, name ) )
     `,
     )
     .eq("payments.status", "active")
@@ -715,8 +715,8 @@ export async function fetchDailyRemittanceItems(params: {
   type Row = {
     amount: string;
     student_invoices: {
-      receipt_type_id: string;
-      receipt_types: { code: string; name: string } | null;
+      invoice_type_id: string;
+      invoice_types: { code: string; name: string } | null;
     };
   };
 
@@ -726,15 +726,15 @@ export async function fetchDailyRemittanceItems(params: {
   const byType = new Map<string, DailyRemittanceItem>();
   for (const r of rows) {
     const amount = Number(r.amount);
-    const receiptTypeId = r.student_invoices.receipt_type_id;
+    const receiptTypeId = r.student_invoices.invoice_type_id;
     const existing = byType.get(receiptTypeId);
     if (existing) {
       existing.amount = Math.round((existing.amount + amount) * 100) / 100;
     } else {
       byType.set(receiptTypeId, {
         receiptTypeId,
-        code: r.student_invoices.receipt_types?.code ?? "—",
-        name: r.student_invoices.receipt_types?.name ?? "—",
+        code: r.student_invoices.invoice_types?.code ?? "—",
+        name: r.student_invoices.invoice_types?.name ?? "—",
         amount,
       });
     }
