@@ -24,6 +24,8 @@ export function DailyRemittanceSlip({ summary, dateFrom, dateTo }: DailyRemittan
       </div>
 
       <table className="w-full border-collapse text-sm">
+        {/* Fixed placeholder line item (code 01121) — matches the original paper form;
+            not itemized from real transaction categories since none are tracked yet. */}
         <thead>
           <tr className="border-b">
             <th className="w-16 py-1 text-left">ลำดับ</th>
