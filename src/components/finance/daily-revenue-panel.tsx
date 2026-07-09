@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AppHeader } from "@/components/app-header";
 import { useRequireRole } from "@/components/providers/auth-provider";
 import { useSemesterContext } from "@/hooks/use-semester-context";
-import { fetchDailyRevenue } from "@/lib/queries/reports";
+import { fetchDailyRevenue, fetchDailyRemittanceItems } from "@/lib/queries/reports";
 import { ReportToolbar } from "@/components/finance/report-toolbar";
 import { ReportLetterhead } from "@/components/finance/report-letterhead";
 import { ReceiptIssuanceView } from "@/components/finance/receipt-issuance-view";
@@ -74,6 +74,18 @@ export function DailyRevenuePanel() {
     enabled: !!ctx,
   });
 
+  const { data: remittanceItems } = useQuery({
+    queryKey: ["daily-remittance-items", ctx?.academicYearId, dateFrom, dateTo, method],
+    queryFn: () =>
+      fetchDailyRemittanceItems({
+        academicYearId: ctx!.academicYearId,
+        dateFrom,
+        dateTo,
+        method,
+      }),
+    enabled: !!ctx && docType === "remittance",
+  });
+
   const summary = data?.summary ?? [];
   const receiptsByDate = data?.receiptsByDate ?? {};
 
@@ -86,6 +98,8 @@ export function DailyRevenuePanel() {
     }),
     { receiptCount: 0, cashTotal: 0, transferTotal: 0, total: 0 },
   );
+
+  const yearSemesterLabel = ctx ? `${ctx.semesterNumber}/${ctx.academicYearName}` : "—";
 
   return (
     <>
@@ -141,9 +155,9 @@ export function DailyRevenuePanel() {
           ) : summary.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">ไม่มีข้อมูลในช่วงที่เลือก</p>
           ) : docType === "receipts" ? (
-            <ReceiptIssuanceView receiptsByDate={receiptsByDate} />
+            <ReceiptIssuanceView receiptsByDate={receiptsByDate} yearSemesterLabel={yearSemesterLabel} />
           ) : docType === "remittance" ? (
-            <DailyRemittanceSlip summary={summary} dateFrom={dateFrom} dateTo={dateTo} />
+            <DailyRemittanceSlip items={remittanceItems ?? []} dateFrom={dateFrom} dateTo={dateTo} />
           ) : (
             <Table>
               <TableHeader>
