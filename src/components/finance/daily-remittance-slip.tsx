@@ -24,54 +24,57 @@ export function DailyRemittanceSlip({ items, dateFrom, dateTo }: DailyRemittance
         <p className="text-sm text-muted-foreground">
           ประจำวัน {formatThaiDate(`${dateFrom}T00:00:00+07:00`)} ถึง {formatThaiDate(`${dateTo}T00:00:00+07:00`)}
         </p>
+        <p className="mt-2 text-xs text-muted-foreground print:hidden">กดพิมพ์เพื่อดูรายละเอียดใบนำส่งเงิน</p>
       </div>
 
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="border-b">
-            <th className="w-16 py-1 text-left">ลำดับ</th>
-            <th className="w-24 py-1 text-left">รหัสรายการ</th>
-            <th className="py-1 text-left">รายการ</th>
-            <th className="py-1 text-right">จำนวนเงิน (บาท)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item, index) => (
-            <tr key={item.receiptTypeId}>
-              <td className="py-1">{index + 1}</td>
-              <td className="py-1">{item.code}</td>
-              <td className="py-1">{item.name}</td>
-              <td className="py-1 text-right tabular-nums">{formatBaht(item.amount)}</td>
+      <div className="hidden print:block">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="border-b">
+              <th className="w-16 py-1 text-left">ลำดับ</th>
+              <th className="w-24 py-1 text-left">รหัสรายการ</th>
+              <th className="py-1 text-left">รายการ</th>
+              <th className="py-1 text-right">จำนวนเงิน (บาท)</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {items.map((item, index) => (
+              <tr key={item.receiptTypeId}>
+                <td className="py-1">{index + 1}</td>
+                <td className="py-1">{item.code}</td>
+                <td className="py-1">{item.name}</td>
+                <td className="py-1 text-right tabular-nums">{formatBaht(item.amount)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
-      <div className="ml-auto w-full max-w-xs space-y-1 text-sm">
-        <div className="flex justify-between">
-          <span>รวมรายรับ</span>
-          <span className="tabular-nums">{formatBaht(totalReceipts)}</span>
+        <div className="ml-auto w-full max-w-xs space-y-1 text-sm">
+          <div className="flex justify-between">
+            <span>รวมรายรับ</span>
+            <span className="tabular-nums">{formatBaht(totalReceipts)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>รวมรายจ่าย</span>
+            <span className="tabular-nums">{formatBaht(totalExpenses)}</span>
+          </div>
+          <div className="flex justify-between border-t pt-1 font-semibold">
+            <span>รวมเป็นเงิน</span>
+            <span className="tabular-nums">{formatBaht(netTotal)}</span>
+          </div>
         </div>
-        <div className="flex justify-between">
-          <span>รวมรายจ่าย</span>
-          <span className="tabular-nums">{formatBaht(totalExpenses)}</span>
-        </div>
-        <div className="flex justify-between border-t pt-1 font-semibold">
-          <span>รวมเป็นเงิน</span>
-          <span className="tabular-nums">{formatBaht(netTotal)}</span>
-        </div>
-      </div>
 
-      <p className="border-y py-2 text-center font-medium">({bahtText(netTotal)})</p>
+        <p className="border-y py-2 text-center font-medium">({bahtText(netTotal)})</p>
 
-      <div className="grid grid-cols-2 gap-8 pt-12 text-center text-sm">
-        <div>
-          <p>ลงชื่อ ..................................................</p>
-          <p className="mt-1 text-xs text-muted-foreground">ฝ่ายบัญชีและการเงิน</p>
-        </div>
-        <div>
-          <p>ลงชื่อ ..................................................</p>
-          <p className="mt-1 text-xs text-muted-foreground">หัวหน้าฝ่ายบัญชีและการเงิน</p>
+        <div className="grid grid-cols-2 gap-8 pt-12 text-center text-sm">
+          <div>
+            <p>ลงชื่อ ..................................................</p>
+            <p className="mt-1 text-xs text-muted-foreground">ฝ่ายบัญชีและการเงิน</p>
+          </div>
+          <div>
+            <p>ลงชื่อ ..................................................</p>
+            <p className="mt-1 text-xs text-muted-foreground">ผู้จัดการ</p>
+          </div>
         </div>
       </div>
     </div>
