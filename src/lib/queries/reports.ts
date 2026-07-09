@@ -536,6 +536,14 @@ export async function fetchDailyRevenue(params: {
   return { summary, receiptsByDate };
 }
 
+export function flattenReceiptsForIssuanceReport(
+  receiptsByDate: Record<string, DailyDetailReceipt[]>,
+): DailyDetailReceipt[] {
+  return Object.values(receiptsByDate)
+    .flat()
+    .sort((a, b) => (a.paidAt < b.paidAt ? -1 : a.paidAt > b.paidAt ? 1 : 0));
+}
+
 export type StatementLine = {
   description: string;
   amount: number;
