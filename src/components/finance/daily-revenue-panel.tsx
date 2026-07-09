@@ -8,6 +8,8 @@ import { useSemesterContext } from "@/hooks/use-semester-context";
 import { fetchDailyRevenue } from "@/lib/queries/reports";
 import { ReportToolbar } from "@/components/finance/report-toolbar";
 import { ReportLetterhead } from "@/components/finance/report-letterhead";
+import { ReceiptIssuanceView } from "@/components/finance/receipt-issuance-view";
+import { DailyRemittanceSlip } from "@/components/finance/daily-remittance-slip";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -33,6 +35,12 @@ const METHOD_ITEMS = [
   { value: "transfer", label: "เงินโอน" },
 ];
 
+const DOC_TYPE_ITEMS = [
+  { value: "summary", label: "สรุปรายวัน" },
+  { value: "receipts", label: "รายงานการออกใบเสร็จ" },
+  { value: "remittance", label: "ใบนำส่งเงินประจำวัน" },
+];
+
 function firstOfMonth(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
@@ -50,13 +58,15 @@ export function DailyRevenuePanel() {
   const [dateFrom, setDateFrom] = useState(firstOfMonth());
   const [dateTo, setDateTo] = useState(today());
   const [method, setMethod] = useState<"all" | "cash" | "transfer">("all");
+  const [docType, setDocType] = useState<"summary" | "receipts" | "remittance">("summary");
   const [openDate, setOpenDate] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["daily-revenue", ctx?.academicYearId, dateFrom, dateTo, method],
+    queryKey: ["daily-revenue", ctx?.academicYearId, ctx?.semesterId, dateFrom, dateTo, method],
     queryFn: () =>
       fetchDailyRevenue({
         academicYearId: ctx!.academicYearId,
+        semesterId: ctx!.semesterId,
         dateFrom,
         dateTo,
         method,
@@ -109,6 +119,18 @@ export function DailyRevenuePanel() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={docType} onValueChange={(v) => setDocType((v ?? "summary") as typeof docType)} items={DOC_TYPE_ITEMS}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="รูปแบบเอกสาร" />
+              </SelectTrigger>
+              <SelectContent>
+                {DOC_TYPE_ITEMS.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <div className="ml-auto">
               <ReportToolbar />
             </div>
@@ -118,6 +140,10 @@ export function DailyRevenuePanel() {
             <div className="h-40 animate-pulse rounded-lg bg-muted" />
           ) : summary.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">ไม่มีข้อมูลในช่วงที่เลือก</p>
+          ) : docType === "receipts" ? (
+            <ReceiptIssuanceView receiptsByDate={receiptsByDate} />
+          ) : docType === "remittance" ? (
+            <DailyRemittanceSlip summary={summary} dateFrom={dateFrom} dateTo={dateTo} />
           ) : (
             <Table>
               <TableHeader>
