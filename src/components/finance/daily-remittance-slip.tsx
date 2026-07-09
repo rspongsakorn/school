@@ -11,7 +11,7 @@ type DailyRemittanceSlipProps = {
 
 export function DailyRemittanceSlip({ summary, dateFrom, dateTo }: DailyRemittanceSlipProps) {
   const totalReceipts = summary.reduce((sum, row) => sum + row.total, 0);
-  const totalExpenses = 0;
+  const totalExpenses = 0; // always 0 — system has no expense-tracking data (see design doc)
   const netTotal = totalReceipts - totalExpenses;
 
   return (
@@ -61,11 +61,11 @@ export function DailyRemittanceSlip({ summary, dateFrom, dateTo }: DailyRemittan
 
       <div className="grid grid-cols-2 gap-8 pt-12 text-center text-sm">
         <div>
-          <p>ลงชื่อ .................................................. ผู้ส่งเงิน</p>
+          <p>ลงชื่อ ..................................................</p>
           <p className="mt-1 text-xs text-muted-foreground">ฝ่ายบัญชีและการเงิน</p>
         </div>
         <div>
-          <p>ลงชื่อ .................................................. ผู้รับเงิน</p>
+          <p>ลงชื่อ ..................................................</p>
           <p className="mt-1 text-xs text-muted-foreground">หัวหน้าฝ่ายบัญชีและการเงิน</p>
         </div>
       </div>
