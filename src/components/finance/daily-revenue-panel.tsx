@@ -74,8 +74,8 @@ export function DailyRevenuePanel() {
     enabled: !!ctx,
   });
 
-  const { data: remittanceItems } = useQuery({
-    queryKey: ["daily-remittance-items", ctx?.academicYearId, dateFrom, dateTo, method],
+  const { data: remittanceItems, isLoading: isRemittanceLoading } = useQuery({
+    queryKey: ["daily-remittance-items", ctx?.academicYearId, ctx?.semesterId, dateFrom, dateTo, method],
     queryFn: () =>
       fetchDailyRemittanceItems({
         academicYearId: ctx!.academicYearId,
@@ -150,7 +150,7 @@ export function DailyRevenuePanel() {
             </div>
           </div>
 
-          {isLoading ? (
+          {isLoading || (docType === "remittance" && isRemittanceLoading) ? (
             <div className="h-40 animate-pulse rounded-lg bg-muted" />
           ) : summary.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">ไม่มีข้อมูลในช่วงที่เลือก</p>
