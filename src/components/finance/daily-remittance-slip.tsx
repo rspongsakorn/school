@@ -10,6 +10,9 @@ type DailyRemittanceSlipProps = {
 };
 
 export function DailyRemittanceSlip({ items, dateFrom, dateTo }: DailyRemittanceSlipProps) {
+  // totalReceipts is derived from items (payment_allocations grouped by receipt type), which
+  // should reconcile with the "สรุปรายวัน" summary total since both come from the same active
+  // payments — but a payment with no matching allocation row would silently drop out here.
   const totalReceipts = items.reduce((sum, item) => sum + item.amount, 0);
   const totalExpenses = 0; // always 0 — system has no expense-tracking data (see design doc)
   const netTotal = totalReceipts - totalExpenses;
