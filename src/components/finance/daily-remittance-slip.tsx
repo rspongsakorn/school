@@ -1,16 +1,16 @@
 "use client";
 
 import { formatBaht, formatThaiDate, bahtText } from "@/lib/format";
-import type { DailyRevenueRow } from "@/lib/reports/daily";
+import type { DailyRemittanceItem } from "@/lib/queries/reports";
 
 type DailyRemittanceSlipProps = {
-  summary: DailyRevenueRow[];
+  items: DailyRemittanceItem[];
   dateFrom: string;
   dateTo: string;
 };
 
-export function DailyRemittanceSlip({ summary, dateFrom, dateTo }: DailyRemittanceSlipProps) {
-  const totalReceipts = summary.reduce((sum, row) => sum + row.total, 0);
+export function DailyRemittanceSlip({ items, dateFrom, dateTo }: DailyRemittanceSlipProps) {
+  const totalReceipts = items.reduce((sum, item) => sum + item.amount, 0);
   const totalExpenses = 0; // always 0 — system has no expense-tracking data (see design doc)
   const netTotal = totalReceipts - totalExpenses;
 
@@ -24,8 +24,6 @@ export function DailyRemittanceSlip({ summary, dateFrom, dateTo }: DailyRemittan
       </div>
 
       <table className="w-full border-collapse text-sm">
-        {/* Fixed placeholder line item (code 01121) — matches the original paper form;
-            not itemized from real transaction categories since none are tracked yet. */}
         <thead>
           <tr className="border-b">
             <th className="w-16 py-1 text-left">ลำดับ</th>
@@ -35,12 +33,14 @@ export function DailyRemittanceSlip({ summary, dateFrom, dateTo }: DailyRemittan
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td className="py-1">1</td>
-            <td className="py-1">01121</td>
-            <td className="py-1">ค่าใช้จ่ายอื่นๆ</td>
-            <td className="py-1 text-right tabular-nums">{formatBaht(totalReceipts)}</td>
-          </tr>
+          {items.map((item, index) => (
+            <tr key={item.receiptTypeId}>
+              <td className="py-1">{index + 1}</td>
+              <td className="py-1">{item.code}</td>
+              <td className="py-1">{item.name}</td>
+              <td className="py-1 text-right tabular-nums">{formatBaht(item.amount)}</td>
+            </tr>
+          ))}
         </tbody>
       </table>
 
