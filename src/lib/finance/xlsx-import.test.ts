@@ -196,7 +196,15 @@ describe("validateGroup", () => {
       { ...tuitionInvoice, status: "paid" },
       insuranceInvoice,
     ]);
-    expect(result).toEqual({ ok: false, reason: "ใบแจ้งหนี้นี้ชำระแล้ว" });
+    expect(result).toEqual({ ok: false, reason: "ใบแจ้งหนี้นี้มีการชำระแล้ว" });
+  });
+
+  it("rejects when the invoice is partially paid", () => {
+    const result = validateGroup(tuitionGroup, [
+      { ...tuitionInvoice, status: "partial" },
+      insuranceInvoice,
+    ]);
+    expect(result).toEqual({ ok: false, reason: "ใบแจ้งหนี้นี้มีการชำระแล้ว" });
   });
 
   it("rejects when เบิกได้/เบิกไม่ได้ doesn't match the invoice's is_reimbursable", () => {

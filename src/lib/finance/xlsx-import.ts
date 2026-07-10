@@ -205,8 +205,8 @@ export function validateGroup(
 
   const invoice = candidates[0];
 
-  if (invoice.status === "paid") {
-    return { ok: false, reason: "ใบแจ้งหนี้นี้ชำระแล้ว" };
+  if (invoice.status !== "unpaid") {
+    return { ok: false, reason: "ใบแจ้งหนี้นี้มีการชำระแล้ว" };
   }
 
   if (
