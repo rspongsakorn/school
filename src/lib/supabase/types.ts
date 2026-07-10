@@ -227,8 +227,19 @@ export type Database = {
           p_invoice_type_id: string;
           p_snapshot: Record<string, unknown>;
           p_allocations: Record<string, unknown>[];
+          p_discount_invoice_id?: string | null;
+          p_discount_value?: number | null;
         };
         Returns: { payment_id: string; receipt_number: string }[];
+      };
+      record_backfill_invoice_discount: {
+        Args: {
+          p_invoice_id: string;
+          p_discount_value: number;
+          p_note: string | null;
+          p_recorded_by: string;
+        };
+        Returns: undefined;
       };
     };
     Enums: Record<string, never>;
