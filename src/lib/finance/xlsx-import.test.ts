@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as XLSX from "xlsx";
-import { buildImportGroups, parseXlsxWorkbook, type XlsxSheetRow } from "@/lib/finance/xlsx-import";
+import { buildImportGroups, parseXlsxWorkbook, validateGroup, type InvoiceCandidate, type XlsxSheetRow } from "@/lib/finance/xlsx-import";
 
 function makeRow(overrides: Partial<XlsxSheetRow> = {}): XlsxSheetRow {
   return {
@@ -146,5 +146,76 @@ describe("parseXlsxWorkbook", () => {
       insuranceVoucher: null,
       paidDateIso: "2026-05-05",
     });
+  });
+});
+
+describe("validateGroup", () => {
+  const tuitionGroup = buildImportGroups(makeRow())[0]; // kind: "tuition", groupTotal 2900, expectedIsReimbursable false
+  const insuranceGroup = buildImportGroups(makeRow())[1]; // kind: "insurance", groupTotal 200
+
+  const tuitionInvoice: InvoiceCandidate = {
+    id: "inv-tuition",
+    isReimbursable: false,
+    totalAmount: 2900,
+    status: "unpaid",
+    feeItemNames: ["ค่าธรรมเนียมการศึกษา", "ค่าอาหารกลางวัน"],
+  };
+  const insuranceInvoice: InvoiceCandidate = {
+    id: "inv-insurance",
+    isReimbursable: false,
+    totalAmount: 200,
+    status: "unpaid",
+    feeItemNames: ["ค่าประกันอุบัติเหตุ"],
+  };
+
+  it("matches a tuition group to the non-insurance invoice", () => {
+    const result = validateGroup(tuitionGroup, [tuitionInvoice, insuranceInvoice]);
+    expect(result).toEqual({ ok: true, invoiceId: "inv-tuition" });
+  });
+
+  it("matches an insurance group to the invoice whose fee item name contains ประกัน", () => {
+    const result = validateGroup(insuranceGroup, [tuitionInvoice, insuranceInvoice]);
+    expect(result).toEqual({ ok: true, invoiceId: "inv-insurance" });
+  });
+
+  it("rejects when no matching invoice exists", () => {
+    const result = validateGroup(insuranceGroup, [tuitionInvoice]);
+    expect(result).toEqual({ ok: false, reason: "ไม่พบใบแจ้งหนี้ที่ตรงกัน" });
+  });
+
+  it("rejects when more than one candidate invoice matches", () => {
+    const result = validateGroup(tuitionGroup, [
+      tuitionInvoice,
+      { ...tuitionInvoice, id: "inv-tuition-2" },
+    ]);
+    expect(result).toEqual({ ok: false, reason: "พบใบแจ้งหนี้มากกว่า 1 ใบ" });
+  });
+
+  it("rejects when the invoice is already paid", () => {
+    const result = validateGroup(tuitionGroup, [
+      { ...tuitionInvoice, status: "paid" },
+      insuranceInvoice,
+    ]);
+    expect(result).toEqual({ ok: false, reason: "ใบแจ้งหนี้นี้ชำระแล้ว" });
+  });
+
+  it("rejects when เบิกได้/เบิกไม่ได้ doesn't match the invoice's is_reimbursable", () => {
+    const result = validateGroup(tuitionGroup, [
+      { ...tuitionInvoice, isReimbursable: true },
+      insuranceInvoice,
+    ]);
+    expect(result).toEqual({
+      ok: false,
+      reason: "สถานะเบิกได้/เบิกไม่ได้ไม่ตรงกับใบแจ้งหนี้",
+    });
+  });
+
+  it("rejects when groupTotal doesn't match the invoice's total_amount", () => {
+    const result = validateGroup(tuitionGroup, [
+      { ...tuitionInvoice, totalAmount: 3000 },
+      insuranceInvoice,
+    ]);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toContain("ยอดรวมไม่ตรงกับใบแจ้งหนี้");
   });
 });

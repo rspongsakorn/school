@@ -167,3 +167,62 @@ export function buildImportGroups(row: XlsxSheetRow): ImportGroup[] {
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
+
+export type InvoiceCandidate = {
+  id: string;
+  isReimbursable: boolean;
+  totalAmount: number;
+  status: "unpaid" | "partial" | "paid";
+  /** fee_items.name for every invoice_lines row on this invoice. */
+  feeItemNames: string[];
+};
+
+export type GroupValidationResult =
+  | { ok: true; invoiceId: string }
+  | { ok: false; reason: string };
+
+const AMOUNT_EPSILON = 0.005;
+
+/** Matches one import group against a student's invoice candidates and checks it's safe to import. */
+export function validateGroup(
+  group: ImportGroup,
+  invoices: InvoiceCandidate[],
+): GroupValidationResult {
+  const isInsuranceInvoice = (inv: InvoiceCandidate) =>
+    inv.feeItemNames.some((name) => name.includes("ประกัน"));
+
+  const candidates =
+    group.kind === "insurance"
+      ? invoices.filter(isInsuranceInvoice)
+      : invoices.filter((inv) => !isInsuranceInvoice(inv));
+
+  if (candidates.length === 0) {
+    return { ok: false, reason: "ไม่พบใบแจ้งหนี้ที่ตรงกัน" };
+  }
+  if (candidates.length > 1) {
+    return { ok: false, reason: "พบใบแจ้งหนี้มากกว่า 1 ใบ" };
+  }
+
+  const invoice = candidates[0];
+
+  if (invoice.status === "paid") {
+    return { ok: false, reason: "ใบแจ้งหนี้นี้ชำระแล้ว" };
+  }
+
+  if (
+    group.kind === "tuition" &&
+    group.expectedIsReimbursable !== null &&
+    invoice.isReimbursable !== group.expectedIsReimbursable
+  ) {
+    return { ok: false, reason: "สถานะเบิกได้/เบิกไม่ได้ไม่ตรงกับใบแจ้งหนี้" };
+  }
+
+  if (Math.abs(group.groupTotal - invoice.totalAmount) > AMOUNT_EPSILON) {
+    return {
+      ok: false,
+      reason: `ยอดรวมไม่ตรงกับใบแจ้งหนี้ (ไฟล์ ${group.groupTotal} ≠ ระบบ ${invoice.totalAmount})`,
+    };
+  }
+
+  return { ok: true, invoiceId: invoice.id };
+}
