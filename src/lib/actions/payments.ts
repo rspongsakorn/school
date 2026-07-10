@@ -498,6 +498,13 @@ export async function importPaymentsXlsxBackfill(input: {
   ]);
   if (!invoiceTypeId) return { ok: false, error: "ไม่พบประเภทใบแจ้งเริ่มต้น" };
 
+  const studentIds = [...new Set(groups.map((g) => g.studentId))];
+  const { data: students } = await supabase
+    .from("students")
+    .select("id, student_code, first_name, last_name")
+    .in("id", studentIds);
+  const studentById = new Map((students ?? []).map((s) => [s.id, s]));
+
   const failed: XlsxImportResult["failed"] = [];
   let imported = 0;
 
@@ -519,11 +526,7 @@ export async function importPaymentsXlsxBackfill(input: {
     }
 
     if (group.netCash > 0) {
-      const { data: student } = await supabase
-        .from("students")
-        .select("student_code, first_name, last_name")
-        .eq("id", group.studentId)
-        .maybeSingle();
+      const student = studentById.get(group.studentId);
       if (!student) {
         failed.push({ rowNumber: group.rowNumber, studentCode: group.studentCode, reason: "ไม่พบนักเรียน" });
         continue;
