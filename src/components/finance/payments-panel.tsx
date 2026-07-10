@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { AppHeader } from "@/components/app-header";
 import { PaymentImportDialog } from "@/components/finance/payment-import-dialog";
+import { XlsxPaymentImportDialog } from "@/components/finance/xlsx-payment-import-dialog";
 import { useRequireRole } from "@/components/providers/auth-provider";
 import { useSemesterContext } from "@/hooks/use-semester-context";
 import { formatBaht } from "@/lib/format";
@@ -106,6 +107,7 @@ export function PaymentsPanel() {
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [xlsxImportOpen, setXlsxImportOpen] = useState(false);
   const [lastPayment, setLastPayment] = useState<{ id: string; receiptNumber: string; amount: number } | null>(null);
   const [voidTarget, setVoidTarget] = useState<PaymentListRow | null>(null);
   const [voidReason, setVoidReason] = useState("");
@@ -531,9 +533,14 @@ export function PaymentsPanel() {
           <Card className="border-border shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base">รับชำระเงิน</CardTitle>
-                <Button type="button" variant="outline" size="sm" onClick={() => setImportOpen(true)}>
-                  นำเข้า CSV
-                </Button>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+                    นำเข้า CSV
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setXlsxImportOpen(true)}>
+                    นำเข้า XLSX
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 {!selectedStudent && lastPayment ? (
@@ -1049,6 +1056,20 @@ export function PaymentsPanel() {
             <PaymentImportDialog
               open={importOpen}
               onOpenChange={setImportOpen}
+              academicYearId={ctx.academicYearId}
+              academicYearName={ctx.academicYearName}
+              semesterId={ctx.semesterId}
+              onImported={() => {
+                invalidateFinanceQueries(queryClient);
+                router.refresh();
+              }}
+            />
+          ) : null}
+
+          {ctx ? (
+            <XlsxPaymentImportDialog
+              open={xlsxImportOpen}
+              onOpenChange={setXlsxImportOpen}
               academicYearId={ctx.academicYearId}
               academicYearName={ctx.academicYearName}
               semesterId={ctx.semesterId}
