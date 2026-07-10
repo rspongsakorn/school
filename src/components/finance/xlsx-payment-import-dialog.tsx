@@ -77,9 +77,17 @@ export function XlsxPaymentImportDialog({
     if (!file) return;
     setParsing(true);
 
-    const buffer = await file.arrayBuffer();
-    const sheetRows = parseXlsxWorkbook(buffer);
-    const rawGroups = sheetRows.flatMap(buildImportGroups);
+    let rawGroups: ImportGroup[];
+    try {
+      const buffer = await file.arrayBuffer();
+      const sheetRows = parseXlsxWorkbook(buffer);
+      rawGroups = sheetRows.flatMap(buildImportGroups);
+    } catch {
+      toast.error("ไม่สามารถอ่านไฟล์ได้ กรุณาตรวจสอบว่าเป็นไฟล์ .xlsx ที่ถูกต้อง");
+      setParsing(false);
+      e.target.value = "";
+      return;
+    }
 
     const codes = [...new Set(rawGroups.map((g) => g.studentCode))];
     const preview = await getXlsxImportPreviewAction(codes, semesterId);
