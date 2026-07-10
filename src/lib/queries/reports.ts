@@ -440,9 +440,11 @@ export type DailyDetailReceipt = {
   timeLabel: string;
   studentName: string;
   studentCode: string;
+  gradeClassroom: string;
   paymentMethod: "cash" | "transfer";
   amount: number;
   status: "active" | "voided";
+  recordedByName: string;
 };
 
 export type DailyRevenueResult = {
@@ -452,6 +454,7 @@ export type DailyRevenueResult = {
 
 export async function fetchDailyRevenue(params: {
   academicYearId: string;
+  semesterId: string;
   dateFrom: string; // YYYY-MM-DD (Bangkok day)
   dateTo: string; // YYYY-MM-DD (Bangkok day)
   method?: "all" | "cash" | "transfer";
@@ -471,7 +474,9 @@ export async function fetchDailyRevenue(params: {
       payment_method,
       paid_at,
       status,
-      students!inner ( student_code, first_name, last_name )
+      student_id,
+      students!inner ( student_code, first_name, last_name ),
+      profiles!payments_recorded_by_fkey ( display_name )
     `,
     )
     .eq("academic_year_id", params.academicYearId)
@@ -490,10 +495,15 @@ export async function fetchDailyRevenue(params: {
     payment_method: "cash" | "transfer";
     paid_at: string;
     status: "active" | "voided";
+    student_id: string;
     students: { student_code: string; first_name: string; last_name: string };
+    profiles: { display_name: string } | null;
   };
 
-  const { data } = await query;
+  const [{ data }, gradeByStudent] = await Promise.all([
+    query,
+    getStudentGradeMap(params.semesterId),
+  ]);
   const rows = (data ?? []) as unknown as Row[];
 
   const summary = groupDailyRevenue(
@@ -515,13 +525,23 @@ export async function fetchDailyRevenue(params: {
       timeLabel: formatThaiTime(r.paid_at),
       studentName: formatStudentName(r.students.first_name, r.students.last_name),
       studentCode: r.students.student_code,
+      gradeClassroom: gradeByStudent.get(r.student_id) ?? "—",
       paymentMethod: r.payment_method,
       amount: Number(r.amount),
       status: r.status,
+      recordedByName: r.profiles?.display_name ?? "—",
     });
   }
 
   return { summary, receiptsByDate };
+}
+
+export function flattenReceiptsForIssuanceReport(
+  receiptsByDate: Record<string, DailyDetailReceipt[]>,
+): DailyDetailReceipt[] {
+  return Object.values(receiptsByDate)
+    .flat()
+    .sort((a, b) => (a.paidAt < b.paidAt ? -1 : a.paidAt > b.paidAt ? 1 : 0));
 }
 
 export type StatementLine = {
@@ -657,6 +677,70 @@ export async function fetchDiscountReport(params: {
     }
   }
   return { rows: [...byItem.values()].sort((a, b) => b.totalDiscount - a.totalDiscount), grandTotal: Math.round(grandTotal * 100) / 100 };
+}
+
+export type DailyRemittanceItem = {
+  receiptTypeId: string;
+  code: string;
+  name: string;
+  amount: number;
+};
+
+export async function fetchDailyRemittanceItems(params: {
+  academicYearId: string;
+  dateFrom: string;
+  dateTo: string;
+  method?: "all" | "cash" | "transfer";
+}): Promise<DailyRemittanceItem[]> {
+  const supabase = createClient();
+
+  let query = supabase
+    .from("payment_allocations")
+    .select(
+      `
+      amount,
+      payments!inner ( status, academic_year_id, paid_at, payment_method ),
+      student_invoices!inner ( invoice_type_id, invoice_types ( code, name ) )
+    `,
+    )
+    .eq("payments.status", "active")
+    .eq("payments.academic_year_id", params.academicYearId)
+    .gte("payments.paid_at", `${params.dateFrom}T00:00:00+07:00`)
+    .lte("payments.paid_at", `${params.dateTo}T23:59:59.999+07:00`);
+
+  if (params.method && params.method !== "all") {
+    query = query.eq("payments.payment_method", params.method);
+  }
+
+  type Row = {
+    amount: string;
+    student_invoices: {
+      invoice_type_id: string;
+      invoice_types: { code: string; name: string } | null;
+    };
+  };
+
+  const { data } = await query;
+  const rows = (data ?? []) as unknown as Row[];
+
+  const byType = new Map<string, DailyRemittanceItem>();
+  for (const r of rows) {
+    const amount = Number(r.amount);
+    const receiptTypeId = r.student_invoices.invoice_type_id;
+    const existing = byType.get(receiptTypeId);
+    if (existing) {
+      existing.amount = Math.round((existing.amount + amount) * 100) / 100;
+    } else {
+      byType.set(receiptTypeId, {
+        receiptTypeId,
+        code: r.student_invoices.invoice_types?.code ?? "—",
+        name: r.student_invoices.invoice_types?.name ?? "—",
+        amount,
+      });
+    }
+  }
+
+  return [...byType.values()].sort((a, b) => a.code.localeCompare(b.code));
 }
 
 export async function fetchStudentStatementAllYears(
