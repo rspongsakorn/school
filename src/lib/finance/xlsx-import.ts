@@ -15,6 +15,22 @@ export type XlsxSheetRow = {
   paidDateIso: string | null; // "YYYY-MM-DD"
 };
 
+// cells[0] is the row's "ลำดับ" (sequence number) column, intentionally unused.
+const COL = {
+  STUDENT_CODE: 1,
+  FIRST_NAME: 2,
+  LAST_NAME: 3,
+  REIMBURSABLE: 4,
+  TUITION_VOUCHER: 5,
+  NON_REIMBURSABLE: 6,
+  LUNCH: 7,
+  DOCUMENT: 8,
+  INSURANCE: 9,
+  FOREIGN_TEACHER: 10,
+  INSURANCE_VOUCHER: 11,
+  PAID_DATE: 12,
+} as const;
+
 /** Reads the staff's per-classroom sheet: row 1 = class label, row 3 = headers, row 4+ = data. */
 export function parseXlsxWorkbook(buffer: ArrayBuffer): XlsxSheetRow[] {
   const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
@@ -30,25 +46,25 @@ export function parseXlsxWorkbook(buffer: ArrayBuffer): XlsxSheetRow[] {
     const cells = raw[i];
     if (!cells || cells.every((c) => c === null || c === "")) continue;
 
-    const studentCode = String(cells[1] ?? "").trim();
+    const studentCode = String(cells[COL.STUDENT_CODE] ?? "").trim();
     if (!studentCode) continue;
 
-    const firstName = String(cells[2] ?? "").trim();
-    const lastName = String(cells[3] ?? "").trim();
+    const firstName = String(cells[COL.FIRST_NAME] ?? "").trim();
+    const lastName = String(cells[COL.LAST_NAME] ?? "").trim();
 
     rows.push({
       rowNumber: i + 1,
       studentCode,
       studentName: `${firstName} ${lastName}`.trim(),
-      reimbursableAmount: parseCellAmount(cells[4]),
-      nonReimbursableAmount: parseCellAmount(cells[6]),
-      lunchAmount: parseCellAmount(cells[7]),
-      documentAmount: parseCellAmount(cells[8]),
-      insuranceAmount: parseCellAmount(cells[9]),
-      foreignTeacherAmount: parseCellAmount(cells[10]),
-      tuitionVoucher: parseCellText(cells[5]),
-      insuranceVoucher: parseCellText(cells[11]),
-      paidDateIso: parseCellDate(cells[12]),
+      reimbursableAmount: parseCellAmount(cells[COL.REIMBURSABLE]),
+      nonReimbursableAmount: parseCellAmount(cells[COL.NON_REIMBURSABLE]),
+      lunchAmount: parseCellAmount(cells[COL.LUNCH]),
+      documentAmount: parseCellAmount(cells[COL.DOCUMENT]),
+      insuranceAmount: parseCellAmount(cells[COL.INSURANCE]),
+      foreignTeacherAmount: parseCellAmount(cells[COL.FOREIGN_TEACHER]),
+      tuitionVoucher: parseCellText(cells[COL.TUITION_VOUCHER]),
+      insuranceVoucher: parseCellText(cells[COL.INSURANCE_VOUCHER]),
+      paidDateIso: parseCellDate(cells[COL.PAID_DATE]),
     });
   }
   return rows;
