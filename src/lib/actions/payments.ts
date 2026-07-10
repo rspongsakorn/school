@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatStudentName } from "@/lib/format";
 import { searchStudentsForPayment } from "@/lib/data/payments";
 import { getStudentGradeMap } from "@/lib/data/enrollments";
+import type { InvoiceCandidate } from "@/lib/finance/xlsx-import";
 
 export type RecordPaymentResult =
   | { ok: true; paymentId: string; receiptNumber: string; snapshot: Record<string, unknown> }
@@ -241,6 +242,80 @@ export async function getImportPreviewDataAction(
   return { ok: true as const, students: result };
 }
 
+export type XlsxImportPreviewStudent = {
+  studentCode: string;
+  studentId: string;
+  name: string;
+  invoices: InvoiceCandidate[];
+};
+
+export async function getXlsxImportPreviewAction(
+  studentCodes: string[],
+  semesterId: string,
+) {
+  const auth = await requireFinanceAction();
+  if (!auth.ok) return auth;
+
+  const codes = [...new Set(studentCodes.map((c) => c.trim()).filter(Boolean))];
+  if (codes.length === 0) {
+    return { ok: true as const, students: [] as XlsxImportPreviewStudent[] };
+  }
+
+  const supabase = await createClient();
+
+  const { data: students } = await supabase
+    .from("students")
+    .select("id, student_code, first_name, last_name")
+    .in("student_code", codes);
+
+  const studentRows = students ?? [];
+  const studentIds = studentRows.map((s) => s.id);
+
+  type InvoiceRow = {
+    id: string;
+    student_id: string;
+    total_amount: number;
+    status: "unpaid" | "partial" | "paid";
+    is_reimbursable: boolean;
+    invoice_lines: { fee_items: { name: string } | null }[] | null;
+  };
+
+  const invoicesByStudent = new Map<string, InvoiceCandidate[]>();
+  if (studentIds.length > 0) {
+    const { data: invoices } = await supabase
+      .from("student_invoices")
+      .select(
+        "id, student_id, total_amount, status, is_reimbursable, invoice_lines(fee_items(name))",
+      )
+      .in("student_id", studentIds)
+      .eq("semester_id", semesterId) as unknown as { data: InvoiceRow[] | null };
+
+    for (const inv of invoices ?? []) {
+      const candidate: InvoiceCandidate = {
+        id: inv.id,
+        isReimbursable: inv.is_reimbursable,
+        totalAmount: Number(inv.total_amount),
+        status: inv.status,
+        feeItemNames: (inv.invoice_lines ?? [])
+          .map((l) => l.fee_items?.name)
+          .filter((n): n is string => Boolean(n)),
+      };
+      const list = invoicesByStudent.get(inv.student_id) ?? [];
+      list.push(candidate);
+      invoicesByStudent.set(inv.student_id, list);
+    }
+  }
+
+  const result: XlsxImportPreviewStudent[] = studentRows.map((s) => ({
+    studentCode: s.student_code,
+    studentId: s.id,
+    name: formatStudentName(s.first_name, s.last_name),
+    invoices: invoicesByStudent.get(s.id) ?? [],
+  }));
+
+  return { ok: true as const, students: result };
+}
+
 export type ImportRowInput = {
   lineNumber: number;
   studentCode: string;
@@ -374,6 +449,139 @@ export async function importPaymentsBackfill(input: {
     if (rpcError) {
       failed.push({ lineNumber: row.lineNumber, studentCode: row.studentCode, reason: "บันทึกการชำระไม่ได้" });
       continue;
+    }
+
+    imported += 1;
+  }
+
+  revalidateFinancePaths();
+
+  return { ok: true, imported, failed };
+}
+
+export type XlsxImportGroupInput = {
+  rowNumber: number;
+  kind: "tuition" | "insurance";
+  invoiceId: string;
+  studentId: string;
+  studentCode: string;
+  netCash: number;
+  discount: number;
+  voucher: string | null;
+  paidDateIso: string;
+};
+
+export type XlsxImportResult = {
+  ok: true;
+  imported: number;
+  failed: { rowNumber: number; studentCode: string; reason: string }[];
+};
+
+export async function importPaymentsXlsxBackfill(input: {
+  groups: XlsxImportGroupInput[];
+  academicYearId: string;
+  academicYearName: string;
+  semesterId: string;
+}): Promise<XlsxImportResult | { ok: false; error: string }> {
+  const auth = await requireFinanceAction();
+  if (!auth.ok) return auth;
+
+  const supabase = await createClient();
+
+  const groups = [...input.groups].sort((a, b) =>
+    a.paidDateIso.localeCompare(b.paidDateIso),
+  );
+
+  const [invoiceTypeId, gradeByStudent] = await Promise.all([
+    getDefaultInvoiceTypeId(),
+    getStudentGradeMap(input.semesterId),
+  ]);
+  if (!invoiceTypeId) return { ok: false, error: "ไม่พบประเภทใบแจ้งเริ่มต้น" };
+
+  const studentIds = [...new Set(groups.map((g) => g.studentId))];
+  const { data: students } = await supabase
+    .from("students")
+    .select("id, student_code, first_name, last_name")
+    .in("id", studentIds);
+  const studentById = new Map((students ?? []).map((s) => [s.id, s]));
+
+  const failed: XlsxImportResult["failed"] = [];
+  let imported = 0;
+
+  for (const group of groups) {
+    const paidAt = `${group.paidDateIso}T12:00:00+07:00`;
+    const gradeClassroom = gradeByStudent.get(group.studentId) ?? "—";
+
+    const { data: invoiceRow } = await supabase
+      .from("student_invoices")
+      .select("invoice_type_id, invoice_types(name)")
+      .eq("id", group.invoiceId)
+      .maybeSingle() as unknown as {
+        data: { invoice_type_id: string; invoice_types: { name: string } | null } | null;
+      };
+
+    if (!invoiceRow) {
+      failed.push({ rowNumber: group.rowNumber, studentCode: group.studentCode, reason: "ไม่พบใบแจ้งหนี้" });
+      continue;
+    }
+
+    if (group.netCash > 0) {
+      const student = studentById.get(group.studentId);
+      if (!student) {
+        failed.push({ rowNumber: group.rowNumber, studentCode: group.studentCode, reason: "ไม่พบนักเรียน" });
+        continue;
+      }
+
+      const snapshot: Record<string, unknown> = {
+        receiptNumber: "",
+        paidAt,
+        studentCode: student.student_code,
+        studentName: formatStudentName(student.first_name, student.last_name),
+        gradeClassroom,
+        paymentMethod: "cash",
+        transferReference: null,
+        amount: group.netCash,
+        allocations: [
+          {
+            invoiceId: group.invoiceId,
+            invoiceName: invoiceRow.invoice_types?.name ?? "—",
+            amount: group.netCash,
+          },
+        ],
+        recordedBy: auth.profile.display_name ?? "เจ้าหน้าที่",
+      };
+
+      const { error: rpcError } = await supabase.rpc("record_backfill_payment", {
+        p_student_id: group.studentId,
+        p_academic_year_id: input.academicYearId,
+        p_academic_year_name: input.academicYearName,
+        p_amount: group.netCash,
+        p_paid_at: paidAt,
+        p_recorded_by: auth.profile.id,
+        p_note: group.voucher,
+        p_invoice_type_id: invoiceRow.invoice_type_id ?? invoiceTypeId,
+        p_snapshot: snapshot,
+        p_allocations: [{ invoiceId: group.invoiceId, amount: group.netCash }],
+        p_discount_invoice_id: group.discount > 0 ? group.invoiceId : null,
+        p_discount_value: group.discount > 0 ? group.discount : null,
+      });
+
+      if (rpcError) {
+        failed.push({ rowNumber: group.rowNumber, studentCode: group.studentCode, reason: "บันทึกการชำระไม่ได้" });
+        continue;
+      }
+    } else {
+      const { error: rpcError } = await supabase.rpc("record_backfill_invoice_discount", {
+        p_invoice_id: group.invoiceId,
+        p_discount_value: group.discount,
+        p_note: group.voucher,
+        p_recorded_by: auth.profile.id,
+      });
+
+      if (rpcError) {
+        failed.push({ rowNumber: group.rowNumber, studentCode: group.studentCode, reason: "บันทึกส่วนลดไม่ได้" });
+        continue;
+      }
     }
 
     imported += 1;
