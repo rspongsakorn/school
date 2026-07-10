@@ -88,47 +88,50 @@ describe("buildImportGroups", () => {
   });
 });
 
+function buildSheetBuffer(paidDate: Date): ArrayBuffer {
+  const aoa = [
+    ["ห้อง ป.1/1"], // row 1: class label
+    [], // row 2: blank
+    [
+      "ลำดับ",
+      "รหัสนักเรียน",
+      "ชื่อ",
+      "นามสกุล",
+      "เบิกได้",
+      "ใบสำคัญ",
+      "เบิกไม่ได้",
+      "ค่าอาหารกลางวัน",
+      "ค่าเอกสาร",
+      "ค่าประกัน",
+      "ค่าครูต่างชาติ",
+      "ใบสำคัญ",
+      "วันที่ชำระ",
+    ], // row 3: headers
+    [
+      1,
+      "13777",
+      "ศิริลัดดา",
+      "คชรินทร์",
+      "-",
+      "53-2606",
+      2000,
+      "-",
+      400,
+      -200,
+      500,
+      "-",
+      paidDate,
+    ], // row 4: data
+  ];
+  const sheet = XLSX.utils.aoa_to_sheet(aoa);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, "Sheet1");
+  return XLSX.write(workbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+}
+
 describe("parseXlsxWorkbook", () => {
   it("maps columns correctly from a real-shaped sheet", () => {
-    const paidDate = new Date(2026, 4, 5); // 2026-05-05
-    const aoa = [
-      ["ห้อง ป.1/1"], // row 1: class label
-      [], // row 2: blank
-      [
-        "ลำดับ",
-        "รหัสนักเรียน",
-        "ชื่อ",
-        "นามสกุล",
-        "เบิกได้",
-        "ใบสำคัญ",
-        "เบิกไม่ได้",
-        "ค่าอาหารกลางวัน",
-        "ค่าเอกสาร",
-        "ค่าประกัน",
-        "ค่าครูต่างชาติ",
-        "ใบสำคัญ",
-        "วันที่ชำระ",
-      ], // row 3: headers
-      [
-        1,
-        "13777",
-        "ศิริลัดดา",
-        "คชรินทร์",
-        "-",
-        "53-2606",
-        2000,
-        "-",
-        400,
-        -200,
-        500,
-        "-",
-        paidDate,
-      ], // row 4: data
-    ];
-    const sheet = XLSX.utils.aoa_to_sheet(aoa);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, sheet, "Sheet1");
-    const buffer = XLSX.write(workbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+    const buffer = buildSheetBuffer(new Date(2026, 4, 5)); // 2026-05-05
 
     const rows = parseXlsxWorkbook(buffer);
     expect(rows).toHaveLength(1);
@@ -146,6 +149,22 @@ describe("parseXlsxWorkbook", () => {
       insuranceVoucher: null,
       paidDateIso: "2026-05-05",
     });
+  });
+
+  it("corrects a 2-digit Buddhist-era year Excel misparsed as 19xx", () => {
+    // Staff typed "5/5/69" meaning 5 May 2569 BE (2026 CE); Excel's
+    // short-year rule stores that as 1969-05-05 in the cell.
+    const buffer = buildSheetBuffer(new Date(1969, 4, 5));
+
+    const rows = parseXlsxWorkbook(buffer);
+    expect(rows[0].paidDateIso).toBe("2026-05-05");
+  });
+
+  it("leaves a genuine modern-era date untouched", () => {
+    const buffer = buildSheetBuffer(new Date(2024, 11, 31));
+
+    const rows = parseXlsxWorkbook(buffer);
+    expect(rows[0].paidDateIso).toBe("2024-12-31");
   });
 });
 

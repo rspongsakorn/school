@@ -81,9 +81,25 @@ function parseCellText(value: unknown): string | null {
   return String(value).trim();
 }
 
+/**
+ * Staff routinely type the paid date as a 2-digit Buddhist-era year, e.g.
+ * "5/5/69" meaning 5 May 2569 BE (2026 CE). Excel has no concept of the
+ * Buddhist calendar: it treats "69" as a 2-digit CE year and — per its
+ * standard short-year rule (00-29 -> 20xx, 30-99 -> 19xx) — stores it as
+ * 1969, not 2026. No genuine historical payment in this system predates
+ * 2000, so any parsed year below that threshold is unambiguously this
+ * mis-entry, correctable by re-deriving the intended year from the same
+ * 2-digit value: last two digits + 2500 (BE) - 543 (CE offset), which
+ * simplifies to "+57" for the 1930-1999 range Excel actually produces
+ * for a typed "30"-"99".
+ */
+function correctBuddhistShortYear(year: number): number {
+  return year < 2000 ? year + 57 : year;
+}
+
 function parseCellDate(value: unknown): string | null {
   if (!(value instanceof Date)) return null;
-  const y = value.getFullYear();
+  const y = correctBuddhistShortYear(value.getFullYear());
   const m = String(value.getMonth() + 1).padStart(2, "0");
   const d = String(value.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
