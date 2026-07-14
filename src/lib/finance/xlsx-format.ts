@@ -23,7 +23,9 @@ export const SAMPLE_XLSX_FILENAME = "payment-import-sample.xlsx";
  * 2026 CE. This sample encodes that same quirk so it matches real files.
  */
 function buddhistShortYearCell(day: number, month: number, buddhistYear2Digit: number): Date {
-  return new Date(1900 + buddhistYear2Digit, month - 1, day);
+  const fullYear =
+    buddhistYear2Digit < 30 ? 2000 + buddhistYear2Digit : 1900 + buddhistYear2Digit;
+  return new Date(fullYear, month - 1, day);
 }
 
 export function buildSampleXlsxWorkbook(): XLSX.WorkBook {
