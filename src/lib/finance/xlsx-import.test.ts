@@ -12,7 +12,10 @@ function makeRow(overrides: Partial<XlsxSheetRow> = {}): XlsxSheetRow {
     lunchAmount: null,
     documentAmount: 400,
     insuranceAmount: -200,
+    equipmentAmount: null,
     foreignTeacherAmount: 500,
+    abacusAmount: null,
+    airconRoomAmount: null,
     tuitionVoucher: "53-2606",
     insuranceVoucher: null,
     paidDateIso: "2026-05-05",
@@ -86,9 +89,25 @@ describe("buildImportGroups", () => {
     expect(tuition.discount).toBe(150);
     expect(tuition.groupTotal).toBe(2650);
   });
+
+  it("sums the 3 new fee columns into the tuition group's total", () => {
+    const groups = buildImportGroups(
+      makeRow({ equipmentAmount: 300, abacusAmount: 500, airconRoomAmount: -100 }),
+    );
+    const tuition = groups.find((g) => g.kind === "tuition")!;
+    // cash: 2000 (nonReimbursable) + 400 (document) + 500 (foreignTeacher) + 300 (equipment) + 500 (abacus) = 3700
+    // discount: 100 (airconRoom)
+    expect(tuition.netCash).toBe(3700);
+    expect(tuition.discount).toBe(100);
+    expect(tuition.groupTotal).toBe(3800);
+  });
 });
 
-function buildSheetBuffer(paidDate: Date): ArrayBuffer {
+function buildSheetBuffer(
+  paidDate: Date,
+  opts: { equipment?: number | string; abacus?: number | string; airconRoom?: number | string } = {},
+): ArrayBuffer {
+  const { equipment = "-", abacus = "-", airconRoom = "-" } = opts;
   const aoa = [
     ["ห้อง ป.1/1"], // row 1: class label
     [], // row 2: blank
@@ -103,7 +122,10 @@ function buildSheetBuffer(paidDate: Date): ArrayBuffer {
       "ค่าอาหารกลางวัน",
       "ค่าเอกสาร",
       "ค่าประกัน",
+      "ค่าเครื่องใช้",
       "ค่าครูต่างชาติ",
+      "ค่าเรียนจินตคณิต",
+      "ค่าห้องปรับอากาศ",
       "ใบสำคัญ",
       "วันที่ชำระ",
     ], // row 3: headers
@@ -118,7 +140,10 @@ function buildSheetBuffer(paidDate: Date): ArrayBuffer {
       "-",
       400,
       -200,
+      equipment,
       500,
+      abacus,
+      airconRoom,
       "-",
       paidDate,
     ], // row 4: data
@@ -144,11 +169,27 @@ describe("parseXlsxWorkbook", () => {
       lunchAmount: null,
       documentAmount: 400,
       insuranceAmount: -200,
+      equipmentAmount: null,
       foreignTeacherAmount: 500,
+      abacusAmount: null,
+      airconRoomAmount: null,
       tuitionVoucher: "53-2606",
       insuranceVoucher: null,
       paidDateIso: "2026-05-05",
     });
+  });
+
+  it("maps the 3 new fee columns (ค่าเครื่องใช้, ค่าเรียนจินตคณิต, ค่าห้องปรับอากาศ) correctly", () => {
+    const buffer = buildSheetBuffer(new Date(2026, 4, 5), {
+      equipment: 300,
+      abacus: 200,
+      airconRoom: 150,
+    });
+
+    const rows = parseXlsxWorkbook(buffer);
+    expect(rows[0].equipmentAmount).toBe(300);
+    expect(rows[0].abacusAmount).toBe(200);
+    expect(rows[0].airconRoomAmount).toBe(150);
   });
 
   it("corrects a 2-digit Buddhist-era year Excel misparsed as 19xx", () => {
