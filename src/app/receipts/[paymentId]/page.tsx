@@ -47,9 +47,6 @@ export default async function ReceiptPrintPage({
         }}
       />
 
-      <ReceiptCopy data={data} label="ต้นฉบับ" />
-      <ReceiptCopy data={data} label="สำเนา" />
-
       {/* ── Print button (hidden on print) ── */}
       <div
         className="no-print"
@@ -57,7 +54,7 @@ export default async function ReceiptPrintPage({
           display: "flex",
           justifyContent: "center",
           gap: "12px",
-          margin: "24px 0",
+          margin: "24px 0 0",
           position: "relative",
           zIndex: 1,
         }}
@@ -78,6 +75,9 @@ export default async function ReceiptPrintPage({
           กลับ
         </a>
       </div>
+
+      <ReceiptCopy data={data} label="ต้นฉบับ" />
+      <ReceiptCopy data={data} label="สำเนา" />
     </>
   );
 }
