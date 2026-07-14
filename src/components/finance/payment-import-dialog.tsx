@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/table";
 import { formatBaht, formatThaiDate } from "@/lib/format";
 import { assessImportRow, parsePaymentCsv, type ImportRowStatus } from "@/lib/finance/csv-import";
+import { CSV_FORMAT_TABLE, SAMPLE_CSV_CONTENT, SAMPLE_CSV_FILENAME } from "@/lib/finance/csv-format";
 import {
   getImportPreviewDataAction,
   importPaymentsBackfill,
@@ -59,9 +60,6 @@ const STATUS_CLASS: Record<ImportRowStatus, string> = {
   no_outstanding: "text-destructive",
 };
 
-const TEMPLATE_CSV =
-  "student_code,first_name,last_name,amount,paid_date\n14333,นาลันทา,ศรีวัฒนพงศ์,3600,06/05/2569\n";
-
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -79,6 +77,7 @@ export function PaymentImportDialog({
   semesterId,
   onImported,
 }: Props) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<PreviewRow[]>([]);
   const [parsing, setParsing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -89,12 +88,12 @@ export function PaymentImportDialog({
     setSubmitting(false);
   }
 
-  function downloadTemplate() {
-    const blob = new Blob(["﻿" + TEMPLATE_CSV], { type: "text/csv;charset=utf-8;" });
+  function downloadSampleCsv() {
+    const blob = new Blob(["﻿" + SAMPLE_CSV_CONTENT], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "payment-import-template.csv";
+    a.download = SAMPLE_CSV_FILENAME;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -193,65 +192,100 @@ export function PaymentImportDialog({
         onOpenChange(o);
       }}
     >
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="flex max-h-[90vh] w-full max-w-[calc(100vw-2rem)] flex-col overflow-hidden sm:max-w-[calc(100vw-2rem)]">
         <DialogHeader>
           <DialogTitle>นำเข้าการชำระเงินจาก CSV</DialogTitle>
-          <DialogDescription>
-            ไฟล์ต้องมีคอลัมน์: รหัส, ชื่อ, สกุล, ยอดชำระ, วันที่ (พ.ศ. วว/ดด/ปปปป)
-          </DialogDescription>
+          <DialogDescription>อัปโหลดไฟล์ตามรูปแบบด้านล่าง ระบบจะตรวจสอบก่อนนำเข้า</DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-center gap-3 py-2">
-          <input type="file" accept=".csv,text/csv" onChange={handleFile} disabled={parsing || submitting} />
-          <button type="button" className="text-sm text-primary hover:underline" onClick={downloadTemplate}>
-            ดาวน์โหลดเทมเพลต
-          </button>
-        </div>
-
-        {rows.length > 0 ? (
-          <>
-            <div className="max-h-[50vh] overflow-auto rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>รหัส</TableHead>
-                    <TableHead>ชื่อใน CSV</TableHead>
-                    <TableHead>ชื่อในระบบ</TableHead>
-                    <TableHead className="text-right">ยอดชำระ</TableHead>
-                    <TableHead className="text-right">ยอดค้าง</TableHead>
-                    <TableHead>วันที่</TableHead>
-                    <TableHead>สถานะ</TableHead>
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+          <div className="overflow-x-auto rounded-md border">
+            <Table className="w-full">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>คอลัมน์</TableHead>
+                  <TableHead>คำอธิบาย</TableHead>
+                  <TableHead>ตัวอย่าง</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {CSV_FORMAT_TABLE.map((row) => (
+                  <TableRow key={row.key}>
+                    <TableCell className="font-mono text-xs">{row.key}</TableCell>
+                    <TableCell>{row.description}</TableCell>
+                    <TableCell className="text-muted-foreground">{row.example}</TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((r) => (
-                    <TableRow key={r.lineNumber}>
-                      <TableCell className="tabular-nums">{r.studentCode}</TableCell>
-                      <TableCell>{r.csvName}</TableCell>
-                      <TableCell className={cn(r.nameMismatch && "text-amber-600")}>
-                        {r.systemName ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{formatBaht(r.amount)}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {r.outstanding === null ? "—" : formatBaht(r.outstanding)}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        {r.paidDateIso ? formatThaiDate(`${r.paidDateIso}T12:00:00+07:00`) : "—"}
-                      </TableCell>
-                      <TableCell className={cn("whitespace-nowrap", STATUS_CLASS[r.status])}>
-                        {STATUS_LABEL[r.status]}
-                        {r.nameMismatch && r.willImport ? " ⚠" : ""}
-                      </TableCell>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={downloadSampleCsv}>
+              ดาวน์โหลดไฟล์ตัวอย่าง
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={parsing || submitting}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              เลือกไฟล์ CSV
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={handleFile}
+            />
+          </div>
+
+          {rows.length > 0 ? (
+            <>
+              <div className="max-h-[50vh] overflow-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>รหัส</TableHead>
+                      <TableHead>ชื่อใน CSV</TableHead>
+                      <TableHead>ชื่อในระบบ</TableHead>
+                      <TableHead className="text-right">ยอดชำระ</TableHead>
+                      <TableHead className="text-right">ยอดค้าง</TableHead>
+                      <TableHead>วันที่</TableHead>
+                      <TableHead>สถานะ</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              พร้อมนำเข้า {willImportCount} รายการ · ข้าม {skipCount} รายการ · ยอดรวม {formatBaht(totalAmount)}
-            </p>
-          </>
-        ) : null}
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map((r) => (
+                      <TableRow key={r.lineNumber}>
+                        <TableCell className="tabular-nums">{r.studentCode}</TableCell>
+                        <TableCell>{r.csvName}</TableCell>
+                        <TableCell className={cn(r.nameMismatch && "text-amber-600")}>
+                          {r.systemName ?? "—"}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">{formatBaht(r.amount)}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {r.outstanding === null ? "—" : formatBaht(r.outstanding)}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {r.paidDateIso ? formatThaiDate(`${r.paidDateIso}T12:00:00+07:00`) : "—"}
+                        </TableCell>
+                        <TableCell className={cn("whitespace-nowrap", STATUS_CLASS[r.status])}>
+                          {STATUS_LABEL[r.status]}
+                          {r.nameMismatch && r.willImport ? " ⚠" : ""}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                พร้อมนำเข้า {willImportCount} รายการ · ข้าม {skipCount} รายการ · ยอดรวม {formatBaht(totalAmount)}
+              </p>
+            </>
+          ) : null}
+        </div>
 
         <DialogFooter>
           <Button type="button" variant="outline" disabled={submitting} onClick={() => onOpenChange(false)}>
