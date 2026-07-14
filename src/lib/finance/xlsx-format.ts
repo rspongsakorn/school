@@ -10,7 +10,10 @@ export const XLSX_FORMAT_TABLE = [
   { key: "ค่าอาหารกลางวัน", description: "ค่าอาหารกลางวัน (บาท)", example: "500" },
   { key: "ค่าเอกสาร", description: "ค่าเอกสารประกอบการเรียนและวัดผล (บาท)", example: "400" },
   { key: "ค่าประกัน", description: "ค่าประกันอุบัติเหตุ (บาท) — ใส่ค่าลบสำหรับส่วนลด", example: "300" },
+  { key: "ค่าเครื่องใช้", description: "ค่าเครื่องใช้ประกอบการเรียน (บาท)", example: "300" },
   { key: "ค่าครูต่างชาติ", description: "ค่าครูสอนภาษาต่างประเทศ (บาท)", example: "—" },
+  { key: "ค่าเรียนจินตคณิต", description: "ค่าเรียนจินตคณิต/เสริมทักษะคำนวณ (บาท)", example: "200" },
+  { key: "ค่าห้องปรับอากาศ", description: "ค่าห้องปรับอากาศ (บาท)", example: "150" },
   { key: "ใบสำคัญ (ประกัน)", description: "เลขที่ใบสำคัญรับเงินฝั่งค่าประกัน", example: "—" },
   { key: "วันที่ชำระ", description: "วันที่ชำระ — เซลล์ชนิดวันที่ (Date) ของ Excel", example: "5/5/69" },
 ] as const;
@@ -43,7 +46,10 @@ export function buildSampleXlsxWorkbook(): XLSX.WorkBook {
       "ค่าอาหารกลางวัน",
       "ค่าเอกสาร",
       "ค่าประกัน",
+      "ค่าเครื่องใช้",
       "ค่าครูต่างชาติ",
+      "ค่าเรียนจินตคณิต",
+      "ค่าห้องปรับอากาศ",
       "ใบสำคัญ",
       "วันที่ชำระ",
     ], // row 3: headers
@@ -58,6 +64,9 @@ export function buildSampleXlsxWorkbook(): XLSX.WorkBook {
       500,
       "-",
       300,
+      300,
+      "-",
+      "-",
       "-",
       "-",
       buddhistShortYearCell(5, 5, 69), // 5/5/69 -> corrected to 2026-05-05
@@ -74,6 +83,9 @@ export function buildSampleXlsxWorkbook(): XLSX.WorkBook {
       400,
       "-",
       "-",
+      "-",
+      200,
+      150,
       "-",
       buddhistShortYearCell(12, 5, 69), // 12/5/69 -> corrected to 2026-05-12
     ],

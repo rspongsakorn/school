@@ -9,7 +9,10 @@ export type XlsxSheetRow = {
   lunchAmount: number | null; // ค่าอาหารกลางวัน
   documentAmount: number | null; // ค่าเอกสารประกอบการเรียนและวัดผล
   insuranceAmount: number | null; // ค่าประกัน
+  equipmentAmount: number | null; // ค่าเครื่องใช้
   foreignTeacherAmount: number | null; // ค่าครูสอนภาษาต่างประเทศ
+  abacusAmount: number | null; // ค่าเรียนจินตคณิต
+  airconRoomAmount: number | null; // ค่าห้องปรับอากาศ
   tuitionVoucher: string | null; // first ใบสำคัญ
   insuranceVoucher: string | null; // second ใบสำคัญ
   paidDateIso: string | null; // "YYYY-MM-DD"
@@ -26,9 +29,12 @@ const COL = {
   LUNCH: 7,
   DOCUMENT: 8,
   INSURANCE: 9,
-  FOREIGN_TEACHER: 10,
-  INSURANCE_VOUCHER: 11,
-  PAID_DATE: 12,
+  EQUIPMENT: 10,
+  FOREIGN_TEACHER: 11,
+  ABACUS: 12,
+  AIRCON_ROOM: 13,
+  INSURANCE_VOUCHER: 14,
+  PAID_DATE: 15,
 } as const;
 
 /** Reads the staff's per-classroom sheet: row 1 = class label, row 3 = headers, row 4+ = data. */
@@ -61,7 +67,10 @@ export function parseXlsxWorkbook(buffer: ArrayBuffer): XlsxSheetRow[] {
       lunchAmount: parseCellAmount(cells[COL.LUNCH]),
       documentAmount: parseCellAmount(cells[COL.DOCUMENT]),
       insuranceAmount: parseCellAmount(cells[COL.INSURANCE]),
+      equipmentAmount: parseCellAmount(cells[COL.EQUIPMENT]),
       foreignTeacherAmount: parseCellAmount(cells[COL.FOREIGN_TEACHER]),
+      abacusAmount: parseCellAmount(cells[COL.ABACUS]),
+      airconRoomAmount: parseCellAmount(cells[COL.AIRCON_ROOM]),
       tuitionVoucher: parseCellText(cells[COL.TUITION_VOUCHER]),
       insuranceVoucher: parseCellText(cells[COL.INSURANCE_VOUCHER]),
       paidDateIso: parseCellDate(cells[COL.PAID_DATE]),
@@ -134,6 +143,9 @@ export function buildImportGroups(row: XlsxSheetRow): ImportGroup[] {
     row.lunchAmount,
     row.documentAmount,
     row.foreignTeacherAmount,
+    row.equipmentAmount,
+    row.abacusAmount,
+    row.airconRoomAmount,
   ].filter((v): v is number => v !== null);
 
   if (tuitionCells.length > 0) {

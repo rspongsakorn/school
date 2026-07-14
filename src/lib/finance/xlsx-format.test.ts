@@ -4,7 +4,7 @@ import { buildImportGroups, parseXlsxWorkbook } from "@/lib/finance/xlsx-import"
 import { SAMPLE_XLSX_FILENAME, XLSX_FORMAT_TABLE, buildSampleXlsxWorkbook } from "./xlsx-format";
 
 describe("XLSX_FORMAT_TABLE", () => {
-  it("documents all 12 data columns parseXlsxWorkbook reads, in sheet order", () => {
+  it("documents all 15 data columns parseXlsxWorkbook reads, in sheet order", () => {
     expect(XLSX_FORMAT_TABLE.map((r) => r.key)).toEqual([
       "รหัสนักเรียน",
       "ชื่อ",
@@ -15,7 +15,10 @@ describe("XLSX_FORMAT_TABLE", () => {
       "ค่าอาหารกลางวัน",
       "ค่าเอกสาร",
       "ค่าประกัน",
+      "ค่าเครื่องใช้",
       "ค่าครูต่างชาติ",
+      "ค่าเรียนจินตคณิต",
+      "ค่าห้องปรับอากาศ",
       "ใบสำคัญ (ประกัน)",
       "วันที่ชำระ",
     ]);
@@ -43,6 +46,21 @@ describe("buildSampleXlsxWorkbook", () => {
     expect(second.paidDateIso).toBe("2026-05-12");
   });
 
+  it("exercises the 3 new fee columns across the 2 sample rows", () => {
+    const workbook = buildSampleXlsxWorkbook();
+    const buffer = XLSX.write(workbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+    const rows = parseXlsxWorkbook(buffer);
+
+    const [first, second] = rows;
+    expect(first.equipmentAmount).toBe(300);
+    expect(first.abacusAmount).toBeNull();
+    expect(first.airconRoomAmount).toBeNull();
+
+    expect(second.equipmentAmount).toBeNull();
+    expect(second.abacusAmount).toBe(200);
+    expect(second.airconRoomAmount).toBe(150);
+  });
+
   it("produces groups that would import cleanly (one เบิกได้ row, one เบิกไม่ได้ row)", () => {
     const workbook = buildSampleXlsxWorkbook();
     const buffer = XLSX.write(workbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
@@ -52,9 +70,12 @@ describe("buildSampleXlsxWorkbook", () => {
     const tuitionGroups = groups.filter((g) => g.kind === "tuition");
     expect(tuitionGroups).toHaveLength(2);
     expect(tuitionGroups[0].expectedIsReimbursable).toBe(true);
+    expect(tuitionGroups[0].groupTotal).toBe(4400); // 3600 reimbursable + 500 lunch + 300 equipment
     expect(tuitionGroups[1].expectedIsReimbursable).toBe(false);
+    expect(tuitionGroups[1].groupTotal).toBe(3650); // 2900 nonReimbursable + 400 document + 200 abacus + 150 airconRoom
 
     const insuranceGroups = groups.filter((g) => g.kind === "insurance");
     expect(insuranceGroups).toHaveLength(1);
+    expect(insuranceGroups[0].groupTotal).toBe(300);
   });
 });
