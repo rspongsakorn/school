@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +27,11 @@ import {
   validateGroup,
   type ImportGroup,
 } from "@/lib/finance/xlsx-import";
+import {
+  SAMPLE_XLSX_FILENAME,
+  XLSX_FORMAT_TABLE,
+  buildSampleXlsxWorkbook,
+} from "@/lib/finance/xlsx-format";
 import {
   getXlsxImportPreviewAction,
   importPaymentsXlsxBackfill,
@@ -62,6 +68,7 @@ export function XlsxPaymentImportDialog({
   semesterId,
   onImported,
 }: Props) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [groups, setGroups] = useState<PreviewGroup[]>([]);
   const [parsing, setParsing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -70,6 +77,11 @@ export function XlsxPaymentImportDialog({
     setGroups([]);
     setParsing(false);
     setSubmitting(false);
+  }
+
+  function downloadSampleXlsx() {
+    const workbook = buildSampleXlsxWorkbook();
+    XLSX.writeFile(workbook, SAMPLE_XLSX_FILENAME);
   }
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -171,68 +183,103 @@ export function XlsxPaymentImportDialog({
         onOpenChange(o);
       }}
     >
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="flex max-h-[90vh] w-full max-w-[calc(100vw-2rem)] flex-col overflow-hidden sm:max-w-[calc(100vw-2rem)]">
         <DialogHeader>
           <DialogTitle>นำเข้าการชำระเงินจาก XLSX</DialogTitle>
           <DialogDescription>
-            ไฟล์รูปแบบใบบันทึกการชำระรายห้อง (เบิกได้/เบิกไม่ได้/ค่าอาหารกลางวัน/ค่าเอกสารฯ/ค่าประกัน/ค่าครูต่างชาติ) — ใส่ตัวเลขติดลบสำหรับส่วนลด เช่น -200
+            ไฟล์รูปแบบใบบันทึกการชำระรายห้อง — แถว 1 คือชื่อห้อง, แถว 3 คือหัวคอลัมน์, แถว 4 เป็นต้นไปคือข้อมูลนักเรียน ใส่ตัวเลขติดลบสำหรับส่วนลด เช่น -200
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-center gap-3 py-2">
-          <input
-            type="file"
-            accept=".xlsx"
-            onChange={handleFile}
-            disabled={parsing || submitting}
-          />
-        </div>
-
-        {groups.length > 0 ? (
-          <>
-            <div className="max-h-[50vh] overflow-auto rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>แถว</TableHead>
-                    <TableHead>รหัส</TableHead>
-                    <TableHead>ชื่อ</TableHead>
-                    <TableHead>ประเภท</TableHead>
-                    <TableHead className="text-right">เงินสด</TableHead>
-                    <TableHead className="text-right">ส่วนลด</TableHead>
-                    <TableHead>วันที่</TableHead>
-                    <TableHead>สถานะ</TableHead>
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+          <div className="overflow-x-auto rounded-md border">
+            <Table className="w-full">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>คอลัมน์</TableHead>
+                  <TableHead>คำอธิบาย</TableHead>
+                  <TableHead>ตัวอย่าง</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {XLSX_FORMAT_TABLE.map((row) => (
+                  <TableRow key={row.key}>
+                    <TableCell className="font-mono text-xs">{row.key}</TableCell>
+                    <TableCell>{row.description}</TableCell>
+                    <TableCell className="text-muted-foreground">{row.example}</TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {groups.map((g, i) => (
-                    <TableRow key={`${g.rowNumber}-${g.kind}-${i}`}>
-                      <TableCell className="tabular-nums">{g.rowNumber}</TableCell>
-                      <TableCell className="tabular-nums">{g.studentCode}</TableCell>
-                      <TableCell>{g.studentName}</TableCell>
-                      <TableCell>{KIND_LABEL[g.kind]}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatBaht(g.netCash)}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {g.discount > 0 ? formatBaht(g.discount) : "—"}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        {g.paidDateIso ? formatThaiDate(`${g.paidDateIso}T12:00:00+07:00`) : "—"}
-                      </TableCell>
-                      <TableCell
-                        className={cn("whitespace-nowrap", g.willImport ? "text-emerald-700" : "text-destructive")}
-                      >
-                        {g.willImport ? "จะนำเข้า" : `ข้าม — ${g.reason}`}
-                      </TableCell>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={downloadSampleXlsx}>
+              ดาวน์โหลดไฟล์ตัวอย่าง
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={parsing || submitting}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              เลือกไฟล์ XLSX
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx"
+              className="hidden"
+              onChange={handleFile}
+            />
+          </div>
+
+          {groups.length > 0 ? (
+            <>
+              <div className="max-h-[50vh] overflow-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>แถว</TableHead>
+                      <TableHead>รหัส</TableHead>
+                      <TableHead>ชื่อ</TableHead>
+                      <TableHead>ประเภท</TableHead>
+                      <TableHead className="text-right">เงินสด</TableHead>
+                      <TableHead className="text-right">ส่วนลด</TableHead>
+                      <TableHead>วันที่</TableHead>
+                      <TableHead>สถานะ</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              พร้อมนำเข้า {willImportCount} รายการ · ข้าม {skipCount} รายการ
-            </p>
-          </>
-        ) : null}
+                  </TableHeader>
+                  <TableBody>
+                    {groups.map((g, i) => (
+                      <TableRow key={`${g.rowNumber}-${g.kind}-${i}`}>
+                        <TableCell className="tabular-nums">{g.rowNumber}</TableCell>
+                        <TableCell className="tabular-nums">{g.studentCode}</TableCell>
+                        <TableCell>{g.studentName}</TableCell>
+                        <TableCell>{KIND_LABEL[g.kind]}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatBaht(g.netCash)}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {g.discount > 0 ? formatBaht(g.discount) : "—"}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {g.paidDateIso ? formatThaiDate(`${g.paidDateIso}T12:00:00+07:00`) : "—"}
+                        </TableCell>
+                        <TableCell
+                          className={cn("whitespace-nowrap", g.willImport ? "text-emerald-700" : "text-destructive")}
+                        >
+                          {g.willImport ? "จะนำเข้า" : `ข้าม — ${g.reason}`}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                พร้อมนำเข้า {willImportCount} รายการ · ข้าม {skipCount} รายการ
+              </p>
+            </>
+          ) : null}
+        </div>
 
         <DialogFooter>
           <Button type="button" variant="outline" disabled={submitting} onClick={() => onOpenChange(false)}>
