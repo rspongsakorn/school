@@ -66,7 +66,6 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
 
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<"cash" | "transfer">("cash");
-  const [transferRef, setTransferRef] = useState("");
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -104,7 +103,6 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
   useEffect(() => {
     if (!open || !invoice) return;
     setMethod("cash");
-    setTransferRef("");
     setNote("");
     setAmount(invoice.outstanding > 0 ? String(invoice.outstanding) : "");
     setLineDiscounts({});
@@ -134,10 +132,6 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
     }
     if (parsed > invoice.outstanding) {
       toast.error(`จำนวนเงินเกินยอดค้าง (${formatBaht(invoice.outstanding)})`);
-      return;
-    }
-    if (method === "transfer" && !transferRef.trim()) {
-      toast.error("กรุณาระบุเลขอ้างอิงการโอน");
       return;
     }
     if (hasDiscount && netDue <= 0) {
@@ -170,7 +164,6 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
       semesterId: ctx.semesterId,
       amount: Number.parseFloat(effectiveAmount),
       paymentMethod: method,
-      transferReference: method === "transfer" ? transferRef.trim() : undefined,
       note: note.trim() || undefined,
       discounts: discounts.length > 0 ? discounts : undefined,
     });
@@ -339,19 +332,6 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
                   </p>
                 </div>
 
-                {method === "transfer" && (
-                  <div className="grid gap-2">
-                    <Label htmlFor="pay-ref">เลขอ้างอิง</Label>
-                    <Input
-                      id="pay-ref"
-                      value={transferRef}
-                      onChange={(e) => setTransferRef(e.target.value)}
-                      placeholder="เลขที่อ้างอิงการโอน"
-                      required
-                    />
-                  </div>
-                )}
-
                 <div className="grid gap-2">
                   <Label htmlFor="pay-note">หมายเหตุ</Label>
                   <Input
@@ -383,7 +363,7 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
             <AlertDialogTitle>ยืนยันการชำระเงิน</AlertDialogTitle>
             <AlertDialogDescription>
               {invoice?.studentName} — ชำระ {formatBaht(Number.parseFloat(effectiveAmount) || 0)}{" "}
-              ({method === "cash" ? "เงินสด" : `โอน ref: ${transferRef}`})
+              ({method === "cash" ? "เงินสด" : "โอน"})
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
