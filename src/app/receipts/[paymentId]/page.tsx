@@ -141,13 +141,6 @@ export default async function ReceiptPrintPage({
           </div>
         </div>
 
-        {/* ── Transfer reference (transfer only) ── */}
-        {data.transferReference ? (
-          <div style={{ fontSize: "10px", color: "#6b7280", marginBottom: "8px" }}>
-            เลขอ้างอิงโอน: {data.transferReference}
-          </div>
-        ) : null}
-
         {/* ── Fee line items table ── */}
         <table
           style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px", marginBottom: "10px" }}

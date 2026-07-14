@@ -77,12 +77,6 @@ export function ReceiptDialog({ open, onOpenChange, snapshot }: ReceiptDialogPro
                 ? PAYMENT_METHOD_LABELS[data.paymentMethod]
                 : "—"}
             </dd>
-            {data.transferReference ? (
-              <>
-                <dt className="text-muted-foreground">อ้างอิง</dt>
-                <dd>{data.transferReference}</dd>
-              </>
-            ) : null}
           </dl>
 
           <div className="rounded-lg border border-border">
