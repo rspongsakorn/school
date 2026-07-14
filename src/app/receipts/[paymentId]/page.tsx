@@ -53,7 +53,14 @@ export default async function ReceiptPrintPage({
       {/* ── Print button (hidden on print) ── */}
       <div
         className="no-print"
-        style={{ display: "flex", justifyContent: "center", gap: "12px", margin: "24px 0" }}
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: "12px",
+          margin: "24px 0",
+          position: "relative",
+          zIndex: 1,
+        }}
       >
         <PrintButton />
         <a
