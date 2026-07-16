@@ -3,7 +3,6 @@ import { requireFinancePage } from "@/lib/auth/require-finance";
 import { getReceiptPrintData, type ReceiptPrintData } from "@/lib/data/receipt-print";
 import { SCHOOL_CONFIG } from "@/lib/school-config";
 import { formatThaiDateLong, bahtText } from "@/lib/format";
-import { PAYMENT_METHOD_LABELS } from "@/lib/finance/constants";
 import { PrintButton } from "./print-button";
 import { LogoImage } from "./logo-image";
 import { AutoPrint } from "./auto-print";
@@ -31,7 +30,7 @@ export default async function ReceiptPrintPage({
         @page { size: A5 portrait; margin: 8mm; }
         @media print {
           .no-print { display: none !important; }
-          .copy { break-after: page; }
+          .copy { break-after: page; margin: 0 !important; box-shadow: none !important; }
           .copy:last-child { break-after: auto; }
         }
       `}</style>
@@ -84,7 +83,6 @@ export default async function ReceiptPrintPage({
 
 function ReceiptCopy({ data, label }: { data: ReceiptPrintData; label: string }) {
   const paidAtLabel = formatThaiDateLong(data.paidAt);
-  const methodLabel = PAYMENT_METHOD_LABELS[data.paymentMethod];
 
   return (
     <div
@@ -158,9 +156,7 @@ function ReceiptCopy({ data, label }: { data: ReceiptPrintData; label: string })
           <div>
             <span style={{ color: "#6b7280" }}>ปีการศึกษา: </span>
             {data.academicYearName}
-          </div>
-          <div>
-            <span style={{ color: "#6b7280" }}>ภาคเรียนที่: </span>
+            <span style={{ color: "#6b7280" }}> ภาคเรียนที่: </span>
             {data.semesterNumber}
           </div>
         </div>
@@ -172,10 +168,6 @@ function ReceiptCopy({ data, label }: { data: ReceiptPrintData; label: string })
           <div>
             <span style={{ color: "#6b7280" }}>วันที่: </span>
             {paidAtLabel}
-          </div>
-          <div>
-            <span style={{ color: "#6b7280" }}>วิธีชำระ: </span>
-            {methodLabel}
           </div>
         </div>
       </div>
