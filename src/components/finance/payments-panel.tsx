@@ -923,12 +923,13 @@ export function PaymentsPanel() {
                         <TableHead>วิธี</TableHead>
                         <TableHead className="text-right">จำนวน</TableHead>
                         <TableHead>สถานะ</TableHead>
+                        <TableHead className="text-right">จัดการ</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {displayedPayments.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={8} className="py-6 text-center text-muted-foreground">
+                          <TableCell colSpan={9} className="py-6 text-center text-muted-foreground">
                             ไม่พบรายการการชำระ
                           </TableCell>
                         </TableRow>
@@ -958,6 +959,26 @@ export function PaymentsPanel() {
                               ) : (
                                 <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100">ยกเลิก</Badge>
                               )}
+                            </TableCell>
+                            <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex justify-end gap-2">
+                                <a href={`/receipts/${p.id}`} target="_blank" rel="noopener noreferrer">
+                                  <Button type="button" size="sm" variant="outline">
+                                    ใบเสร็จ
+                                  </Button>
+                                </a>
+                                {p.status === "active" ? (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-destructive"
+                                    onClick={() => setVoidTarget(p)}
+                                  >
+                                    ยกเลิก
+                                  </Button>
+                                ) : null}
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))
