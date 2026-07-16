@@ -116,6 +116,36 @@ function parseCellDate(value: unknown): string | null {
 
 export type ImportGroupKind = "tuition" | "insurance";
 
+/** One sheet column that can carry a fee amount (positive = cash, negative = discount). */
+export type DiscountColumn =
+  | "reimbursable"
+  | "nonReimbursable"
+  | "lunch"
+  | "document"
+  | "insurance"
+  | "equipment"
+  | "foreignTeacher"
+  | "abacus"
+  | "airconRoom";
+
+/** Substring matched against fee_items.name to find the invoice_line a column's discount applies to. */
+export const DISCOUNT_COLUMN_KEYWORDS: Record<DiscountColumn, string> = {
+  reimbursable: "ธรรมเนียม",
+  nonReimbursable: "ธรรมเนียม",
+  lunch: "อาหาร",
+  document: "เอกสาร",
+  insurance: "ประกัน",
+  equipment: "เครื่องใช้",
+  foreignTeacher: "ต่างชาติ",
+  abacus: "จินตคณิต",
+  airconRoom: "ห้องปรับอากาศ",
+};
+
+export type DiscountLine = {
+  column: DiscountColumn;
+  amount: number;
+};
+
 export type ImportGroup = {
   rowNumber: number;
   kind: ImportGroupKind;
@@ -127,6 +157,8 @@ export type ImportGroup = {
   netCash: number;
   /** Sum of |negative cell values| in this group — amount written off. */
   discount: number;
+  /** Per-column breakdown of the negative cells that make up `discount`. */
+  discountLines: DiscountLine[];
   /** netCash + discount — must equal the matched invoice's gross total_amount. */
   groupTotal: number;
   voucher: string | null;
@@ -137,22 +169,25 @@ export type ImportGroup = {
 export function buildImportGroups(row: XlsxSheetRow): ImportGroup[] {
   const groups: ImportGroup[] = [];
 
-  const tuitionCells = [
-    row.reimbursableAmount,
-    row.nonReimbursableAmount,
-    row.lunchAmount,
-    row.documentAmount,
-    row.foreignTeacherAmount,
-    row.equipmentAmount,
-    row.abacusAmount,
-    row.airconRoomAmount,
-  ].filter((v): v is number => v !== null);
+  const tuitionColumns = [
+    { column: "reimbursable", value: row.reimbursableAmount },
+    { column: "nonReimbursable", value: row.nonReimbursableAmount },
+    { column: "lunch", value: row.lunchAmount },
+    { column: "document", value: row.documentAmount },
+    { column: "foreignTeacher", value: row.foreignTeacherAmount },
+    { column: "equipment", value: row.equipmentAmount },
+    { column: "abacus", value: row.abacusAmount },
+    { column: "airconRoom", value: row.airconRoomAmount },
+  ].filter((c): c is { column: DiscountColumn; value: number } => c.value !== null);
 
-  if (tuitionCells.length > 0) {
-    const netCash = round2(tuitionCells.filter((v) => v > 0).reduce((s, v) => s + v, 0));
-    const discount = round2(
-      tuitionCells.filter((v) => v < 0).reduce((s, v) => s - v, 0),
+  if (tuitionColumns.length > 0) {
+    const netCash = round2(
+      tuitionColumns.filter((c) => c.value > 0).reduce((s, c) => s + c.value, 0),
     );
+    const discountLines: DiscountLine[] = tuitionColumns
+      .filter((c) => c.value < 0)
+      .map((c) => ({ column: c.column, amount: round2(-c.value) }));
+    const discount = round2(discountLines.reduce((s, d) => s + d.amount, 0));
     groups.push({
       rowNumber: row.rowNumber,
       kind: "tuition",
@@ -166,6 +201,7 @@ export function buildImportGroups(row: XlsxSheetRow): ImportGroup[] {
             : null,
       netCash,
       discount,
+      discountLines,
       groupTotal: round2(netCash + discount),
       voucher: row.tuitionVoucher,
       paidDateIso: row.paidDateIso,
@@ -174,7 +210,9 @@ export function buildImportGroups(row: XlsxSheetRow): ImportGroup[] {
 
   if (row.insuranceAmount !== null) {
     const netCash = row.insuranceAmount > 0 ? round2(row.insuranceAmount) : 0;
-    const discount = row.insuranceAmount < 0 ? round2(-row.insuranceAmount) : 0;
+    const discountLines: DiscountLine[] =
+      row.insuranceAmount < 0 ? [{ column: "insurance", amount: round2(-row.insuranceAmount) }] : [];
+    const discount = round2(discountLines.reduce((s, d) => s + d.amount, 0));
     groups.push({
       rowNumber: row.rowNumber,
       kind: "insurance",
@@ -183,6 +221,7 @@ export function buildImportGroups(row: XlsxSheetRow): ImportGroup[] {
       expectedIsReimbursable: null,
       netCash,
       discount,
+      discountLines,
       groupTotal: round2(netCash + discount),
       voucher: row.insuranceVoucher,
       paidDateIso: row.paidDateIso,

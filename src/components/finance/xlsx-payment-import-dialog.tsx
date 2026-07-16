@@ -141,6 +141,7 @@ export function XlsxPaymentImportDialog({
         studentCode: g.studentCode,
         netCash: g.netCash,
         discount: g.discount,
+        discountLines: g.discountLines,
         voucher: g.voucher,
         paidDateIso: g.paidDateIso!,
       }));

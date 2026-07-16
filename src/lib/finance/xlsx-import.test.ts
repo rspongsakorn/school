@@ -90,6 +90,28 @@ describe("buildImportGroups", () => {
     expect(tuition.groupTotal).toBe(2650);
   });
 
+  it("breaks the discount down per column", () => {
+    const groups = buildImportGroups(
+      makeRow({ documentAmount: -100, lunchAmount: -50 }),
+    );
+    const tuition = groups.find((g) => g.kind === "tuition")!;
+    expect(tuition.discountLines).toEqual([
+      { column: "lunch", amount: 50 },
+      { column: "document", amount: 100 },
+    ]);
+
+    const insurance = groups.find((g) => g.kind === "insurance")!;
+    expect(insurance.discountLines).toEqual([{ column: "insurance", amount: 200 }]);
+  });
+
+  it("has an empty discountLines array when no cell in the group is negative", () => {
+    const groups = buildImportGroups(makeRow({ insuranceAmount: 200 }));
+    const tuition = groups.find((g) => g.kind === "tuition")!;
+    const insurance = groups.find((g) => g.kind === "insurance")!;
+    expect(tuition.discountLines).toEqual([]);
+    expect(insurance.discountLines).toEqual([]);
+  });
+
   it("sums the 3 new fee columns into the tuition group's total", () => {
     const groups = buildImportGroups(
       makeRow({ equipmentAmount: 300, abacusAmount: 500, airconRoomAmount: -100 }),

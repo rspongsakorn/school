@@ -16,6 +16,7 @@ import { formatStudentName } from "@/lib/format";
 import { searchStudentsForPayment } from "@/lib/data/payments";
 import { getStudentGradeMap } from "@/lib/data/enrollments";
 import type { InvoiceCandidate } from "@/lib/finance/xlsx-import";
+import { DISCOUNT_COLUMN_KEYWORDS, type DiscountLine } from "@/lib/finance/xlsx-import";
 
 export type RecordPaymentResult =
   | { ok: true; paymentId: string; receiptNumber: string; snapshot: Record<string, unknown> }
@@ -467,6 +468,7 @@ export type XlsxImportGroupInput = {
   studentCode: string;
   netCash: number;
   discount: number;
+  discountLines: DiscountLine[];
   voucher: string | null;
   paidDateIso: string;
 };
@@ -514,10 +516,14 @@ export async function importPaymentsXlsxBackfill(input: {
 
     const { data: invoiceRow } = await supabase
       .from("student_invoices")
-      .select("invoice_type_id, invoice_types(name)")
+      .select("invoice_type_id, invoice_types(name), invoice_lines(id, fee_item_id, fee_items(name))")
       .eq("id", group.invoiceId)
       .maybeSingle() as unknown as {
-        data: { invoice_type_id: string; invoice_types: { name: string } | null } | null;
+        data: {
+          invoice_type_id: string;
+          invoice_types: { name: string } | null;
+          invoice_lines: { id: string; fee_item_id: string; fee_items: { name: string } | null }[];
+        } | null;
       };
 
     if (!invoiceRow) {
@@ -529,6 +535,34 @@ export async function importPaymentsXlsxBackfill(input: {
       const student = studentById.get(group.studentId);
       if (!student) {
         failed.push({ rowNumber: group.rowNumber, studentCode: group.studentCode, reason: "ไม่พบนักเรียน" });
+        continue;
+      }
+
+      const resolvedDiscounts: {
+        invoiceLineId: string;
+        feeItemId: string;
+        discountType: "fixed";
+        discountValue: number;
+        amount: number;
+      }[] = [];
+      let unmatchedDiscount = false;
+      for (const line of group.discountLines) {
+        const keyword = DISCOUNT_COLUMN_KEYWORDS[line.column];
+        const invoiceLine = invoiceRow.invoice_lines.find((l) => l.fee_items?.name.includes(keyword));
+        if (!invoiceLine) {
+          unmatchedDiscount = true;
+          break;
+        }
+        resolvedDiscounts.push({
+          invoiceLineId: invoiceLine.id,
+          feeItemId: invoiceLine.fee_item_id,
+          discountType: "fixed",
+          discountValue: line.amount,
+          amount: line.amount,
+        });
+      }
+      if (unmatchedDiscount) {
+        failed.push({ rowNumber: group.rowNumber, studentCode: group.studentCode, reason: "ไม่พบรายการค่าธรรมเนียมสำหรับส่วนลด" });
         continue;
       }
 
@@ -562,8 +596,7 @@ export async function importPaymentsXlsxBackfill(input: {
         p_invoice_type_id: invoiceRow.invoice_type_id ?? invoiceTypeId,
         p_snapshot: snapshot,
         p_allocations: [{ invoiceId: group.invoiceId, amount: group.netCash }],
-        p_discount_invoice_id: group.discount > 0 ? group.invoiceId : null,
-        p_discount_value: group.discount > 0 ? group.discount : null,
+        p_discounts: resolvedDiscounts,
       });
 
       if (rpcError) {

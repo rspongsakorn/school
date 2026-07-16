@@ -227,8 +227,7 @@ export type Database = {
           p_invoice_type_id: string;
           p_snapshot: Record<string, unknown>;
           p_allocations: Record<string, unknown>[];
-          p_discount_invoice_id?: string | null;
-          p_discount_value?: number | null;
+          p_discounts?: Record<string, unknown>[];
         };
         Returns: { payment_id: string; receipt_number: string }[];
       };
