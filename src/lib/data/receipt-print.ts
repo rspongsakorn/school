@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { computeReceiptLineItems } from "@/lib/finance/receipt-line-items";
 
 export type ReceiptPrintData = {
   receiptNumber: string;
@@ -84,34 +85,10 @@ export async function getReceiptPrintData(
   const payment = raw as unknown as RawPayment;
   const snapshot = payment.receipts?.snapshot_data ?? {};
 
-  const lineItems = (payment.payment_allocations ?? []).flatMap((pa) => {
-    const inv = pa.student_invoices;
-    if (!inv) return [];
-    const allocAmount = Number(pa.amount);
-    const lines = inv.invoice_lines ?? [];
-    const linesTotal =
-      Math.round(lines.reduce((sum, l) => sum + Number(l.amount), 0) * 100) / 100;
-
-    const hasDiscount = (payment.payment_discounts ?? []).length > 0;
-    // Full payment of this invoice (or discounted) — expand to individual fee line items
-    if (hasDiscount || Math.round(allocAmount * 100) / 100 === linesTotal) {
-      return lines.map((line) => ({
-        name: line.fee_items?.name ?? "รายการค่าธรรมเนียม",
-        amount: Number(line.amount),
-      }));
-    }
-
-    // Partial payment — single consolidated line to avoid total mismatch
-    return [{ name: inv.invoice_types?.name ?? "รายการค่าธรรมเนียม", amount: allocAmount }];
-  });
-
-  const discounts = (payment.payment_discounts ?? []).map((d) => ({
-    name: d.fee_items?.name ?? "ส่วนลด",
-    amount: Number(d.amount),
-  }));
-
-  const subtotal =
-    Math.round(lineItems.reduce((sum, li) => sum + li.amount, 0) * 100) / 100;
+  const { lineItems, subtotal, discounts } = computeReceiptLineItems(
+    payment.payment_allocations ?? [],
+    payment.payment_discounts ?? [],
+  );
 
   const semesterNumber =
     (payment.payment_allocations ?? [])
