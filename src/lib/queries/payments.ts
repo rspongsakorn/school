@@ -1,6 +1,7 @@
-import { formatStudentName, formatThaiDate } from "@/lib/format";
+import { formatStudentName, formatThaiDate, formatThaiDateLong } from "@/lib/format";
 import { buildStudentSearchOrFilter } from "@/lib/students/search";
 import { createClient } from "@/lib/supabase/client";
+import { computeReceiptLineItems, type ReceiptLineItem, type ReceiptDiscount } from "@/lib/finance/receipt-line-items";
 
 async function getStudentGradeMap(semesterId: string): Promise<Map<string, string>> {
   const supabase = createClient();
@@ -142,6 +143,104 @@ export async function fetchPaymentsFiltered(params: {
   const { data: payments } = await query;
 
   return mapPaymentRows((payments ?? []) as unknown as PaymentQueryRow[], gradeByStudent);
+}
+
+export type PaymentDetail = {
+  receiptNumber: string;
+  paidAtLabel: string;
+  paymentMethod: "cash" | "transfer";
+  academicYearName: string;
+  semesterNumber: number;
+  studentName: string;
+  studentCode: string;
+  gradeClassroom: string;
+  recordedBy: string;
+  lineItems: ReceiptLineItem[];
+  subtotal: number;
+  discounts: ReceiptDiscount[];
+};
+
+type PaymentDetailQueryRow = {
+  receipt_number: string;
+  payment_method: "cash" | "transfer";
+  paid_at: string;
+  academic_years: { name: string } | null;
+  receipts: {
+    snapshot_data: {
+      studentName?: string;
+      studentCode?: string;
+      gradeClassroom?: string;
+      recordedBy?: string;
+    };
+  } | null;
+  payment_allocations: Array<{
+    amount: string;
+    student_invoices: {
+      invoice_types: { name: string } | null;
+      semesters: { number: number } | null;
+      invoice_lines: Array<{ amount: string; fee_items: { name: string } | null }>;
+    } | null;
+  }>;
+  payment_discounts: Array<{ amount: string; fee_items: { name: string } | null }>;
+};
+
+export async function fetchPaymentDetail(paymentId: string): Promise<PaymentDetail | null> {
+  const supabase = createClient();
+
+  const { data: raw } = await supabase
+    .from("payments")
+    .select(
+      `
+      receipt_number,
+      payment_method,
+      paid_at,
+      academic_years ( name ),
+      receipts ( snapshot_data ),
+      payment_allocations (
+        amount,
+        student_invoices (
+          invoice_types ( name ),
+          semesters ( number ),
+          invoice_lines ( amount, fee_items ( name ) )
+        )
+      ),
+      payment_discounts (
+        amount,
+        fee_items ( name )
+      )
+    `,
+    )
+    .eq("id", paymentId)
+    .maybeSingle();
+
+  if (!raw) return null;
+  const payment = raw as unknown as PaymentDetailQueryRow;
+  const snapshot = payment.receipts?.snapshot_data ?? {};
+
+  const { lineItems, subtotal, discounts } = computeReceiptLineItems(
+    payment.payment_allocations ?? [],
+    payment.payment_discounts ?? [],
+  );
+
+  const semesterNumber =
+    (payment.payment_allocations ?? [])
+      .map((pa) => pa.student_invoices?.semesters?.number)
+      .find((n) => n != null) ?? 1;
+
+  return {
+    receiptNumber: payment.receipt_number,
+    paidAtLabel: formatThaiDateLong(payment.paid_at),
+    paymentMethod: payment.payment_method,
+    academicYearName: payment.academic_years?.name ?? "—",
+    semesterNumber,
+    studentName: snapshot.studentName ?? "—",
+    studentCode: snapshot.studentCode ?? "—",
+    gradeClassroom: snapshot.gradeClassroom ?? "—",
+    recordedBy: snapshot.recordedBy ?? "—",
+    lineItems,
+    subtotal,
+    discounts,
+  };
 }
 
 export type StudentSearchHit = {
