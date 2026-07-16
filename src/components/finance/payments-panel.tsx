@@ -35,6 +35,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { AppHeader } from "@/components/app-header";
+import { PaymentDetailDialog } from "@/components/finance/payment-detail-dialog";
 import { PaymentImportDialog } from "@/components/finance/payment-import-dialog";
 import { XlsxPaymentImportDialog } from "@/components/finance/xlsx-payment-import-dialog";
 import { useRequireRole } from "@/components/providers/auth-provider";
@@ -110,6 +111,7 @@ export function PaymentsPanel() {
   const [xlsxImportOpen, setXlsxImportOpen] = useState(false);
   const [lastPayment, setLastPayment] = useState<{ id: string; receiptNumber: string; amount: number } | null>(null);
   const [voidTarget, setVoidTarget] = useState<PaymentListRow | null>(null);
+  const [detailPayment, setDetailPayment] = useState<PaymentListRow | null>(null);
   const [voidReason, setVoidReason] = useState("");
   const [paymentSearch, setPaymentSearch] = useState(qParam);
   const [prevQParam, setPrevQParam] = useState(qParam);
@@ -921,19 +923,22 @@ export function PaymentsPanel() {
                         <TableHead>วิธี</TableHead>
                         <TableHead className="text-right">จำนวน</TableHead>
                         <TableHead>สถานะ</TableHead>
-                        <TableHead className="text-right">จัดการ</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {displayedPayments.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={9} className="py-6 text-center text-muted-foreground">
+                          <TableCell colSpan={8} className="py-6 text-center text-muted-foreground">
                             ไม่พบรายการการชำระ
                           </TableCell>
                         </TableRow>
                       ) : (
                         displayedPayments.map((p) => (
-                          <TableRow key={p.id}>
+                          <TableRow
+                            key={p.id}
+                            className="cursor-pointer"
+                            onClick={() => setDetailPayment(p)}
+                          >
                             <TableCell className="tabular-nums">{p.receiptNumber}</TableCell>
                             <TableCell className="tabular-nums">{p.studentCode}</TableCell>
                             <TableCell>{p.studentName}</TableCell>
@@ -953,26 +958,6 @@ export function PaymentsPanel() {
                               ) : (
                                 <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100">ยกเลิก</Badge>
                               )}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                <a href={`/receipts/${p.id}`} target="_blank" rel="noopener noreferrer">
-                                  <Button type="button" size="sm" variant="outline">
-                                    ใบเสร็จ
-                                  </Button>
-                                </a>
-                                {p.status === "active" ? (
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-destructive"
-                                    onClick={() => setVoidTarget(p)}
-                                  >
-                                    ยกเลิก
-                                  </Button>
-                                ) : null}
-                              </div>
                             </TableCell>
                           </TableRow>
                         ))
@@ -1051,6 +1036,15 @@ export function PaymentsPanel() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+
+          <PaymentDetailDialog
+            payment={detailPayment}
+            onClose={() => setDetailPayment(null)}
+            onVoid={(p) => {
+              setDetailPayment(null);
+              setVoidTarget(p);
+            }}
+          />
 
           {ctx ? (
             <PaymentImportDialog
