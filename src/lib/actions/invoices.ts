@@ -27,22 +27,39 @@ type EnrollmentForInvoice = {
   gradeLevelId: string;
 };
 
+// PostgREST puts .in() values in the request URL; a few hundred UUIDs
+// overflows the gateway's URL length limit, so large id lists are queried
+// in batches and merged instead of one query with a huge .in() list.
+const STUDENT_ID_BATCH_SIZE = 200;
+
 async function loadEnrollmentsForInvoice(
   semesterId: string,
   studentIds?: string[],
 ): Promise<EnrollmentForInvoice[]> {
   const supabase = await createClient();
-  let query = supabase
-    .from("student_enrollments")
-    .select("student_id, classroom_id")
-    .eq("semester_id", semesterId)
-    .eq("status", "enrolled");
+  const baseQuery = () =>
+    supabase
+      .from("student_enrollments")
+      .select("student_id, classroom_id")
+      .eq("semester_id", semesterId)
+      .eq("status", "enrolled");
 
+  let enrollments: { student_id: string; classroom_id: string }[] | null;
   if (studentIds && studentIds.length > 0) {
-    query = query.in("student_id", studentIds);
+    const batches: { student_id: string; classroom_id: string }[][] = [];
+    for (let i = 0; i < studentIds.length; i += STUDENT_ID_BATCH_SIZE) {
+      const chunk = studentIds.slice(i, i + STUDENT_ID_BATCH_SIZE);
+      const { data, error } = await baseQuery().in("student_id", chunk);
+      if (error) throw error;
+      batches.push(data ?? []);
+    }
+    enrollments = batches.flat();
+  } else {
+    const { data, error } = await baseQuery();
+    if (error) throw error;
+    enrollments = data;
   }
 
-  const { data: enrollments } = await query;
   if (!enrollments || enrollments.length === 0) return [];
 
   const classroomIds = [...new Set(enrollments.map((e) => e.classroom_id))];
