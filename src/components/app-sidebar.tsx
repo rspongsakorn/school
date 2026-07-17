@@ -21,29 +21,31 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useSidebarContext } from "@/hooks/use-sidebar";
 import { useAuth } from "@/components/providers/auth-provider";
 
+type Role = "admin" | "finance" | "teacher";
+
 const basicNav = [
-  { href: "/", label: "ภาพรวม", icon: LayoutDashboard },
-  { href: "/academic-year", label: "ปีการศึกษา", icon: Calendar },
-  { href: "/students", label: "นักเรียน", icon: Users },
-  { href: "/registration", label: "ลงทะเบียน", icon: ClipboardList },
+  { href: "/", label: "ภาพรวม", icon: LayoutDashboard, roles: ["admin", "finance"] as Role[] },
+  { href: "/academic-year", label: "ปีการศึกษา", icon: Calendar, roles: ["admin"] as Role[] },
+  { href: "/students", label: "นักเรียน", icon: Users, roles: ["admin", "finance"] as Role[] },
+  { href: "/registration", label: "ลงทะเบียน", icon: ClipboardList, roles: ["admin", "finance"] as Role[] },
 ];
 
 const financeNav = [
-  { href: "/invoice-types", label: "ประเภทใบแจ้ง", icon: Receipt },
-  { href: "/invoices", label: "ใบแจ้งชำระ", icon: FileText },
-  { href: "/payments", label: "บันทึกการจ่าย", icon: CreditCard },
+  { href: "/invoice-types", label: "ประเภทใบแจ้ง", icon: Receipt, roles: ["admin"] as Role[] },
+  { href: "/invoices", label: "ใบแจ้งชำระ", icon: FileText, roles: ["admin", "finance"] as Role[] },
+  { href: "/payments", label: "บันทึกการจ่าย", icon: CreditCard, roles: ["admin", "finance"] as Role[] },
 ];
 
 const reportsNav = [
-  { href: "/reports/daily", label: "รายรับรายวัน" },
-  { href: "/reports/discounts", label: "รายงานส่วนลด" },
-  { href: "/reports/outstanding", label: "รายงานค้างชำระ" },
-  { href: "/reports/collections", label: "สถิติการเก็บ" },
-  { href: "/reports/students", label: "รายบุคคล" },
+  { href: "/reports/daily", label: "รายรับรายวัน", roles: ["admin", "finance"] as Role[] },
+  { href: "/reports/discounts", label: "รายงานส่วนลด", roles: ["admin", "finance"] as Role[] },
+  { href: "/reports/outstanding", label: "รายงานค้างชำระ", roles: ["admin", "finance", "teacher"] as Role[] },
+  { href: "/reports/collections", label: "สถิติการเก็บ", roles: ["admin", "finance", "teacher"] as Role[] },
+  { href: "/reports/students", label: "รายบุคคล", roles: ["admin", "finance", "teacher"] as Role[] },
 ];
 
 const systemNav = [
-  { href: "/admin/users", label: "จัดการผู้ใช้", icon: Settings2 },
+  { href: "/admin/users", label: "จัดการผู้ใช้", icon: Settings2, roles: ["admin"] as Role[] },
 ];
 
 function NavSection({
@@ -51,7 +53,7 @@ function NavSection({
   items,
 }: {
   title: string;
-  items: { href: string; label: string; icon: React.ComponentType<{ className?: string }> }[];
+  items: { href: string; label: string; icon: React.ComponentType<{ className?: string }>; roles: Role[] }[];
 }) {
   const pathname = usePathname();
 
@@ -87,9 +89,10 @@ function NavSection({
   );
 }
 
-function NavReportsDropdown() {
+function NavReportsDropdown({ role }: { role?: Role }) {
   const pathname = usePathname();
-  const active = reportsNav.some(
+  const items = reportsNav.filter((item) => role && item.roles.includes(role));
+  const active = items.some(
     (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
   );
   const [open, setOpen] = useState(active);
@@ -123,7 +126,7 @@ function NavReportsDropdown() {
         )}
       >
         <ul className="min-h-0 space-y-1 py-1 pl-8">
-          {reportsNav.map((item) => {
+          {items.map((item) => {
             const itemActive =
               pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
@@ -150,8 +153,10 @@ function NavReportsDropdown() {
 
 function SidebarContent() {
   const { profile } = useAuth();
-  const role = profile?.role;
+  const role = profile?.role as Role | undefined;
   const pathname = usePathname();
+  const visibleBasicNav = basicNav.filter((item) => role && item.roles.includes(role));
+  const visibleFinanceNav = financeNav.filter((item) => role && item.roles.includes(role));
 
   return (
     <>
@@ -179,17 +184,17 @@ function SidebarContent() {
             <h3 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
               รายงาน
             </h3>
-            <NavReportsDropdown />
+            <NavReportsDropdown role={role} />
           </div>
         ) : (
           <>
-            <NavSection title="ข้อมูลพื้นฐาน" items={basicNav} />
+            <NavSection title="ข้อมูลพื้นฐาน" items={visibleBasicNav} />
             <div className="mb-6">
               <h3 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
                 การเงิน
               </h3>
               <ul className="space-y-1">
-                {financeNav.map((item) => {
+                {visibleFinanceNav.map((item) => {
                   const itemActive =
                     pathname === item.href || pathname.startsWith(`${item.href}/`);
                   const Icon = item.icon;
@@ -211,7 +216,7 @@ function SidebarContent() {
                   );
                 })}
                 <li>
-                  <NavReportsDropdown />
+                  <NavReportsDropdown role={role} />
                 </li>
               </ul>
             </div>
