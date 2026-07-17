@@ -1,7 +1,7 @@
-import { requireAdminPage } from "@/lib/auth/require-admin";
+import { requireFinancePage } from "@/lib/auth/require-finance";
 import { InvoicesPanel } from "@/components/finance/invoices-panel";
 
 export default async function InvoicesPage() {
-  await requireAdminPage();
+  await requireFinancePage();
   return <InvoicesPanel />;
 }
