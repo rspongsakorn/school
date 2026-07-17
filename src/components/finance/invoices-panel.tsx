@@ -81,7 +81,7 @@ function statusBadgeClass(status: InvoiceListRow["status"]) {
 }
 
 export function InvoicesPanel() {
-  useRequireRole("admin");
+  useRequireRole(["admin", "finance"]);
 
   const router = useRouter();
   const queryClient = useQueryClient();
