@@ -24,10 +24,12 @@ export type ReceiptLineItemsResult = {
 };
 
 /**
- * Turns a payment's raw allocations/discounts into what the receipt shows:
- * full or discounted payments expand to each fee line; an undiscounted
- * partial payment collapses to one line (its true per-fee split isn't
- * knowable from a partial amount) so the printed total can't mismatch.
+ * Turns a payment's raw allocations/discounts into what the receipt shows.
+ * Full or discounted payments expand to each fee line at its real amount.
+ * An undiscounted partial payment also expands to each fee line, but scaled
+ * proportionally to the amount actually paid (its true per-fee split isn't
+ * knowable from a partial amount), with the last line absorbing any
+ * rounding remainder so the lines still sum exactly to the paid amount.
  */
 export function computeReceiptLineItems(
   paymentAllocations: ReceiptAllocationRaw[],
@@ -43,6 +45,10 @@ export function computeReceiptLineItems(
     const linesTotal =
       Math.round(lines.reduce((sum, l) => sum + Number(l.amount), 0) * 100) / 100;
 
+    if (lines.length === 0) {
+      return [{ name: inv.invoice_types?.name ?? "รายการค่าธรรมเนียม", amount: allocAmount }];
+    }
+
     if (hasDiscount || Math.round(allocAmount * 100) / 100 === linesTotal) {
       return lines.map((line) => ({
         name: line.fee_items?.name ?? "รายการค่าธรรมเนียม",
@@ -50,7 +56,16 @@ export function computeReceiptLineItems(
       }));
     }
 
-    return [{ name: inv.invoice_types?.name ?? "รายการค่าธรรมเนียม", amount: allocAmount }];
+    const ratio = linesTotal === 0 ? 0 : allocAmount / linesTotal;
+    let allocated = 0;
+    return lines.map((line, i) => {
+      const isLast = i === lines.length - 1;
+      const amount = isLast
+        ? Math.round((allocAmount - allocated) * 100) / 100
+        : Math.round(Number(line.amount) * ratio * 100) / 100;
+      allocated += amount;
+      return { name: line.fee_items?.name ?? "รายการค่าธรรมเนียม", amount };
+    });
   });
 
   const discounts = paymentDiscounts.map((d) => ({
