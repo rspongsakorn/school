@@ -130,8 +130,8 @@ export type DiscountColumn =
 
 /** Substring matched against fee_items.name to find the invoice_line a column's discount applies to. */
 export const DISCOUNT_COLUMN_KEYWORDS: Record<DiscountColumn, string> = {
-  reimbursable: "ธรรมเนียม",
-  nonReimbursable: "ธรรมเนียม",
+  reimbursable: "เทอม",
+  nonReimbursable: "เทอม",
   lunch: "อาหาร",
   document: "เอกสาร",
   insurance: "ประกัน",
