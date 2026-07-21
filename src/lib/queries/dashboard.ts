@@ -229,12 +229,17 @@ export async function fetchDashboardData(
 
       const { data: gradeInvoices } = await supabase
         .from("student_invoices")
-        .select("status")
+        .select("student_id, status")
         .eq("academic_year_id", academicYearId)
         .eq("semester_id", semesterId)
         .in("student_id", studentIdsForGrade);
 
-      const paid = (gradeInvoices ?? []).filter((i) => i.status === "paid").length;
+      const allPaidByStudent = new Map<string, boolean>();
+      for (const inv of gradeInvoices ?? []) {
+        const soFar = allPaidByStudent.get(inv.student_id) ?? true;
+        allPaidByStudent.set(inv.student_id, soFar && inv.status === "paid");
+      }
+      const paid = [...allPaidByStudent.values()].filter(Boolean).length;
       return { grade: gl.name, rate: Math.round((paid / total) * 1000) / 10, paid, total };
     }),
   );
