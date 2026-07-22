@@ -151,6 +151,8 @@ export type ImportGroup = {
   kind: ImportGroupKind;
   studentCode: string;
   studentName: string;
+  /** Sheet columns populated in this group — used to disambiguate which invoice a "tuition" group belongs to. */
+  columns: DiscountColumn[];
   /** Only meaningful for "tuition" groups; null means neither เบิกได้/เบิกไม่ได้ was populated. */
   expectedIsReimbursable: boolean | null;
   /** Sum of positive cell values in this group — actual cash collected. */
@@ -193,6 +195,7 @@ export function buildImportGroups(row: XlsxSheetRow): ImportGroup[] {
       kind: "tuition",
       studentCode: row.studentCode,
       studentName: row.studentName,
+      columns: tuitionColumns.map((c) => c.column),
       expectedIsReimbursable:
         row.reimbursableAmount !== null
           ? true
@@ -218,6 +221,7 @@ export function buildImportGroups(row: XlsxSheetRow): ImportGroup[] {
       kind: "insurance",
       studentCode: row.studentCode,
       studentName: row.studentName,
+      columns: ["insurance"],
       expectedIsReimbursable: null,
       netCash,
       discount,
@@ -258,10 +262,23 @@ export function validateGroup(
   const isInsuranceInvoice = (inv: InvoiceCandidate) =>
     inv.feeItemNames.some((name) => name.includes("ประกัน"));
 
-  const candidates =
+  let candidates =
     group.kind === "insurance"
       ? invoices.filter(isInsuranceInvoice)
       : invoices.filter((inv) => !isInsuranceInvoice(inv));
+
+  // Normally a student has exactly one non-insurance invoice. Some students
+  // are billed extra fees (e.g. lunch) as a standalone invoice instead of a
+  // line on the tuition invoice — when that leaves more than one candidate,
+  // narrow to invoices whose fee items overlap with this group's populated
+  // columns (e.g. a row with no lunchAmount shouldn't match the lunch invoice).
+  if (group.kind === "tuition" && candidates.length > 1) {
+    const keywords = group.columns.map((c) => DISCOUNT_COLUMN_KEYWORDS[c]);
+    const narrowed = candidates.filter((inv) =>
+      inv.feeItemNames.some((name) => keywords.some((kw) => name.includes(kw))),
+    );
+    if (narrowed.length > 0) candidates = narrowed;
+  }
 
   if (candidates.length === 0) {
     return { ok: false, reason: "ไม่พบใบแจ้งหนี้ที่ตรงกัน" };

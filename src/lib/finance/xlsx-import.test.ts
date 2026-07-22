@@ -308,4 +308,32 @@ describe("validateGroup", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toContain("ยอดรวมไม่ตรงกับใบแจ้งหนี้");
   });
+
+  it("matches a tuition group (no lunch column) to the tuition-fee invoice, not a separate standalone lunch invoice", () => {
+    // Some students (exception to the norm) get billed lunch as its own
+    // invoice instead of a line on the tuition invoice. A backfill row that
+    // only pays the tuition/document/etc. columns (no lunchAmount) must
+    // still resolve unambiguously to the tuition invoice.
+    const group = buildImportGroups(makeRow({ lunchAmount: null }))[0];
+    const tuitionOnlyInvoice: InvoiceCandidate = {
+      id: "inv-tuition-only",
+      isReimbursable: false,
+      totalAmount: 2900,
+      status: "unpaid",
+      feeItemNames: ["ค่าเทอม"],
+    };
+    const standaloneLunchInvoice: InvoiceCandidate = {
+      id: "inv-lunch-standalone",
+      isReimbursable: false,
+      totalAmount: 1200,
+      status: "unpaid",
+      feeItemNames: ["ค่าอาหารกลางวัน"],
+    };
+    const result = validateGroup(group, [
+      tuitionOnlyInvoice,
+      standaloneLunchInvoice,
+      insuranceInvoice,
+    ]);
+    expect(result).toEqual({ ok: true, invoiceId: "inv-tuition-only" });
+  });
 });
