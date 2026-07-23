@@ -28,6 +28,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatBaht, formatThaiDate } from "@/lib/format";
+import { Card, CardContent } from "@/components/ui/card";
 
 const METHOD_ITEMS = [
   { value: "all", label: "ทุกวิธี" },
@@ -111,7 +112,8 @@ export function DailyRevenuePanel() {
           semesterNumber={ctx?.semesterNumber}
           subtitle={`ช่วงวันที่ ${dateFrom} ถึง ${dateTo}`}
         />
-        <div className="space-y-4">
+        <Card className="border-border shadow-sm">
+        <CardContent className="space-y-4">
           <div className="report-toolbar flex flex-wrap items-end gap-2">
             <div>
               <label className="text-xs text-muted-foreground">ตั้งแต่</label>
@@ -220,7 +222,8 @@ export function DailyRevenuePanel() {
               </TableBody>
             </Table>
           )}
-        </div>
+        </CardContent>
+        </Card>
       </main>
     </>
   );

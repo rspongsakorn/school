@@ -21,6 +21,7 @@ import { ReportLetterhead } from "@/components/finance/report-letterhead";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { formatBaht } from "@/lib/format";
 import { INVOICE_STATUS_LABELS } from "@/lib/finance/constants";
+import { Card, CardContent } from "@/components/ui/card";
 
 const STATUS_ITEMS = [
   { value: "all", label: "ทุกสถานะ" },
@@ -79,7 +80,8 @@ export function StudentRosterPanel() {
       <AppHeader title="รายงานรายบุคคล" basePath="/reports/students" />
       <main className="p-4 lg:p-6">
         <ReportLetterhead title="รายงานสรุปรายบุคคล" yearName={ctx?.academicYearName} semesterNumber={ctx?.semesterNumber} />
-        <div className="space-y-4">
+        <Card className="border-border shadow-sm">
+        <CardContent className="space-y-4">
           <div className="report-toolbar flex flex-wrap items-center gap-2">
             <Select value={grade} onValueChange={(v) => { setGrade(v ?? "all"); setClassroom("all"); }} items={gradeItems}>
               <SelectTrigger className="w-[140px]"><SelectValue placeholder="ชั้น" /></SelectTrigger>
@@ -133,7 +135,8 @@ export function StudentRosterPanel() {
               </TableBody>
             </Table>
           )}
-        </div>
+        </CardContent>
+        </Card>
       </main>
     </>
   );

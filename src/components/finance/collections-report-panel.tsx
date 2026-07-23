@@ -91,7 +91,8 @@ export function CollectionsReportPanel() {
           yearName={ctx?.academicYearName}
           semesterNumber={ctx?.semesterNumber}
         />
-        <div className="space-y-4">
+        <Card className="border-border shadow-sm">
+        <CardContent className="space-y-4">
           <div className="report-toolbar flex flex-wrap items-center gap-2">
             <Select
               value={level}
@@ -252,7 +253,8 @@ export function CollectionsReportPanel() {
               </div>
             </>
           )}
-        </div>
+        </CardContent>
+        </Card>
       </main>
     </>
   );

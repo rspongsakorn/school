@@ -30,6 +30,7 @@ import { INVOICE_STATUS_LABELS } from "@/lib/finance/constants";
 import { ReportToolbar } from "@/components/finance/report-toolbar";
 import { ReportLetterhead } from "@/components/finance/report-letterhead";
 import { TableSkeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from "@/components/ui/card";
 
 const STATUS_ITEMS = [
   { value: "all", label: "ทุกสถานะ" },
@@ -197,7 +198,8 @@ export function OutstandingReportPanel() {
           yearName={ctx?.academicYearName}
           semesterNumber={ctx?.semesterNumber}
         />
-        <div className="space-y-4">
+        <Card className="border-border shadow-sm">
+        <CardContent className="space-y-4">
           <div className="report-toolbar flex flex-wrap items-center gap-2">
             <Select
               value={params.grade}
@@ -463,7 +465,8 @@ export function OutstandingReportPanel() {
             </Table>
           </div>
           )}
-        </div>
+        </CardContent>
+        </Card>
       </main>
     </>
   );

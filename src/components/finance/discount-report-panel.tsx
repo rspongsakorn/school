@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { formatBaht } from "@/lib/format";
 import { fetchDiscountReport } from "@/lib/queries/reports";
+import { Card, CardContent } from "@/components/ui/card";
 
 function firstOfMonth(): string {
   const d = new Date();
@@ -58,7 +59,8 @@ export function DiscountReportPanel() {
           semesterNumber={ctx?.semesterNumber}
           subtitle={`ช่วงวันที่ ${dateFrom} ถึง ${dateTo}`}
         />
-        <div className="space-y-4">
+        <Card className="border-border shadow-sm">
+        <CardContent className="space-y-4">
           <div className="report-toolbar flex flex-wrap items-end gap-2">
             <div>
               <label className="text-xs text-muted-foreground">ตั้งแต่</label>
@@ -118,7 +120,8 @@ export function DiscountReportPanel() {
               </TableBody>
             </Table>
           )}
-        </div>
+        </CardContent>
+        </Card>
       </main>
     </>
   );
