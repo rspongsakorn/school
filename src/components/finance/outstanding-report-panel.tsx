@@ -8,6 +8,7 @@ import { useAuth, useRequireRole } from "@/components/providers/auth-provider";
 import { useSemesterContext } from "@/hooks/use-semester-context";
 import { fetchOutstandingReport } from "@/lib/queries/reports";
 import { fetchGradeLevels, fetchClassroomsBySemester } from "@/lib/queries/classrooms";
+import { fetchInvoiceTypes } from "@/lib/queries/invoice-types";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -24,16 +25,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatBaht } from "@/lib/format";
+import { formatBaht, formatThaiDate } from "@/lib/format";
 import { INVOICE_STATUS_LABELS } from "@/lib/finance/constants";
 import { ReportToolbar } from "@/components/finance/report-toolbar";
 import { ReportLetterhead } from "@/components/finance/report-letterhead";
 import { TableSkeleton } from "@/components/ui/skeleton";
 
 const STATUS_ITEMS = [
-  { value: "all", label: "ค้างทั้งหมด" },
+  { value: "all", label: "ทุกสถานะ" },
   { value: "unpaid", label: "ค้างชำระ" },
   { value: "partial", label: "ชำระบางส่วน" },
+  { value: "paid", label: "ชำระแล้ว" },
 ];
 
 const REIMBURSABLE_ITEMS = [
@@ -60,13 +62,17 @@ export function OutstandingReportPanel() {
   const classroomParam = searchParams.get("classroom") ?? "all";
   const rawStatus = searchParams.get("status");
   const statusParam =
-    rawStatus === "unpaid" || rawStatus === "partial" ? rawStatus : ("all" as const);
+    rawStatus === "unpaid" || rawStatus === "partial" || rawStatus === "paid"
+      ? rawStatus
+      : ("all" as const);
 
   const variantParam = searchParams.get("variant") ?? "all";
   const variantValue: "all" | "standard" | "reimbursable" =
     variantParam === "reimbursable" || variantParam === "standard"
       ? variantParam
       : "all";
+
+  const invoiceTypeParam = searchParams.get("invoiceType") ?? "all";
 
   const viewParam: "list" | "byRoom" =
     searchParams.get("view") === "byRoom" ? "byRoom" : "list";
@@ -82,6 +88,7 @@ export function OutstandingReportPanel() {
       classroomParam,
       statusParam,
       variantValue,
+      invoiceTypeParam,
       teacherProfileId,
     ],
     queryFn: () =>
@@ -92,7 +99,9 @@ export function OutstandingReportPanel() {
         classroomId: classroomParam !== "all" ? classroomParam : undefined,
         status: statusParam,
         variant: variantValue,
+        invoiceTypeId: invoiceTypeParam !== "all" ? invoiceTypeParam : undefined,
         teacherProfileId,
+        includeAllStatuses: true,
       }),
     enabled: !!ctx,
   });
@@ -109,7 +118,19 @@ export function OutstandingReportPanel() {
     enabled: !!ctx,
   });
 
-  const params = { grade: gradeParam, classroom: classroomParam, status: statusParam, variant: variantValue, view: viewParam };
+  const { data: invoiceTypes = [] } = useQuery({
+    queryKey: ["invoice-types"],
+    queryFn: fetchInvoiceTypes,
+  });
+
+  const params = {
+    grade: gradeParam,
+    classroom: classroomParam,
+    status: statusParam,
+    variant: variantValue,
+    invoiceType: invoiceTypeParam,
+    view: viewParam,
+  };
 
   const pushParams = useCallback(
     (next: Partial<typeof params>) => {
@@ -118,6 +139,7 @@ export function OutstandingReportPanel() {
       const classroom = next.classroom ?? params.classroom;
       const status = next.status ?? params.status;
       const variant = next.variant ?? params.variant;
+      const invoiceType = next.invoiceType ?? params.invoiceType;
       const view = next.view ?? params.view;
 
       if (grade !== "all") query.set("grade", grade);
@@ -128,6 +150,8 @@ export function OutstandingReportPanel() {
       else query.delete("status");
       if (variant !== "all") query.set("variant", variant);
       else query.delete("variant");
+      if (invoiceType !== "all") query.set("invoiceType", invoiceType);
+      else query.delete("invoiceType");
       if (view !== "list") query.set("view", view);
       else query.delete("view");
 
@@ -146,6 +170,11 @@ export function OutstandingReportPanel() {
     ...classrooms
       .filter((c) => params.grade === "all" || c.grade_level_id === params.grade)
       .map((c) => ({ value: c.id, label: `${grades.find((g) => g.id === c.grade_level_id)?.name ?? ""}/${c.name}` })),
+  ];
+
+  const invoiceTypeItems = [
+    { value: "all", label: "ทุกประเภทใบแจ้งหนี้" },
+    ...invoiceTypes.map((t) => ({ value: t.id, label: t.name })),
   ];
 
   const groupedByRoom = (() => {
@@ -235,6 +264,22 @@ export function OutstandingReportPanel() {
               </SelectContent>
             </Select>
             <Select
+              value={params.invoiceType}
+              onValueChange={(v) => pushParams({ invoiceType: v ?? "all" })}
+              items={invoiceTypeItems}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="ประเภทใบแจ้งหนี้" />
+              </SelectTrigger>
+              <SelectContent>
+                {invoiceTypeItems.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
               value={viewParam}
               onValueChange={(v) => pushParams({ view: (v ?? "list") as typeof params.view })}
               items={VIEW_ITEMS}
@@ -263,7 +308,7 @@ export function OutstandingReportPanel() {
           ) : (
             <div className="sm:hidden space-y-2">
               {rows.map((row) => (
-                <div key={row.studentId} className="rounded-lg border border-border px-4 py-3">
+                <div key={row.invoiceId} className="rounded-lg border border-border px-4 py-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
@@ -286,6 +331,10 @@ export function OutstandingReportPanel() {
                   <div className="mt-2 flex gap-4 text-sm text-muted-foreground">
                     <span>ต้องชำระ <span className="tabular-nums text-foreground">{formatBaht(row.totalAmount)}</span></span>
                     <span>ชำระแล้ว <span className="tabular-nums text-foreground">{formatBaht(row.paidAmount)}</span></span>
+                  </div>
+                  <div className="mt-1 flex gap-4 text-xs text-muted-foreground">
+                    <span>ออกใบ {formatThaiDate(row.issuedAt)}</span>
+                    <span>จ่ายล่าสุด {row.lastPaidAt ? formatThaiDate(row.lastPaidAt) : "—"}</span>
                   </div>
                 </div>
               ))}
@@ -323,11 +372,13 @@ export function OutstandingReportPanel() {
                             <TableHead className="text-right">ชำระแล้ว</TableHead>
                             <TableHead className="text-right">ค้าง</TableHead>
                             <TableHead>สถานะ</TableHead>
+                            <TableHead>วันที่ออกใบ</TableHead>
+                            <TableHead>จ่ายล่าสุด</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {roomRows.map((row) => (
-                            <TableRow key={row.studentId}>
+                            <TableRow key={row.invoiceId}>
                               <TableCell className="tabular-nums">{row.studentCode}</TableCell>
                               <TableCell>{row.studentName}</TableCell>
                               <TableCell className="text-right tabular-nums">{formatBaht(row.totalAmount)}</TableCell>
@@ -336,6 +387,8 @@ export function OutstandingReportPanel() {
                               <TableCell>
                                 <Badge variant="outline">{INVOICE_STATUS_LABELS[row.status]}</Badge>
                               </TableCell>
+                              <TableCell>{formatThaiDate(row.issuedAt)}</TableCell>
+                              <TableCell>{row.lastPaidAt ? formatThaiDate(row.lastPaidAt) : "—"}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -358,24 +411,26 @@ export function OutstandingReportPanel() {
                   <TableHead className="text-right">ชำระแล้ว</TableHead>
                   <TableHead className="text-right">ค้าง</TableHead>
                   <TableHead>สถานะ</TableHead>
+                  <TableHead>วันที่ออกใบ</TableHead>
+                  <TableHead>จ่ายล่าสุด</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rowsLoading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-6 text-center text-muted-foreground">
+                    <TableCell colSpan={10} className="py-6 text-center text-muted-foreground">
                       กำลังโหลด...
                     </TableCell>
                   </TableRow>
                 ) : rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-6 text-center text-muted-foreground">
+                    <TableCell colSpan={10} className="py-6 text-center text-muted-foreground">
                       ไม่พบรายการค้างชำระ
                     </TableCell>
                   </TableRow>
                 ) : (
                   rows.map((row) => (
-                    <TableRow key={row.studentId}>
+                    <TableRow key={row.invoiceId}>
                       <TableCell className="tabular-nums">{row.studentCode}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -399,6 +454,8 @@ export function OutstandingReportPanel() {
                       <TableCell>
                         <Badge variant="outline">{INVOICE_STATUS_LABELS[row.status]}</Badge>
                       </TableCell>
+                      <TableCell>{formatThaiDate(row.issuedAt)}</TableCell>
+                      <TableCell>{row.lastPaidAt ? formatThaiDate(row.lastPaidAt) : "—"}</TableCell>
                     </TableRow>
                   ))
                 )}
