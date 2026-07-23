@@ -2,8 +2,10 @@ import { createClient } from "@/lib/supabase/client";
 import { formatClassroom, formatStudentName, formatThaiTime, formatThaiDate } from "@/lib/format";
 import { bangkokDateKey } from "@/lib/reports/date";
 import { groupDailyRevenue, type DailyRevenueRow } from "@/lib/reports/daily";
+import { latestPaidAtByInvoice } from "@/lib/reports/last-paid";
 
 export type OutstandingReportRow = {
+  invoiceId: string;
   studentId: string;
   studentCode: string;
   studentName: string;
@@ -14,6 +16,9 @@ export type OutstandingReportRow = {
   outstanding: number;
   status: "unpaid" | "partial" | "paid";
   isReimbursable: boolean;
+  invoiceTypeName: string;
+  issuedAt: string;
+  lastPaidAt: string | null;
 };
 
 export type CollectionsReportRow = {
@@ -65,6 +70,7 @@ export async function fetchOutstandingReport(params: {
   classroomId?: string;
   status?: "unpaid" | "partial" | "paid" | "all";
   variant?: "standard" | "reimbursable" | "all";
+  invoiceTypeId?: string;
   teacherProfileId?: string;
   includeAllStatuses?: boolean;
 }): Promise<OutstandingReportRow[]> {
@@ -120,12 +126,15 @@ export async function fetchOutstandingReport(params: {
     .from("student_invoices")
     .select(
       `
+      id,
       student_id,
       subtotal,
       total_amount,
       paid_amount,
       status,
       is_reimbursable,
+      created_at,
+      invoice_types ( name ),
       students!inner ( student_code, first_name, last_name )
     `,
     )
@@ -145,6 +154,10 @@ export async function fetchOutstandingReport(params: {
     query = query.eq("is_reimbursable", false);
   }
 
+  if (params.invoiceTypeId) {
+    query = query.eq("invoice_type_id", params.invoiceTypeId);
+  }
+
   if (allowedStudentIds) {
     query = query.in("student_id", allowedStudentIds);
   }
@@ -152,20 +165,28 @@ export async function fetchOutstandingReport(params: {
   const { data } = await query;
 
   type Row = {
+    id: string;
     student_id: string;
     subtotal: number;
     total_amount: number;
     paid_amount: number;
     status: "unpaid" | "partial" | "paid";
     is_reimbursable: boolean;
+    created_at: string;
+    invoice_types: { name: string } | null;
     students: { student_code: string; first_name: string; last_name: string };
   };
 
-  return ((data ?? []) as unknown as Row[]).map((row) => {
+  const rows = (data ?? []) as unknown as Row[];
+  const invoiceIds = rows.map((row) => row.id);
+  const lastPaidByInvoice = await fetchLastPaidAtByInvoiceIds(supabase, invoiceIds);
+
+  return rows.map((row) => {
     const totalAmount = Number(row.total_amount);
     const paidAmount = Number(row.paid_amount);
     const subtotal = Number(row.subtotal);
     return {
+      invoiceId: row.id,
       studentId: row.student_id,
       studentCode: row.students.student_code,
       studentName: formatStudentName(row.students.first_name, row.students.last_name),
@@ -176,8 +197,38 @@ export async function fetchOutstandingReport(params: {
       outstanding: Math.max(0, round2(totalAmount - paidAmount)),
       isReimbursable: row.is_reimbursable,
       status: row.status,
+      invoiceTypeName: row.invoice_types?.name ?? "—",
+      issuedAt: row.created_at,
+      lastPaidAt: lastPaidByInvoice.get(row.id) ?? null,
     };
   });
+}
+
+async function fetchLastPaidAtByInvoiceIds(
+  supabase: ReturnType<typeof createClient>,
+  invoiceIds: string[],
+): Promise<Map<string, string>> {
+  if (invoiceIds.length === 0) return new Map();
+
+  const { data } = await supabase
+    .from("payment_allocations")
+    .select("invoice_id, payments!inner ( paid_at, status )")
+    .in("invoice_id", invoiceIds);
+
+  type AllocationRow = {
+    invoice_id: string;
+    payments: { paid_at: string; status: "active" | "voided" };
+  };
+
+  const allocationRows = (data ?? []) as unknown as AllocationRow[];
+
+  return latestPaidAtByInvoice(
+    allocationRows.map((row) => ({
+      invoiceId: row.invoice_id,
+      paidAt: row.payments.paid_at,
+      status: row.payments.status,
+    })),
+  );
 }
 
 export async function fetchCollectionsByGrade(
