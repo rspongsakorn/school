@@ -412,6 +412,7 @@ export async function updateInvoiceReimbursable(
   }
 
   let subtotal = 0;
+  const lineUpdates = [];
   for (const line of existingLines) {
     const rate = rateMap.get(line.fee_item_id);
     if (!rate) {
@@ -426,13 +427,17 @@ export async function updateInvoiceReimbursable(
     });
     subtotal += picked.amount;
 
-    const { error: lineError } = await supabase
-      .from("invoice_lines")
-      .update({ amount: picked.amount, variant: picked.variant })
-      .eq("id", line.id);
-    if (lineError) {
-      return { ok: false, error: "ไม่สามารถปรับรายการในใบแจ้งชำระได้" };
-    }
+    lineUpdates.push(
+      supabase
+        .from("invoice_lines")
+        .update({ amount: picked.amount, variant: picked.variant })
+        .eq("id", line.id),
+    );
+  }
+
+  const lineResults = await Promise.all(lineUpdates);
+  if (lineResults.some((r) => r.error)) {
+    return { ok: false, error: "ไม่สามารถปรับรายการในใบแจ้งชำระได้" };
   }
 
   const totalAmount = computeInvoiceTotal(
