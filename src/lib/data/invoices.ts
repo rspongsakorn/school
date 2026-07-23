@@ -331,13 +331,21 @@ export async function listStudentInvoiceTypeMap(
   semesterId: string,
 ): Promise<Map<string, Set<string>>> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("student_invoices")
-    .select("student_id, invoice_type_id")
-    .eq("semester_id", semesterId);
+  const PAGE_SIZE = 1000;
+  const rows: { student_id: string; invoice_type_id: string }[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("student_invoices")
+      .select("student_id, invoice_type_id")
+      .eq("semester_id", semesterId)
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    rows.push(...(data ?? []));
+    if (!data || data.length < PAGE_SIZE) break;
+  }
 
   const map = new Map<string, Set<string>>();
-  for (const r of (data ?? []) as { student_id: string; invoice_type_id: string }[]) {
+  for (const r of rows) {
     let set = map.get(r.student_id);
     if (!set) {
       set = new Set();
