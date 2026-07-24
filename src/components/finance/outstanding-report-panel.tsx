@@ -207,14 +207,15 @@ export function OutstandingReportPanel() {
   return (
     <>
       <AppHeader title="รายงานค้างชำระ" basePath="/reports/outstanding" />
-      <main className="p-4 lg:p-6">
+      <style>{"@media print { @page { size: A4 landscape; margin: 10mm; } }"}</style>
+      <main className="p-4 lg:p-6 print:p-0">
         <ReportLetterhead
           title="รายงานลูกหนี้ค้างชำระ"
           yearName={ctx?.academicYearName}
           semesterNumber={ctx?.semesterNumber}
         />
-        <Card className="border-border shadow-sm">
-        <CardContent className="space-y-4">
+        <Card className="border-border shadow-sm print:border-none print:shadow-none">
+        <CardContent className="space-y-4 print:p-0 print:text-xs">
           <div className="report-toolbar flex flex-wrap items-center gap-2">
             <Select
               value={params.grade}

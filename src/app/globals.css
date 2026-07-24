@@ -125,4 +125,14 @@
   .report-room-group:first-of-type {
     break-before: auto;
   }
+  table {
+    width: 100%;
+    table-layout: auto;
+  }
+  thead {
+    display: table-header-group;
+  }
+  tr {
+    break-inside: avoid;
+  }
 }
