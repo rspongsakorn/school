@@ -212,23 +212,34 @@ export async function fetchOutstandingReport(params: {
   });
 }
 
+// A few thousand invoice UUIDs in a single .in() overflows the gateway's URL
+// length limit and the request fails silently (see STUDENT_ID_BATCH_SIZE in
+// lib/actions/invoices.ts for the same issue), so batch it.
+const INVOICE_ID_BATCH_SIZE = 200;
+
 async function fetchLastPaidAtByInvoiceIds(
   supabase: ReturnType<typeof createClient>,
   invoiceIds: string[],
 ): Promise<Map<string, string>> {
   if (invoiceIds.length === 0) return new Map();
 
-  const { data } = await supabase
-    .from("payment_allocations")
-    .select("invoice_id, payments!inner ( paid_at, status )")
-    .in("invoice_id", invoiceIds);
-
   type AllocationRow = {
     invoice_id: string;
     payments: { paid_at: string; status: "active" | "voided" };
   };
 
-  const allocationRows = (data ?? []) as unknown as AllocationRow[];
+  const batches: AllocationRow[][] = [];
+  for (let i = 0; i < invoiceIds.length; i += INVOICE_ID_BATCH_SIZE) {
+    const chunk = invoiceIds.slice(i, i + INVOICE_ID_BATCH_SIZE);
+    const { data, error } = await supabase
+      .from("payment_allocations")
+      .select("invoice_id, payments!inner ( paid_at, status )")
+      .in("invoice_id", chunk);
+    if (error) throw error;
+    batches.push((data ?? []) as unknown as AllocationRow[]);
+  }
+
+  const allocationRows = batches.flat();
 
   return latestPaidAtByInvoice(
     allocationRows.map((row) => ({

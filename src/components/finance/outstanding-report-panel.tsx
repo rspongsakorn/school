@@ -50,6 +50,12 @@ function formatDiscount(discountType: "fixed" | "percent" | null, discountValue:
   return discountType === "percent" ? `ลด ${discountValue}%` : `ลด ${formatBaht(discountValue)}`;
 }
 
+const STATUS_BADGE_CLASSES: Record<"unpaid" | "partial" | "paid", string> = {
+  paid: "border-transparent bg-emerald-50 text-emerald-700 hover:bg-emerald-50",
+  partial: "border-transparent bg-amber-50 text-amber-700 hover:bg-amber-50",
+  unpaid: "border-transparent bg-red-50 text-red-700 hover:bg-red-50",
+};
+
 const VIEW_ITEMS = [
   { value: "list", label: "ตามรายชื่อ" },
   { value: "byRoom", label: "จัดกลุ่มตามห้อง" },
@@ -336,7 +342,7 @@ export function OutstandingReportPanel() {
                       <span className="font-semibold tabular-nums text-amber-700">
                         ค้าง {formatBaht(row.outstanding)}
                       </span>
-                      <Badge variant="outline">{INVOICE_STATUS_LABELS[row.status]}</Badge>
+                      <Badge variant="outline" className={STATUS_BADGE_CLASSES[row.status]}>{INVOICE_STATUS_LABELS[row.status]}</Badge>
                     </div>
                   </div>
                   <div className="mt-2 flex gap-4 text-sm text-muted-foreground">
@@ -406,7 +412,7 @@ export function OutstandingReportPanel() {
                                 {formatDiscount(row.discountType, row.discountValue) ?? "—"}
                               </TableCell>
                               <TableCell>
-                                <Badge variant="outline">{INVOICE_STATUS_LABELS[row.status]}</Badge>
+                                <Badge variant="outline" className={STATUS_BADGE_CLASSES[row.status]}>{INVOICE_STATUS_LABELS[row.status]}</Badge>
                               </TableCell>
                               <TableCell>{formatThaiDate(row.issuedAt)}</TableCell>
                               <TableCell>{row.lastPaidAt ? formatThaiDate(row.lastPaidAt) : "—"}</TableCell>
@@ -479,7 +485,7 @@ export function OutstandingReportPanel() {
                         {formatDiscount(row.discountType, row.discountValue) ?? "—"}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{INVOICE_STATUS_LABELS[row.status]}</Badge>
+                        <Badge variant="outline" className={STATUS_BADGE_CLASSES[row.status]}>{INVOICE_STATUS_LABELS[row.status]}</Badge>
                       </TableCell>
                       <TableCell>{formatThaiDate(row.issuedAt)}</TableCell>
                       <TableCell>{row.lastPaidAt ? formatThaiDate(row.lastPaidAt) : "—"}</TableCell>
