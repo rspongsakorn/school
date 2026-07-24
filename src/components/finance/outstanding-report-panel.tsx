@@ -369,12 +369,13 @@ export function OutstandingReportPanel() {
               <div className="hidden sm:block space-y-6">
                 {groupedByRoom.map(([room, roomRows]) => {
                   const roomOutstanding = roomRows.reduce((s, r) => s + r.outstanding, 0);
+                  const roomPaid = roomRows.reduce((s, r) => s + r.paidAmount, 0);
                   return (
                     <div key={room} className="report-room-group">
                       <div className="mb-2 flex items-center justify-between">
                         <h3 className="font-semibold">{room}</h3>
                         <span className="text-sm text-muted-foreground tabular-nums">
-                          ค้างรวม {formatBaht(roomOutstanding)}
+                          รวมยอดเก็บได้ {formatBaht(roomPaid)} · ค้างรวม {formatBaht(roomOutstanding)}
                         </span>
                       </div>
                       <Table>
