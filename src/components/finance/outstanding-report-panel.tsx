@@ -97,8 +97,8 @@ export function OutstandingReportPanel() {
       invoiceTypeParam,
       teacherProfileId,
     ],
-    queryFn: () =>
-      fetchOutstandingReport({
+    queryFn: async () => {
+      const data = await fetchOutstandingReport({
         semesterId: ctx!.semesterId,
         academicYearId: ctx!.academicYearId,
         gradeLevelId: gradeParam !== "all" ? gradeParam : undefined,
@@ -108,7 +108,11 @@ export function OutstandingReportPanel() {
         invoiceTypeId: invoiceTypeParam !== "all" ? invoiceTypeParam : undefined,
         teacherProfileId,
         includeAllStatuses: true,
-      }),
+      });
+      return [...data].sort((a, b) =>
+        a.studentCode.localeCompare(b.studentCode, "th", { numeric: true }),
+      );
+    },
     enabled: !!ctx,
   });
 
@@ -339,7 +343,7 @@ export function OutstandingReportPanel() {
                     <span>ต้องชำระ <span className="tabular-nums text-foreground">{formatBaht(row.totalAmount)}</span></span>
                     <span>ชำระแล้ว <span className="tabular-nums text-foreground">{formatBaht(row.paidAmount)}</span></span>
                     {formatDiscount(row.discountType, row.discountValue) ? (
-                      <span className="text-green-700">{formatDiscount(row.discountType, row.discountValue)}</span>
+                      <span className="text-red-700">{formatDiscount(row.discountType, row.discountValue)}</span>
                     ) : null}
                   </div>
                   <div className="mt-1 flex gap-4 text-xs text-muted-foreground">
@@ -397,7 +401,7 @@ export function OutstandingReportPanel() {
                               <TableCell className="text-right tabular-nums">{formatBaht(row.totalAmount)}</TableCell>
                               <TableCell className="text-right tabular-nums">{formatBaht(row.paidAmount)}</TableCell>
                               <TableCell className="text-right tabular-nums font-medium">{formatBaht(row.outstanding)}</TableCell>
-                              <TableCell className="text-green-700">
+                              <TableCell className="text-red-700">
                                 {formatDiscount(row.discountType, row.discountValue) ?? "—"}
                               </TableCell>
                               <TableCell>
@@ -470,7 +474,7 @@ export function OutstandingReportPanel() {
                       <TableCell className="text-right tabular-nums font-medium">
                         {formatBaht(row.outstanding)}
                       </TableCell>
-                      <TableCell className="text-green-700">
+                      <TableCell className="text-red-700">
                         {formatDiscount(row.discountType, row.discountValue) ?? "—"}
                       </TableCell>
                       <TableCell>
