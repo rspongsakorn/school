@@ -19,6 +19,8 @@ export type OutstandingReportRow = {
   invoiceTypeName: string;
   issuedAt: string;
   lastPaidAt: string | null;
+  discountType: "fixed" | "percent" | null;
+  discountValue: number | null;
 };
 
 export type CollectionsReportRow = {
@@ -134,6 +136,8 @@ export async function fetchOutstandingReport(params: {
       status,
       is_reimbursable,
       created_at,
+      discount_type,
+      discount_value,
       invoice_types ( name ),
       students!inner ( student_code, first_name, last_name )
     `,
@@ -173,6 +177,8 @@ export async function fetchOutstandingReport(params: {
     status: "unpaid" | "partial" | "paid";
     is_reimbursable: boolean;
     created_at: string;
+    discount_type: "fixed" | "percent" | null;
+    discount_value: number | null;
     invoice_types: { name: string } | null;
     students: { student_code: string; first_name: string; last_name: string };
   };
@@ -200,6 +206,8 @@ export async function fetchOutstandingReport(params: {
       invoiceTypeName: row.invoice_types?.name ?? "—",
       issuedAt: row.created_at,
       lastPaidAt: lastPaidByInvoice.get(row.id) ?? null,
+      discountType: row.discount_type,
+      discountValue: row.discount_value != null ? Number(row.discount_value) : null,
     };
   });
 }

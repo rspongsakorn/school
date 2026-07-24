@@ -45,6 +45,11 @@ const REIMBURSABLE_ITEMS = [
   { value: "standard", label: "เบิกไม่ได้" },
 ];
 
+function formatDiscount(discountType: "fixed" | "percent" | null, discountValue: number | null): string | null {
+  if (!discountType || discountValue == null) return null;
+  return discountType === "percent" ? `ลด ${discountValue}%` : `ลด ${formatBaht(discountValue)}`;
+}
+
 const VIEW_ITEMS = [
   { value: "list", label: "ตามรายชื่อ" },
   { value: "byRoom", label: "จัดกลุ่มตามห้อง" },
@@ -333,6 +338,9 @@ export function OutstandingReportPanel() {
                   <div className="mt-2 flex gap-4 text-sm text-muted-foreground">
                     <span>ต้องชำระ <span className="tabular-nums text-foreground">{formatBaht(row.totalAmount)}</span></span>
                     <span>ชำระแล้ว <span className="tabular-nums text-foreground">{formatBaht(row.paidAmount)}</span></span>
+                    {formatDiscount(row.discountType, row.discountValue) ? (
+                      <span className="text-green-700">{formatDiscount(row.discountType, row.discountValue)}</span>
+                    ) : null}
                   </div>
                   <div className="mt-1 flex gap-4 text-xs text-muted-foreground">
                     <span>ออกใบ {formatThaiDate(row.issuedAt)}</span>
@@ -374,6 +382,7 @@ export function OutstandingReportPanel() {
                             <TableHead className="text-right">ต้องชำระ</TableHead>
                             <TableHead className="text-right">ชำระแล้ว</TableHead>
                             <TableHead className="text-right">ค้าง</TableHead>
+                            <TableHead>ส่วนลด</TableHead>
                             <TableHead>สถานะ</TableHead>
                             <TableHead>วันที่ออกใบ</TableHead>
                             <TableHead>จ่ายล่าสุด</TableHead>
@@ -388,6 +397,9 @@ export function OutstandingReportPanel() {
                               <TableCell className="text-right tabular-nums">{formatBaht(row.totalAmount)}</TableCell>
                               <TableCell className="text-right tabular-nums">{formatBaht(row.paidAmount)}</TableCell>
                               <TableCell className="text-right tabular-nums font-medium">{formatBaht(row.outstanding)}</TableCell>
+                              <TableCell className="text-green-700">
+                                {formatDiscount(row.discountType, row.discountValue) ?? "—"}
+                              </TableCell>
                               <TableCell>
                                 <Badge variant="outline">{INVOICE_STATUS_LABELS[row.status]}</Badge>
                               </TableCell>
@@ -415,6 +427,7 @@ export function OutstandingReportPanel() {
                   <TableHead className="text-right">ต้องชำระ</TableHead>
                   <TableHead className="text-right">ชำระแล้ว</TableHead>
                   <TableHead className="text-right">ค้าง</TableHead>
+                  <TableHead>ส่วนลด</TableHead>
                   <TableHead>สถานะ</TableHead>
                   <TableHead>วันที่ออกใบ</TableHead>
                   <TableHead>จ่ายล่าสุด</TableHead>
@@ -423,13 +436,13 @@ export function OutstandingReportPanel() {
               <TableBody>
                 {rowsLoading ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="py-6 text-center text-muted-foreground">
+                    <TableCell colSpan={12} className="py-6 text-center text-muted-foreground">
                       กำลังโหลด...
                     </TableCell>
                   </TableRow>
                 ) : rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="py-6 text-center text-muted-foreground">
+                    <TableCell colSpan={12} className="py-6 text-center text-muted-foreground">
                       ไม่พบรายการค้างชำระ
                     </TableCell>
                   </TableRow>
@@ -456,6 +469,9 @@ export function OutstandingReportPanel() {
                       </TableCell>
                       <TableCell className="text-right tabular-nums font-medium">
                         {formatBaht(row.outstanding)}
+                      </TableCell>
+                      <TableCell className="text-green-700">
+                        {formatDiscount(row.discountType, row.discountValue) ?? "—"}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">{INVOICE_STATUS_LABELS[row.status]}</Badge>
