@@ -368,6 +368,7 @@ export function OutstandingReportPanel() {
                       <Table>
                         <TableHeader>
                           <TableRow>
+                            <TableHead className="w-10">ลำดับ</TableHead>
                             <TableHead>รหัส</TableHead>
                             <TableHead>ชื่อ-นามสกุล</TableHead>
                             <TableHead className="text-right">ต้องชำระ</TableHead>
@@ -379,8 +380,9 @@ export function OutstandingReportPanel() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {roomRows.map((row) => (
+                          {roomRows.map((row, index) => (
                             <TableRow key={row.invoiceId}>
+                              <TableCell className="tabular-nums text-muted-foreground">{index + 1}</TableCell>
                               <TableCell className="tabular-nums">{row.studentCode}</TableCell>
                               <TableCell>{row.studentName}</TableCell>
                               <TableCell className="text-right tabular-nums">{formatBaht(row.totalAmount)}</TableCell>
@@ -405,6 +407,7 @@ export function OutstandingReportPanel() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">ลำดับ</TableHead>
                   <TableHead>รหัส</TableHead>
                   <TableHead>ชื่อ-นามสกุล</TableHead>
                   <TableHead>ชั้น/ห้อง</TableHead>
@@ -420,19 +423,20 @@ export function OutstandingReportPanel() {
               <TableBody>
                 {rowsLoading ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="py-6 text-center text-muted-foreground">
+                    <TableCell colSpan={11} className="py-6 text-center text-muted-foreground">
                       กำลังโหลด...
                     </TableCell>
                   </TableRow>
                 ) : rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="py-6 text-center text-muted-foreground">
+                    <TableCell colSpan={11} className="py-6 text-center text-muted-foreground">
                       ไม่พบรายการค้างชำระ
                     </TableCell>
                   </TableRow>
                 ) : (
-                  rows.map((row) => (
+                  rows.map((row, index) => (
                     <TableRow key={row.invoiceId}>
+                      <TableCell className="tabular-nums text-muted-foreground">{index + 1}</TableCell>
                       <TableCell className="tabular-nums">{row.studentCode}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
