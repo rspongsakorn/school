@@ -1,5 +1,6 @@
 import type { StudentGender, StudentStatus } from "@/lib/students/constants";
 import { isFutureIsoDate } from "@/lib/students/dates";
+import type { PriceTier } from "@/lib/finance/price-tier";
 
 export type StudentFormInput = {
   studentCode: string;
@@ -9,7 +10,7 @@ export type StudentFormInput = {
   status: StudentStatus;
   gender: "" | StudentGender;
   dateOfBirth: string;
-  isReimbursable: boolean;
+  priceTier: PriceTier;
 };
 
 export type StudentFormErrors = Partial<

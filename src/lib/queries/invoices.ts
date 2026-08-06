@@ -1,3 +1,4 @@
+import { parsePriceTier, type PriceTier } from "@/lib/finance/price-tier";
 import { formatClassroom, formatStudentName } from "@/lib/format";
 import { buildStudentSearchOrFilter } from "@/lib/students/search";
 import { createClient } from "@/lib/supabase/client";
@@ -18,7 +19,7 @@ export type InvoiceListRow = {
   paidAmount: number;
   outstanding: number;
   status: InvoiceStatus;
-  isReimbursable: boolean;
+  priceTier: PriceTier;
   invoiceTypeId: string;
   createdAt: string;
   hasActivePaymentAllocation: boolean;
@@ -41,7 +42,7 @@ export type InvoiceCandidateRow = {
   /** Invoice type ids the student already has an invoice for this semester. */
   invoiceTypeIds: string[];
   /** Student-level default: pre-tick as reimbursable when generating. */
-  defaultReimbursable: boolean;
+  defaultPriceTier: PriceTier;
 };
 
 const INVOICE_PAGE_SIZE = 100;
@@ -151,7 +152,7 @@ export async function fetchInvoicesPaginated(params: {
   gradeLevelId?: string;
   classroomId?: string;
   status?: InvoiceStatus | "all";
-  reimbursable?: "reimbursable" | "standard" | "all";
+  priceTier?: PriceTier | "all";
   page?: number;
 }): Promise<PaginatedInvoices> {
   const page = Math.max(1, params.page ?? 1);
@@ -194,7 +195,7 @@ export async function fetchInvoicesPaginated(params: {
       total_amount,
       paid_amount,
       status,
-      is_reimbursable,
+      price_tier,
       invoice_type_id,
       invoice_types ( name ),
       created_at,
@@ -210,8 +211,9 @@ export async function fetchInvoicesPaginated(params: {
     query = query.eq("status", params.status);
   }
 
-  if (params.reimbursable && params.reimbursable !== "all") {
-    query = query.eq("is_reimbursable", params.reimbursable === "reimbursable");
+  const tierFilter = parsePriceTier(params.priceTier);
+  if (tierFilter) {
+    query = query.eq("price_tier", tierFilter);
   }
 
   if (studentIdsFilter) {
@@ -240,7 +242,7 @@ export async function fetchInvoicesPaginated(params: {
     total_amount: number;
     paid_amount: number;
     status: InvoiceStatus;
-    is_reimbursable: boolean;
+    price_tier: string;
     invoice_type_id: string;
     created_at: string;
     students: { student_code: string; first_name: string; last_name: string };
@@ -266,7 +268,7 @@ export async function fetchInvoicesPaginated(params: {
       paidAmount,
       outstanding: Math.max(0, round2(totalAmount - paidAmount)),
       status: row.status,
-      isReimbursable: row.is_reimbursable,
+      priceTier: parsePriceTier(row.price_tier) ?? "standard",
       invoiceTypeId: row.invoice_type_id,
       createdAt: row.created_at,
       hasActivePaymentAllocation: activeAllocationInvoiceIds.has(row.id),
@@ -296,7 +298,7 @@ export async function fetchInvoiceCandidates(semesterId: string): Promise<Invoic
     .select(
       `
       student_id,
-      students!inner ( student_code, first_name, last_name, is_reimbursable )
+      students!inner ( student_code, first_name, last_name, price_tier )
     `,
     )
     .eq("semester_id", semesterId)
@@ -309,7 +311,7 @@ export async function fetchInvoiceCandidates(semesterId: string): Promise<Invoic
       student_code: string;
       first_name: string;
       last_name: string;
-      is_reimbursable: boolean;
+      price_tier: string;
     };
   };
 
@@ -321,7 +323,7 @@ export async function fetchInvoiceCandidates(semesterId: string): Promise<Invoic
       gradeClassroom: gradeByStudent.get(row.student_id) ?? "—",
       gradeSortOrder: gradeSortByStudent.get(row.student_id) ?? 0,
       invoiceTypeIds: [...(typesByStudent.get(row.student_id) ?? [])],
-      defaultReimbursable: row.students.is_reimbursable,
+      defaultPriceTier: parsePriceTier(row.students.price_tier) ?? "standard",
     }))
     .sort((a, b) => a.studentCode.localeCompare(b.studentCode, undefined, { numeric: true }));
 }

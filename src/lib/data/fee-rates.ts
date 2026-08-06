@@ -8,6 +8,7 @@ export type FeeRateMatrixCell = {
   id: string;
   amount: number;
   amountReimbursable: number | null;
+  amountPrivate: number | null;
 };
 
 export type FeeRateMatrix = {

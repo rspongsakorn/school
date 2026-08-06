@@ -1,3 +1,4 @@
+import { parsePriceTier, type PriceTier } from "@/lib/finance/price-tier";
 import { formatClassroom, formatStudentName } from "@/lib/format";
 import { getStudentGradeMap, getStudentGradeSortMap } from "@/lib/data/enrollments";
 import type { InvoiceDeleteContext } from "@/lib/finance/invoice-delete-eligibility";
@@ -18,7 +19,7 @@ export type InvoiceListRow = {
   paidAmount: number;
   outstanding: number;
   status: InvoiceStatus;
-  isReimbursable: boolean;
+  priceTier: PriceTier;
   invoiceTypeId: string;
   createdAt: string;
   hasActivePaymentAllocation: boolean;
@@ -99,7 +100,7 @@ export async function listInvoicesPaginated(params: {
       total_amount,
       paid_amount,
       status,
-      is_reimbursable,
+      price_tier,
       invoice_type_id,
       invoice_types ( name ),
       created_at,
@@ -141,7 +142,7 @@ export async function listInvoicesPaginated(params: {
     total_amount: number;
     paid_amount: number;
     status: InvoiceStatus;
-    is_reimbursable: boolean;
+    price_tier: string;
     invoice_type_id: string;
     created_at: string;
     students: { student_code: string; first_name: string; last_name: string };
@@ -165,7 +166,7 @@ export async function listInvoicesPaginated(params: {
       paidAmount,
       outstanding: Math.max(0, round2(totalAmount - paidAmount)),
       status: row.status,
-      isReimbursable: row.is_reimbursable,
+      priceTier: parsePriceTier(row.price_tier) ?? "standard",
       invoiceTypeId: row.invoice_type_id,
       createdAt: row.created_at,
       hasActivePaymentAllocation: activeAllocationInvoiceIds.has(row.id),
@@ -233,7 +234,7 @@ export type InvoiceCandidateRow = {
   /** Invoice type ids the student already has an invoice for this semester. */
   invoiceTypeIds: string[];
   /** Student-level default: pre-tick as reimbursable when generating. */
-  defaultReimbursable: boolean;
+  defaultPriceTier: PriceTier;
 };
 
 export async function listInvoiceCandidates(semesterId: string): Promise<InvoiceCandidateRow[]> {
@@ -249,7 +250,7 @@ export async function listInvoiceCandidates(semesterId: string): Promise<Invoice
     .select(
       `
       student_id,
-      students!inner ( student_code, first_name, last_name, is_reimbursable )
+      students!inner ( student_code, first_name, last_name, price_tier )
     `,
     )
     .eq("semester_id", semesterId)
@@ -262,7 +263,7 @@ export async function listInvoiceCandidates(semesterId: string): Promise<Invoice
       student_code: string;
       first_name: string;
       last_name: string;
-      is_reimbursable: boolean;
+      price_tier: string;
     };
   };
 
@@ -273,7 +274,7 @@ export async function listInvoiceCandidates(semesterId: string): Promise<Invoice
     gradeClassroom: gradeByStudent.get(row.student_id) ?? "—",
     gradeSortOrder: gradeSortByStudent.get(row.student_id) ?? 0,
     invoiceTypeIds: [...(typesByStudent.get(row.student_id) ?? [])],
-    defaultReimbursable: row.students.is_reimbursable,
+    defaultPriceTier: parsePriceTier(row.students.price_tier) ?? "standard",
   }));
 }
 

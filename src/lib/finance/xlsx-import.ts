@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import type { PriceTier } from "@/lib/finance/price-tier";
 
 export type XlsxSheetRow = {
   rowNumber: number;
@@ -241,7 +242,7 @@ function round2(n: number): number {
 
 export type InvoiceCandidate = {
   id: string;
-  isReimbursable: boolean;
+  priceTier: PriceTier;
   totalAmount: number;
   status: "unpaid" | "partial" | "paid";
   /** fee_items.name for every invoice_lines row on this invoice. */
@@ -293,10 +294,12 @@ export function validateGroup(
     return { ok: false, reason: "ใบแจ้งหนี้นี้มีการชำระแล้ว" };
   }
 
+  // The backfill sheet only ever had เบิกได้ / เบิกไม่ได้ columns, so any
+  // reimbursing tier (including เอกชน) matches its เบิกได้ column.
   if (
     group.kind === "tuition" &&
     group.expectedIsReimbursable !== null &&
-    invoice.isReimbursable !== group.expectedIsReimbursable
+    (invoice.priceTier !== "standard") !== group.expectedIsReimbursable
   ) {
     return { ok: false, reason: "สถานะเบิกได้/เบิกไม่ได้ไม่ตรงกับใบแจ้งหนี้" };
   }

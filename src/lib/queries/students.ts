@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { formatStudentName } from "@/lib/format";
 import { buildStudentSearchOrFilter } from "@/lib/students/search";
+import { parsePriceTier } from "@/lib/finance/price-tier";
 import {
   STUDENT_STATUS_LABELS,
   STUDENTS_PAGE_SIZE,
@@ -73,7 +74,7 @@ export async function fetchStudentsPaginated(params: StudentListParams): Promise
     let query = supabase
       .from("students")
       .select(
-        "id, student_code, first_name, last_name, id_card, gender, date_of_birth, status, is_reimbursable",
+        "id, student_code, first_name, last_name, id_card, gender, date_of_birth, status, price_tier",
         {
           count: "exact",
         },
@@ -108,7 +109,7 @@ export async function fetchStudentsPaginated(params: StudentListParams): Promise
       lastName: s.last_name,
       gender: (s.gender as StudentGender | null) ?? null,
       dateOfBirth: s.date_of_birth ?? null,
-      isReimbursable: s.is_reimbursable,
+      priceTier: parsePriceTier(s.price_tier) ?? "standard",
       deletable: !blockedStudentIds.has(s.id),
     };
   });

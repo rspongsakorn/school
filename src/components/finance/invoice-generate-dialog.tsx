@@ -28,7 +28,8 @@ import { Label } from "@/components/ui/label";
 import { generateInvoices } from "@/lib/actions/invoices";
 import type { InvoiceCandidateRow } from "@/lib/data/invoices";
 import type { FeeItemRow } from "@/lib/data/fee-items";
-import { defaultReimbursableIds } from "@/lib/finance/reimbursable-selection";
+import { defaultPriceTiers } from "@/lib/finance/price-tier-selection";
+import { PRICE_TIERS, priceTierLabel, type PriceTier } from "@/lib/finance/price-tier";
 import { cn } from "@/lib/utils";
 
 type InvoiceGenerateDialogProps = {
@@ -79,8 +80,8 @@ export function InvoiceGenerateDialog({
     () => new Set(activeItems.map((i) => i.id)),
   );
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
-  const [reimbursableStudentIds, setReimbursableStudentIds] = useState<Set<string>>(
-    () => defaultReimbursableIds(candidates),
+  const [tierByStudentId, setTierByStudentId] = useState<Map<string, PriceTier>>(
+    () => defaultPriceTiers(candidates),
   );
   const [classroomFilter, setClassroomFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
@@ -94,7 +95,7 @@ export function InvoiceGenerateDialog({
     setInvoiceTypeId("");
     setSelectedFeeItemIds(new Set(activeItems.map((i) => i.id)));
     setSelectedStudentIds(new Set());
-    setReimbursableStudentIds(defaultReimbursableIds(candidates));
+    setTierByStudentId(defaultPriceTiers(candidates));
     setClassroomFilter("all");
     setSearch("");
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -150,12 +151,12 @@ export function InvoiceGenerateDialog({
     });
   }
 
-  function toggleReimbursable(id: string) {
-    setReimbursableStudentIds((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+  function setStudentTier(id: string, tier: PriceTier) {
+    setTierByStudentId((prev) => new Map(prev).set(id, tier));
+  }
+
+  function tierOf(id: string): PriceTier {
+    return tierByStudentId.get(id) ?? "standard";
   }
 
   const allFeeSelected =
@@ -178,20 +179,34 @@ export function InvoiceGenerateDialog({
     });
   }
 
-  function toggleAllReimbursable() {
+  function setAllTiers(tier: PriceTier) {
     const pool =
       mode === "selected"
-        ? selectedStudentIds
-        : new Set(selectableCandidates.map((c) => c.studentId));
-    const allOn = pool.size > 0 && [...pool].every((id) => reimbursableStudentIds.has(id));
-    setReimbursableStudentIds(allOn ? new Set() : new Set(pool));
+        ? [...selectedStudentIds]
+        : selectableCandidates.map((c) => c.studentId);
+    setTierByStudentId((prev) => {
+      const next = new Map(prev);
+      for (const id of pool) next.set(id, tier);
+      return next;
+    });
   }
 
   const targetCount = mode === "all" ? selectableCandidates.length : selectedStudentIds.size;
-  const reimbursableCount =
-    mode === "all"
-      ? reimbursableStudentIds.size
-      : [...selectedStudentIds].filter((id) => reimbursableStudentIds.has(id)).length;
+
+  /** How many of the students that will actually get an invoice are on each tier. */
+  const tierCounts = useMemo(() => {
+    const ids =
+      mode === "all"
+        ? selectableCandidates.map((c) => c.studentId)
+        : [...selectedStudentIds];
+    const counts: Record<PriceTier, number> = {
+      standard: 0,
+      reimbursable: 0,
+      private: 0,
+    };
+    for (const id of ids) counts[tierByStudentId.get(id) ?? "standard"] += 1;
+    return counts;
+  }, [mode, selectableCandidates, selectedStudentIds, tierByStudentId]);
 
   // For action-row label when a room chip is active
   const roomCount = classroomFilter === "all" ? null : filtered.length;
@@ -228,7 +243,7 @@ export function InvoiceGenerateDialog({
       invoiceTypeId,
       feeItemIds,
       studentIds,
-      reimbursableStudentIds: [...reimbursableStudentIds],
+      priceTierByStudentId: Object.fromEntries(tierByStudentId),
     });
     setSubmitting(false);
 
@@ -383,13 +398,19 @@ export function InvoiceGenerateDialog({
                     </span>
                   ) : null}
                 </Label>
-                <button
-                  type="button"
-                  className="text-xs font-medium text-sky-700 hover:underline"
-                  onClick={toggleAllReimbursable}
-                >
-                  สลับเบิกได้ทุกคน
-                </button>
+                <div className="flex items-center gap-1 text-xs">
+                  <span className="text-muted-foreground">ตั้งทั้งหมดเป็น</span>
+                  {PRICE_TIERS.map((tier) => (
+                    <button
+                      key={tier}
+                      type="button"
+                      className="rounded border px-1.5 py-0.5 font-medium hover:bg-muted"
+                      onClick={() => setAllTiers(tier)}
+                    >
+                      {priceTierLabel(tier)}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Classroom filter chips */}
@@ -505,13 +526,14 @@ export function InvoiceGenerateDialog({
                   ) : (
                     filtered.map((c) => {
                       const selected = mode === "all" || selectedStudentIds.has(c.studentId);
-                      const reimb = reimbursableStudentIds.has(c.studentId);
+                      const tier = tierOf(c.studentId);
                       return (
                         <div
                           key={c.studentId}
                           className={cn(
                             "flex items-center gap-2 px-3 py-2 transition-colors",
-                            reimb && "bg-green-50",
+                            tier === "reimbursable" && "bg-green-50",
+                            tier === "private" && "bg-violet-50",
                             mode === "selected" && !selected && "opacity-55",
                           )}
                         >
@@ -530,28 +552,31 @@ export function InvoiceGenerateDialog({
                               <span className="text-xs text-muted-foreground">{c.gradeClassroom}</span>
                             )}
                           </div>
-                          {/* Toggle switch */}
-                          <button
-                            type="button"
-                            onClick={() => toggleReimbursable(c.studentId)}
-                            disabled={mode === "selected" && !selected}
-                            className={cn(
-                              "relative h-6 w-[54px] shrink-0 rounded-full transition-colors disabled:opacity-40",
-                              reimb ? "bg-primary" : "bg-muted",
-                            )}
+                          {/* Price tier — one choice per student */}
+                          <div
+                            role="radiogroup"
+                            aria-label={`การเบิกของ ${c.studentName}`}
+                            className="flex shrink-0 gap-0.5 rounded-md bg-muted p-0.5"
                           >
-                            <span
-                              className={cn(
-                                "absolute top-[3px] size-[18px] rounded-full bg-white shadow-sm transition-all",
-                                reimb ? "left-[33px]" : "left-[3px]",
-                              )}
-                            />
-                            {reimb && (
-                              <span className="absolute left-[7px] top-1/2 -translate-y-1/2 text-[10px] font-semibold text-white">
-                                เบิก
-                              </span>
-                            )}
-                          </button>
+                            {PRICE_TIERS.map((option) => (
+                              <button
+                                key={option}
+                                type="button"
+                                role="radio"
+                                aria-checked={tier === option}
+                                onClick={() => setStudentTier(c.studentId, option)}
+                                disabled={mode === "selected" && !selected}
+                                className={cn(
+                                  "rounded px-1.5 py-0.5 text-[11px] transition-colors disabled:opacity-40",
+                                  tier === option
+                                    ? "bg-primary text-primary-foreground"
+                                    : "text-muted-foreground hover:bg-background",
+                                )}
+                              >
+                                {priceTierLabel(option)}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       );
                     })
@@ -572,10 +597,16 @@ export function InvoiceGenerateDialog({
                 ใบ
               </span>
               <span className="text-muted-foreground">{selectedFeeItemIds.size} รายการ/ใบ</span>
-              {reimbursableCount > 0 ? (
+              {tierCounts.reimbursable > 0 ? (
                 <span className="text-sky-700">
                   เบิกได้{" "}
-                  <span className="font-semibold tabular-nums">{reimbursableCount}</span> คน
+                  <span className="font-semibold tabular-nums">{tierCounts.reimbursable}</span> คน
+                </span>
+              ) : null}
+              {tierCounts.private > 0 ? (
+                <span className="text-violet-700">
+                  เอกชน{" "}
+                  <span className="font-semibold tabular-nums">{tierCounts.private}</span> คน
                 </span>
               ) : null}
             </div>
@@ -620,10 +651,22 @@ export function InvoiceGenerateDialog({
               รายการค่าใช้จ่าย{" "}
               <span className="font-medium text-foreground">{selectedFeeItemIds.size}</span> รายการ/ใบ
             </li>
-            {reimbursableCount > 0 && (
+            {tierCounts.reimbursable > 0 && (
               <li>
                 เบิกได้{" "}
-                <span className="font-medium text-sky-700 tabular-nums">{reimbursableCount}</span> คน
+                <span className="font-medium text-sky-700 tabular-nums">
+                  {tierCounts.reimbursable}
+                </span>{" "}
+                คน
+              </li>
+            )}
+            {tierCounts.private > 0 && (
+              <li>
+                เอกชน{" "}
+                <span className="font-medium text-violet-700 tabular-nums">
+                  {tierCounts.private}
+                </span>{" "}
+                คน
               </li>
             )}
           </ul>

@@ -9,6 +9,13 @@ import { useSemesterContext } from "@/hooks/use-semester-context";
 import { fetchOutstandingReport } from "@/lib/queries/reports";
 import { fetchGradeLevels, fetchClassroomsBySemester } from "@/lib/queries/classrooms";
 import { fetchInvoiceTypes } from "@/lib/queries/invoice-types";
+import {
+  PRICE_TIERS,
+  parsePriceTier,
+  priceTierBadgeClass,
+  priceTierLabel,
+  type PriceTier,
+} from "@/lib/finance/price-tier";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -41,8 +48,7 @@ const STATUS_ITEMS = [
 
 const REIMBURSABLE_ITEMS = [
   { value: "all", label: "ทุกประเภท" },
-  { value: "reimbursable", label: "เบิกได้" },
-  { value: "standard", label: "เบิกไม่ได้" },
+  ...PRICE_TIERS.map((tier) => ({ value: tier, label: priceTierLabel(tier) })),
 ];
 
 function formatDiscount(discountType: "fixed" | "percent" | null, discountValue: number | null): string | null {
@@ -79,10 +85,7 @@ export function OutstandingReportPanel() {
       : ("all" as const);
 
   const variantParam = searchParams.get("variant") ?? "all";
-  const variantValue: "all" | "standard" | "reimbursable" =
-    variantParam === "reimbursable" || variantParam === "standard"
-      ? variantParam
-      : "all";
+  const variantValue: PriceTier | "all" = parsePriceTier(variantParam) ?? "all";
 
   const invoiceTypeParam = searchParams.get("invoiceType") ?? "all";
 
@@ -331,8 +334,10 @@ export function OutstandingReportPanel() {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="truncate font-medium">{row.studentName}</p>
-                        {row.isReimbursable ? (
-                          <Badge className="bg-sky-50 text-sky-700 hover:bg-sky-50">เบิกได้</Badge>
+                        {row.priceTier !== "standard" ? (
+                          <Badge className={priceTierBadgeClass(row.priceTier)}>
+                            {priceTierLabel(row.priceTier)}
+                          </Badge>
                         ) : null}
                       </div>
                       <p className="mt-0.5 text-sm text-muted-foreground">
@@ -466,8 +471,10 @@ export function OutstandingReportPanel() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <span>{row.studentName}</span>
-                          {row.isReimbursable ? (
-                            <Badge className="bg-sky-50 text-sky-700 hover:bg-sky-50">เบิกได้</Badge>
+                          {row.priceTier !== "standard" ? (
+                            <Badge className={priceTierBadgeClass(row.priceTier)}>
+                              {priceTierLabel(row.priceTier)}
+                            </Badge>
                           ) : null}
                         </div>
                       </TableCell>

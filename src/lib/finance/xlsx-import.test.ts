@@ -237,14 +237,14 @@ describe("validateGroup", () => {
 
   const tuitionInvoice: InvoiceCandidate = {
     id: "inv-tuition",
-    isReimbursable: false,
+    priceTier: "standard" as const,
     totalAmount: 2900,
     status: "unpaid",
     feeItemNames: ["ค่าธรรมเนียมการศึกษา", "ค่าอาหารกลางวัน"],
   };
   const insuranceInvoice: InvoiceCandidate = {
     id: "inv-insurance",
-    isReimbursable: false,
+    priceTier: "standard" as const,
     totalAmount: 200,
     status: "unpaid",
     feeItemNames: ["ค่าประกันอุบัติเหตุ"],
@@ -289,9 +289,9 @@ describe("validateGroup", () => {
     expect(result).toEqual({ ok: false, reason: "ใบแจ้งหนี้นี้มีการชำระแล้ว" });
   });
 
-  it("rejects when เบิกได้/เบิกไม่ได้ doesn't match the invoice's is_reimbursable", () => {
+  it("rejects when เบิกได้/เบิกไม่ได้ doesn't match the invoice's price tier", () => {
     const result = validateGroup(tuitionGroup, [
-      { ...tuitionInvoice, isReimbursable: true },
+      { ...tuitionInvoice, priceTier: "reimbursable" as const },
       insuranceInvoice,
     ]);
     expect(result).toEqual({
@@ -317,14 +317,14 @@ describe("validateGroup", () => {
     const group = buildImportGroups(makeRow({ lunchAmount: null }))[0];
     const tuitionOnlyInvoice: InvoiceCandidate = {
       id: "inv-tuition-only",
-      isReimbursable: false,
+      priceTier: "standard" as const,
       totalAmount: 2900,
       status: "unpaid",
       feeItemNames: ["ค่าเทอม"],
     };
     const standaloneLunchInvoice: InvoiceCandidate = {
       id: "inv-lunch-standalone",
-      isReimbursable: false,
+      priceTier: "standard" as const,
       totalAmount: 1200,
       status: "unpaid",
       feeItemNames: ["ค่าอาหารกลางวัน"],

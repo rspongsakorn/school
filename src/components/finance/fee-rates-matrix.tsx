@@ -36,7 +36,11 @@ export function FeeRatesMatrix({
 }: FeeRatesMatrixProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  type DraftCell = { amount: string; amountReimbursable: string };
+  type DraftCell = {
+    amount: string;
+    amountReimbursable: string;
+    amountPrivate: string;
+  };
 
   const [draft, setDraft] = useState<Record<string, DraftCell>>(() => {
     const initial: Record<string, DraftCell> = {};
@@ -48,6 +52,8 @@ export function FeeRatesMatrix({
           amount: cell?.amount != null ? String(cell.amount) : "",
           amountReimbursable:
             cell?.amountReimbursable != null ? String(cell.amountReimbursable) : "",
+          amountPrivate:
+            cell?.amountPrivate != null ? String(cell.amountPrivate) : "",
         };
       }
     }
@@ -85,11 +91,17 @@ export function FeeRatesMatrix({
         if (!Number.isFinite(amount)) continue;
 
         let amountReimbursable: number | null = null;
+        let amountPrivate: number | null = null;
         if (item.hasReimbursableVariant) {
           const rawReim = cell?.amountReimbursable.trim() ?? "";
           if (rawReim) {
             const parsed = Number.parseFloat(rawReim);
             if (Number.isFinite(parsed)) amountReimbursable = parsed;
+          }
+          const rawPrivate = cell?.amountPrivate.trim() ?? "";
+          if (rawPrivate) {
+            const parsed = Number.parseFloat(rawPrivate);
+            if (Number.isFinite(parsed)) amountPrivate = parsed;
           }
         }
 
@@ -97,7 +109,8 @@ export function FeeRatesMatrix({
         if (
           previous &&
           previous.amount === amount &&
-          previous.amountReimbursable === amountReimbursable
+          previous.amountReimbursable === amountReimbursable &&
+          previous.amountPrivate === amountPrivate
         ) {
           continue;
         }
@@ -107,6 +120,7 @@ export function FeeRatesMatrix({
           feeItemId: item.id,
           amount,
           amountReimbursable,
+          amountPrivate,
         });
       }
     }
@@ -115,7 +129,7 @@ export function FeeRatesMatrix({
 
   function updateCell(
     key: string,
-    field: "amount" | "amountReimbursable",
+    field: "amount" | "amountReimbursable" | "amountPrivate",
     value: string,
   ) {
     setDraft((prev) => ({
@@ -176,7 +190,7 @@ export function FeeRatesMatrix({
                       <div className="flex items-center justify-end gap-1">
                         <span>{item.name}</span>
                         {item.hasReimbursableVariant ? (
-                          <span className="rounded bg-sky-50 px-1 text-[10px] text-sky-700">2 ราคา</span>
+                          <span className="rounded bg-sky-50 px-1 text-[10px] text-sky-700">3 ราคา</span>
                         ) : null}
                       </div>
                     </TableHead>
@@ -227,6 +241,19 @@ export function FeeRatesMatrix({
                                   className="tabular-nums"
                                   value={draft[key]?.amountReimbursable ?? ""}
                                   onChange={(e) => updateCell(key, "amountReimbursable", e.target.value)}
+                                  placeholder="(ว่าง = ใช้ราคาปกติ)"
+                                  disabled={rowLocked}
+                                />
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="w-12 text-left text-[10px] text-violet-700">เอกชน</span>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  className="tabular-nums"
+                                  value={draft[key]?.amountPrivate ?? ""}
+                                  onChange={(e) => updateCell(key, "amountPrivate", e.target.value)}
                                   placeholder="(ว่าง = ใช้ราคาปกติ)"
                                   disabled={rowLocked}
                                 />

@@ -40,7 +40,7 @@ export type Database = {
         gender: "male" | "female" | null;
         date_of_birth: string | null;
         status: "active" | "graduated" | "transferred" | "withdrawn";
-        is_reimbursable: boolean;
+        price_tier: "standard" | "reimbursable" | "private";
       }>;
       grade_levels: TableDef<{
         id: string;
@@ -98,6 +98,7 @@ export type Database = {
         amount: number;
         invoice_type_id: string | null;
         amount_reimbursable: number | null;
+        amount_private: number | null;
       }>;
       student_invoices: TableDef<{
         id: string;
@@ -111,7 +112,7 @@ export type Database = {
         paid_amount: number;
         status: "unpaid" | "partial" | "paid";
         created_at: string;
-        is_reimbursable: boolean;
+        price_tier: "standard" | "reimbursable" | "private";
         invoice_type_id: string;
       }>;
       invoice_lines: TableDef<{
@@ -120,7 +121,7 @@ export type Database = {
         fee_item_id: string;
         description: string;
         amount: number;
-        variant: "standard" | "reimbursable";
+        variant: "standard" | "reimbursable" | "private";
       }>;
       payments: TableDef<{
         id: string;

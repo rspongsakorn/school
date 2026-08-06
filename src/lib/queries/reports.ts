@@ -1,3 +1,4 @@
+import { parsePriceTier, type PriceTier } from "@/lib/finance/price-tier";
 import { createClient } from "@/lib/supabase/client";
 import { formatClassroom, formatStudentName, formatThaiTime, formatThaiDate } from "@/lib/format";
 import { bangkokDateKey } from "@/lib/reports/date";
@@ -15,7 +16,7 @@ export type OutstandingReportRow = {
   paidAmount: number;
   outstanding: number;
   status: "unpaid" | "partial" | "paid";
-  isReimbursable: boolean;
+  priceTier: PriceTier;
   invoiceTypeName: string;
   issuedAt: string;
   lastPaidAt: string | null;
@@ -71,7 +72,7 @@ export async function fetchOutstandingReport(params: {
   gradeLevelId?: string;
   classroomId?: string;
   status?: "unpaid" | "partial" | "paid" | "all";
-  variant?: "standard" | "reimbursable" | "all";
+  variant?: PriceTier | "all";
   invoiceTypeId?: string;
   teacherProfileId?: string;
   includeAllStatuses?: boolean;
@@ -134,7 +135,7 @@ export async function fetchOutstandingReport(params: {
       total_amount,
       paid_amount,
       status,
-      is_reimbursable,
+      price_tier,
       created_at,
       discount_type,
       discount_value,
@@ -152,10 +153,9 @@ export async function fetchOutstandingReport(params: {
     query = query.in("status", ["unpaid", "partial"]);
   }
 
-  if (params.variant === "reimbursable") {
-    query = query.eq("is_reimbursable", true);
-  } else if (params.variant === "standard") {
-    query = query.eq("is_reimbursable", false);
+  const variantTier = parsePriceTier(params.variant);
+  if (variantTier) {
+    query = query.eq("price_tier", variantTier);
   }
 
   if (params.invoiceTypeId) {
@@ -175,7 +175,7 @@ export async function fetchOutstandingReport(params: {
     total_amount: number;
     paid_amount: number;
     status: "unpaid" | "partial" | "paid";
-    is_reimbursable: boolean;
+    price_tier: string;
     created_at: string;
     discount_type: "fixed" | "percent" | null;
     discount_value: number | null;
@@ -201,7 +201,7 @@ export async function fetchOutstandingReport(params: {
       totalAmount,
       paidAmount,
       outstanding: Math.max(0, round2(totalAmount - paidAmount)),
-      isReimbursable: row.is_reimbursable,
+      priceTier: parsePriceTier(row.price_tier) ?? "standard",
       status: row.status,
       invoiceTypeName: row.invoice_types?.name ?? "—",
       issuedAt: row.created_at,

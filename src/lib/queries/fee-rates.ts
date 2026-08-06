@@ -76,17 +76,18 @@ export async function fetchFeeRateMatrix(
       .order("name", { ascending: true }),
     supabase
       .from("fee_rates")
-      .select("id, grade_level_id, fee_item_id, amount, amount_reimbursable")
+      .select("id, grade_level_id, fee_item_id, amount, amount_reimbursable, amount_private")
       .eq("semester_id", semesterId),
   ]);
 
-  const rates: Record<string, { id: string; amount: number; amountReimbursable: number | null }> = {};
+  const rates: FeeRateMatrix["rates"] = {};
   for (const row of rateData ?? []) {
     rates[feeRateKey(row.grade_level_id, row.fee_item_id)] = {
       id: row.id,
       amount: Number(row.amount),
       amountReimbursable:
         row.amount_reimbursable != null ? Number(row.amount_reimbursable) : null,
+      amountPrivate: row.amount_private != null ? Number(row.amount_private) : null,
     };
   }
 

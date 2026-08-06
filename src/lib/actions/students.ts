@@ -20,6 +20,7 @@ import {
 import { CSV_IMPORT_MAX_ROWS } from "@/lib/students/csv-format";
 import { STUDENT_GENDER_LABELS } from "@/lib/students/constants";
 import { formatThaiBirthDate } from "@/lib/students/dates";
+import { priceTierLabel } from "@/lib/finance/price-tier";
 import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -166,7 +167,7 @@ export async function previewStudentCsvImport(
       classroomLabel: row.classroom
         ? `${row.classroom.gradeName}/${row.classroom.classroomNumber}`
         : null,
-      reimbursableLabel: row.isReimbursable ? "เบิกได้" : "เบิกไม่ได้",
+      reimbursableLabel: priceTierLabel(row.priceTier),
     }));
 
     return {
@@ -373,7 +374,7 @@ export async function confirmStudentCsvImport(
       date_of_birth: row.dateOfBirth,
       id_card: row.idCard,
       status: "active" as const,
-      is_reimbursable: row.isReimbursable,
+      price_tier: row.priceTier,
     }));
 
     const studentCodeToId = new Map<string, string>();
@@ -455,7 +456,7 @@ export async function createStudent(input: StudentFormInput): Promise<ActionStat
     gender: input.gender || null,
     date_of_birth: input.dateOfBirth.trim() || null,
     status: input.status,
-    is_reimbursable: input.isReimbursable,
+    price_tier: input.priceTier,
   });
 
   if (error?.code === "23505") {
@@ -499,7 +500,7 @@ export async function updateStudent(id: string, input: StudentFormInput): Promis
       gender: input.gender || null,
       date_of_birth: input.dateOfBirth.trim() || null,
       status: input.status,
-      is_reimbursable: input.isReimbursable,
+      price_tier: input.priceTier,
     })
     .eq("id", id);
 

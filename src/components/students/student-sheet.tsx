@@ -43,6 +43,7 @@ import {
   type StudentStatus,
 } from "@/lib/students/constants";
 import { formatThaiBirthDate } from "@/lib/students/dates";
+import { PRICE_TIERS, priceTierLabel, type PriceTier } from "@/lib/finance/price-tier";
 import {
   createStudent,
   deleteStudent,
@@ -68,7 +69,7 @@ type StudentSheetProps = {
     gender: StudentGender | null;
     dateOfBirth: string | null;
     status: StudentStatus;
-    isReimbursable: boolean;
+    priceTier: PriceTier;
     deletable?: boolean;
   };
 };
@@ -87,7 +88,7 @@ const initialForm: StudentFormState = {
   gender: "",
   dateOfBirth: "",
   status: "active",
-  isReimbursable: false,
+  priceTier: "standard",
 };
 
 function buildInitialForm(
@@ -103,7 +104,7 @@ function buildInitialForm(
       gender: initial.gender ?? "",
       dateOfBirth: initial.dateOfBirth ?? "",
       status: initial.status,
-      isReimbursable: initial.isReimbursable,
+      priceTier: initial.priceTier,
     };
   }
   return initialForm;
@@ -357,36 +358,37 @@ function StudentSheetBody({
           </Select>
         </div>
         <div className="grid gap-2">
-          <Label htmlFor="student-reimbursable">การเบิก</Label>
+          <Label htmlFor="student-price-tier">การเบิก</Label>
           {readOnly ? (
-            <p id="student-reimbursable" className="text-sm">
-              {form.isReimbursable ? "เบิกได้" : "เบิกไม่ได้"}
+            <p id="student-price-tier" className="text-sm">
+              {priceTierLabel(form.priceTier)}
             </p>
           ) : (
-            <button
-              id="student-reimbursable"
-              type="button"
-              role="switch"
-              aria-checked={form.isReimbursable}
-              onClick={() => updateField("isReimbursable", !form.isReimbursable)}
-              disabled={submitting}
-              className="flex items-center justify-between rounded-md border px-3 py-2 text-sm disabled:opacity-50"
+            <div
+              id="student-price-tier"
+              role="radiogroup"
+              aria-label="การเบิก"
+              className="grid grid-cols-3 gap-1 rounded-md border p-1"
             >
-              <span>{form.isReimbursable ? "เบิกได้" : "เบิกไม่ได้"}</span>
-              <span
-                className={cn(
-                  "relative h-6 w-[54px] shrink-0 rounded-full transition-colors",
-                  form.isReimbursable ? "bg-primary" : "bg-muted",
-                )}
-              >
-                <span
+              {PRICE_TIERS.map((tier) => (
+                <button
+                  key={tier}
+                  type="button"
+                  role="radio"
+                  aria-checked={form.priceTier === tier}
+                  onClick={() => updateField("priceTier", tier)}
+                  disabled={submitting}
                   className={cn(
-                    "absolute top-[3px] size-[18px] rounded-full bg-white shadow-sm transition-all",
-                    form.isReimbursable ? "left-[33px]" : "left-[3px]",
+                    "rounded px-2 py-1.5 text-sm transition-colors disabled:opacity-50",
+                    form.priceTier === tier
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted",
                   )}
-                />
-              </span>
-            </button>
+                >
+                  {priceTierLabel(tier)}
+                </button>
+              ))}
+            </div>
           )}
         </div>
       </div>

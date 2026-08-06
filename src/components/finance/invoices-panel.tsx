@@ -40,7 +40,14 @@ import {
 } from "@/components/ui/table";
 import { AppHeader } from "@/components/app-header";
 import { InvoicePaymentDialog } from "@/components/finance/invoice-payment-dialog";
-import { InvoiceReimbursableDialog } from "@/components/finance/invoice-reimbursable-dialog";
+import { InvoicePriceTierDialog } from "@/components/finance/invoice-price-tier-dialog";
+import {
+  PRICE_TIERS,
+  parsePriceTier,
+  priceTierBadgeClass,
+  priceTierLabel,
+  type PriceTier,
+} from "@/lib/finance/price-tier";
 import { InvoiceGenerateDialog } from "@/components/finance/invoice-generate-dialog";
 import { StudentSearchInput } from "@/components/students/student-search-input";
 import { useRequireRole } from "@/components/providers/auth-provider";
@@ -68,10 +75,9 @@ const STATUS_FILTER_ITEMS = [
   { value: "paid", label: "ชำระแล้ว" },
 ];
 
-const REIMBURSABLE_FILTER_ITEMS = [
+const PRICE_TIER_FILTER_ITEMS = [
   { value: "all", label: "ทุกประเภท" },
-  { value: "reimbursable", label: "เบิกได้" },
-  { value: "standard", label: "เบิกไม่ได้" },
+  ...PRICE_TIERS.map((tier) => ({ value: tier, label: priceTierLabel(tier) })),
 ];
 
 function statusBadgeClass(status: InvoiceListRow["status"]) {
@@ -110,10 +116,7 @@ export function InvoicesPanel() {
   const [deleting, setDeleting] = useState(false);
   const [isNavigating, startTransition] = useTransition();
 
-  const reimbursable: "reimbursable" | "standard" | "all" =
-    reimbursableParam === "reimbursable" || reimbursableParam === "standard"
-      ? reimbursableParam
-      : "all";
+  const priceTier: PriceTier | "all" = parsePriceTier(reimbursableParam) ?? "all";
 
   const { data: page, isLoading: invoicesLoading } = useQuery({
     queryKey: [
@@ -135,7 +138,7 @@ export function InvoicesPanel() {
         status,
         gradeLevelId: gradeParam !== "all" ? gradeParam : undefined,
         classroomId: classroomParam !== "all" ? classroomParam : undefined,
-        reimbursable,
+        priceTier,
         page: pageParam,
       }),
     enabled: Boolean(ctx?.semesterId),
@@ -355,13 +358,13 @@ export function InvoicesPanel() {
                     <Select
                       value={reimbursableParam}
                       onValueChange={(v) => pushParams({ reimbursable: v ?? "all", page: 1 })}
-                      items={REIMBURSABLE_FILTER_ITEMS}
+                      items={PRICE_TIER_FILTER_ITEMS}
                     >
                       <SelectTrigger className="w-[140px]">
                         <SelectValue placeholder="ประเภท" />
                       </SelectTrigger>
                       <SelectContent>
-                        {REIMBURSABLE_FILTER_ITEMS.map((item) => (
+                        {PRICE_TIER_FILTER_ITEMS.map((item) => (
                           <SelectItem key={item.value} value={item.value}>
                             {item.label}
                           </SelectItem>
@@ -435,8 +438,10 @@ export function InvoicesPanel() {
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
                                 <p className="truncate font-medium">{row.studentName}</p>
-                                {row.isReimbursable ? (
-                                  <Badge className="bg-sky-50 text-sky-700 hover:bg-sky-50">เบิกได้</Badge>
+                                {row.priceTier !== "standard" ? (
+                                  <Badge className={priceTierBadgeClass(row.priceTier)}>
+                                    {priceTierLabel(row.priceTier)}
+                                  </Badge>
                                 ) : null}
                               </div>
                               <p className="mt-0.5 text-sm text-muted-foreground">
@@ -488,7 +493,7 @@ export function InvoicesPanel() {
                                 variant="outline"
                                 onClick={() => setReimbursableTarget(row)}
                               >
-                                {row.isReimbursable ? "เปลี่ยนเป็นเบิกไม่ได้" : "เปลี่ยนเป็นเบิกได้"}
+                                เปลี่ยนประเภทราคา
                               </Button>
                             ) : null}
                             {deletable ? (
@@ -567,8 +572,10 @@ export function InvoicesPanel() {
                               <TableCell>
                                 <div className="flex items-center gap-2">
                                   <span>{row.studentName}</span>
-                                  {row.isReimbursable ? (
-                                    <Badge className="bg-sky-50 text-sky-700 hover:bg-sky-50">เบิกได้</Badge>
+                                  {row.priceTier !== "standard" ? (
+                                    <Badge className={priceTierBadgeClass(row.priceTier)}>
+                                      {priceTierLabel(row.priceTier)}
+                                    </Badge>
                                   ) : null}
                                 </div>
                               </TableCell>
@@ -610,10 +617,14 @@ export function InvoicesPanel() {
                                       type="button"
                                       size="sm"
                                       variant="outline"
-                                      className={row.isReimbursable ? "text-sky-600 border-sky-200" : ""}
+                                      className={
+                                        row.priceTier !== "standard"
+                                          ? "text-sky-600 border-sky-200"
+                                          : ""
+                                      }
                                       onClick={() => setReimbursableTarget(row)}
                                     >
-                                      {row.isReimbursable ? "เบิกได้ ✓" : "เบิกได้"}
+                                      {priceTierLabel(row.priceTier)}
                                     </Button>
                                   ) : null}
                                   {deletable ? (
@@ -693,7 +704,7 @@ export function InvoicesPanel() {
                   }}
                 />
 
-                <InvoiceReimbursableDialog
+                <InvoicePriceTierDialog
                   open={Boolean(reimbursableTarget)}
                   onOpenChange={(open) => !open && setReimbursableTarget(null)}
                   invoice={reimbursableTarget}

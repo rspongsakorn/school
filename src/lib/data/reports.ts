@@ -1,3 +1,4 @@
+import { parsePriceTier, type PriceTier } from "@/lib/finance/price-tier";
 import { formatStudentName } from "@/lib/format";
 import { getStudentGradeMap } from "@/lib/data/enrollments";
 import { createClient } from "@/lib/supabase/server";
@@ -12,7 +13,7 @@ export type OutstandingReportRow = {
   paidAmount: number;
   outstanding: number;
   status: "unpaid" | "partial" | "paid";
-  isReimbursable: boolean;
+  priceTier: PriceTier;
 };
 
 export type CollectionsReportRow = {
@@ -29,7 +30,7 @@ export async function listOutstandingReport(params: {
   gradeLevelId?: string;
   classroomId?: string;
   status?: "unpaid" | "partial" | "paid" | "all";
-  variant?: "standard" | "reimbursable" | "all";
+  variant?: PriceTier | "all";
   teacherProfileId?: string;
 }): Promise<OutstandingReportRow[]> {
   const supabase = await createClient();
@@ -89,7 +90,7 @@ export async function listOutstandingReport(params: {
       total_amount,
       paid_amount,
       status,
-      is_reimbursable,
+      price_tier,
       students!inner ( student_code, first_name, last_name )
     `,
     )
@@ -103,10 +104,9 @@ export async function listOutstandingReport(params: {
     query = query.in("status", ["unpaid", "partial"]);
   }
 
-  if (params.variant === "reimbursable") {
-    query = query.eq("is_reimbursable", true);
-  } else if (params.variant === "standard") {
-    query = query.eq("is_reimbursable", false);
+  const variantTier = parsePriceTier(params.variant);
+  if (variantTier) {
+    query = query.eq("price_tier", variantTier);
   }
 
   if (allowedStudentIds) {
@@ -121,7 +121,7 @@ export async function listOutstandingReport(params: {
     total_amount: number;
     paid_amount: number;
     status: "unpaid" | "partial" | "paid";
-    is_reimbursable: boolean;
+    price_tier: string;
     students: { student_code: string; first_name: string; last_name: string };
   };
 
@@ -138,7 +138,7 @@ export async function listOutstandingReport(params: {
       totalAmount,
       paidAmount,
       outstanding: Math.max(0, round2(totalAmount - paidAmount)),
-      isReimbursable: row.is_reimbursable,
+      priceTier: parsePriceTier(row.price_tier) ?? "standard",
       status: row.status,
     };
   });

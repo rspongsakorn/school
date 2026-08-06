@@ -5,6 +5,7 @@ import type { ActionState } from "@/lib/actions/academic-years";
 import { requireAdminAction } from "@/lib/auth/require-admin";
 import { computeInvoiceTotal } from "@/lib/finance/amounts";
 import { pickFeeAmount } from "@/lib/finance/pick-fee-amount";
+import { parsePriceTier, type PriceTier } from "@/lib/finance/price-tier";
 import { canDeleteInvoice } from "@/lib/finance/invoice-delete-eligibility";
 import { getInvoiceDeleteContext, listStudentInvoiceTypeMap } from "@/lib/data/invoices";
 import { createClient } from "@/lib/supabase/server";
@@ -19,7 +20,8 @@ type GenerateInput = {
   invoiceTypeId: string;
   feeItemIds: string[];
   studentIds?: string[];
-  reimbursableStudentIds?: string[];
+  /** Per-student price tier for this batch. Students not listed use `standard`. */
+  priceTierByStudentId?: Record<string, PriceTier>;
 };
 
 type EnrollmentForInvoice = {
@@ -123,7 +125,7 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
   const { data: rateRows } = await supabase
     .from("fee_rates")
     .select(
-      "grade_level_id, fee_item_id, amount, amount_reimbursable, fee_items(name, has_reimbursable_variant)",
+      "grade_level_id, fee_item_id, amount, amount_reimbursable, amount_private, fee_items(name, has_reimbursable_variant)",
     )
     .eq("semester_id", input.semesterId)
     .in("fee_item_id", input.feeItemIds);
@@ -133,6 +135,7 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
     fee_item_id: string;
     amount: number;
     amount_reimbursable: number | null;
+    amount_private: number | null;
     fee_items: { name: string; has_reimbursable_variant: boolean } | null;
   };
 
@@ -141,6 +144,7 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
   type RateMapEntry = {
     amount: number;
     amountReimbursable: number | null;
+    amountPrivate: number | null;
     name: string;
     hasReimbursableVariant: boolean;
   };
@@ -151,12 +155,13 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
       amount: Number(rate.amount),
       amountReimbursable:
         rate.amount_reimbursable != null ? Number(rate.amount_reimbursable) : null,
+      amountPrivate: rate.amount_private != null ? Number(rate.amount_private) : null,
       name: rate.fee_items?.name ?? "",
       hasReimbursableVariant: rate.fee_items?.has_reimbursable_variant ?? false,
     });
   }
 
-  const reimbursableSet = new Set(input.reimbursableStudentIds ?? []);
+  const tierByStudent = input.priceTierByStudentId ?? {};
 
   let created = 0;
   let skipped = 0;
@@ -172,14 +177,14 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
     total_amount: number;
     paid_amount: number;
     status: string;
-    is_reimbursable: boolean;
+    price_tier: PriceTier;
   };
   type LineRow = {
     invoice_id: string;
     fee_item_id: string;
     description: string;
     amount: number;
-    variant: "standard" | "reimbursable";
+    variant: PriceTier;
   };
 
   const invoiceRows: InvoiceRow[] = [];
@@ -193,17 +198,18 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
       continue;
     }
 
-    const isReimbursable = reimbursableSet.has(enrollment.studentId);
+    const tier = parsePriceTier(tierByStudent[enrollment.studentId]) ?? "standard";
     const lines: LineRow[] = [];
 
     for (const feeItemId of input.feeItemIds) {
       const rate = rateMap.get(`${enrollment.gradeLevelId}:${feeItemId}`);
       if (!rate) continue;
       const picked = pickFeeAmount({
-        isReimbursable,
+        tier,
         hasReimbursableVariant: rate.hasReimbursableVariant,
         amount: rate.amount,
         amountReimbursable: rate.amountReimbursable,
+        amountPrivate: rate.amountPrivate,
       });
       lines.push({
         invoice_id: "", // filled below
@@ -233,7 +239,7 @@ export async function generateInvoices(input: GenerateInput): Promise<GenerateIn
       total_amount: totalAmount,
       paid_amount: 0,
       status: "unpaid",
-      is_reimbursable: isReimbursable,
+      price_tier: tier,
     });
 
     for (const line of lines) {
@@ -339,9 +345,9 @@ export async function deleteInvoices(invoiceIds: string[]): Promise<DeleteInvoic
   return { ok: true, deleted: deletableIds.length, skipped };
 }
 
-export async function updateInvoiceReimbursable(
+export async function updateInvoicePriceTier(
   invoiceId: string,
-  isReimbursable: boolean,
+  tier: PriceTier,
 ): Promise<ActionState> {
   const auth = await requireAdminAction();
   if (!auth.ok) return auth;
@@ -393,7 +399,7 @@ export async function updateInvoiceReimbursable(
   const { data: rateRows } = await supabase
     .from("fee_rates")
     .select(
-      "fee_item_id, amount, amount_reimbursable, fee_items(has_reimbursable_variant)",
+      "fee_item_id, amount, amount_reimbursable, amount_private, fee_items(has_reimbursable_variant)",
     )
     .eq("semester_id", invoice.semester_id)
     .eq("grade_level_id", gradeLevelId)
@@ -403,6 +409,7 @@ export async function updateInvoiceReimbursable(
     fee_item_id: string;
     amount: number;
     amount_reimbursable: number | null;
+    amount_private: number | null;
     fee_items: { has_reimbursable_variant: boolean } | null;
   };
 
@@ -419,11 +426,12 @@ export async function updateInvoiceReimbursable(
       return { ok: false, error: "ไม่พบอัตราค่าธรรมเนียมของบางรายการ" };
     }
     const picked = pickFeeAmount({
-      isReimbursable,
+      tier,
       hasReimbursableVariant: rate.fee_items?.has_reimbursable_variant ?? false,
       amount: Number(rate.amount),
       amountReimbursable:
         rate.amount_reimbursable != null ? Number(rate.amount_reimbursable) : null,
+      amountPrivate: rate.amount_private != null ? Number(rate.amount_private) : null,
     });
     subtotal += picked.amount;
 
@@ -449,7 +457,7 @@ export async function updateInvoiceReimbursable(
   const { error: invoiceError } = await supabase
     .from("student_invoices")
     .update({
-      is_reimbursable: isReimbursable,
+      price_tier: tier,
       subtotal,
       total_amount: totalAmount,
       status: "unpaid",

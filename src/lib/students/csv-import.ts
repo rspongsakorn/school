@@ -5,6 +5,11 @@ import {
 } from "@/lib/students/dates";
 import { CSV_REQUIRED_HEADERS } from "@/lib/students/csv-format";
 import type { StudentGender } from "@/lib/students/constants";
+import {
+  parsePriceTierLabel,
+  priceTierLabel,
+  type PriceTier,
+} from "@/lib/finance/price-tier";
 
 export type CsvStudentRow = Record<string, string>;
 
@@ -28,7 +33,7 @@ export type ImportStudentRow = {
   dateOfBirth: string;
   idCard: string | null;
   classroom: { gradeName: string; classroomNumber: string } | null;
-  isReimbursable: boolean;
+  priceTier: PriceTier;
 };
 
 export type ImportRowError = {
@@ -121,12 +126,12 @@ export function mapGenderLabel(label: string): StudentGender | null {
   return null;
 }
 
-export function mapReimbursableLabel(label: string): boolean | null {
-  const value = label.trim();
-  if (!value) return false;
-  if (value === "เบิกได้") return true;
-  if (value === "เบิกไม่ได้") return false;
-  return null;
+/**
+ * Reads the `reimbursable` CSV column. The legacy wording (เบิกได้ / เบิกไม่ได้)
+ * keeps working so files produced before the third tier still import.
+ */
+export function mapPriceTierLabel(label: string): PriceTier | null {
+  return parsePriceTierLabel(label);
 }
 
 export function parseThaiBirthdateShort(text: string): string | null {
@@ -218,9 +223,9 @@ export function validateAndBuildImportRows(
           classroomNumber: classroomParsed.classroomNumber,
         };
 
-    const isReimbursable = mapReimbursableLabel(row.reimbursable ?? "");
-    if (isReimbursable === null) {
-      pushError("สถานะเบิกไม่ถูกต้อง (ต้องเป็น เบิกได้ หรือ เบิกไม่ได้)");
+    const priceTier = mapPriceTierLabel(row.reimbursable ?? "");
+    if (priceTier === null) {
+      pushError("สถานะเบิกไม่ถูกต้อง (ต้องเป็น เบิกไม่ได้ เบิกได้ หรือ เอกชน)");
       continue;
     }
 
@@ -233,7 +238,7 @@ export function validateAndBuildImportRows(
       dateOfBirth,
       idCard: row.id_card?.trim() || null,
       classroom,
-      isReimbursable,
+      priceTier,
     });
   }
 
@@ -252,7 +257,7 @@ export function importRowToCsvInput(row: ImportStudentRow, rowNumber: number): C
     classroom: row.classroom
       ? `${row.classroom.gradeName}/${row.classroom.classroomNumber}`
       : "",
-    reimbursable: row.isReimbursable ? "เบิกได้" : "เบิกไม่ได้",
+    reimbursable: priceTierLabel(row.priceTier),
   };
 }
 

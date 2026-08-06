@@ -1,48 +1,54 @@
 import { describe, expect, it } from "vitest";
 import { pickFeeAmount } from "./pick-fee-amount";
 
+const tiered = {
+  hasReimbursableVariant: true,
+  amount: 5000,
+  amountReimbursable: 7000,
+  amountPrivate: 6000,
+};
+
 describe("pickFeeAmount", () => {
-  it("returns standard amount when invoice is not reimbursable", () => {
-    expect(
-      pickFeeAmount({
-        isReimbursable: false,
-        hasReimbursableVariant: true,
-        amount: 5000,
-        amountReimbursable: 7000,
-      }),
-    ).toEqual({ amount: 5000, variant: "standard" });
+  it("returns the standard amount for the standard tier", () => {
+    expect(pickFeeAmount({ ...tiered, tier: "standard" })).toEqual({
+      amount: 5000,
+      variant: "standard",
+    });
   });
 
-  it("returns reimbursable amount when invoice + item + price all set", () => {
-    expect(
-      pickFeeAmount({
-        isReimbursable: true,
-        hasReimbursableVariant: true,
-        amount: 5000,
-        amountReimbursable: 7000,
-      }),
-    ).toEqual({ amount: 7000, variant: "reimbursable" });
+  it("returns the reimbursable amount for the reimbursable tier", () => {
+    expect(pickFeeAmount({ ...tiered, tier: "reimbursable" })).toEqual({
+      amount: 7000,
+      variant: "reimbursable",
+    });
+  });
+
+  it("returns the private amount for the private tier", () => {
+    expect(pickFeeAmount({ ...tiered, tier: "private" })).toEqual({
+      amount: 6000,
+      variant: "private",
+    });
   });
 
   it("falls back to standard when amountReimbursable is null", () => {
     expect(
-      pickFeeAmount({
-        isReimbursable: true,
-        hasReimbursableVariant: true,
-        amount: 5000,
-        amountReimbursable: null,
-      }),
+      pickFeeAmount({ ...tiered, tier: "reimbursable", amountReimbursable: null }),
     ).toEqual({ amount: 5000, variant: "standard" });
   });
 
-  it("returns standard when item does not have reimbursable variant", () => {
+  it("falls back to standard — not reimbursable — when amountPrivate is null", () => {
+    expect(pickFeeAmount({ ...tiered, tier: "private", amountPrivate: null })).toEqual({
+      amount: 5000,
+      variant: "standard",
+    });
+  });
+
+  it("returns standard when the item has no tiered pricing", () => {
     expect(
-      pickFeeAmount({
-        isReimbursable: true,
-        hasReimbursableVariant: false,
-        amount: 5000,
-        amountReimbursable: 7000,
-      }),
+      pickFeeAmount({ ...tiered, tier: "private", hasReimbursableVariant: false }),
+    ).toEqual({ amount: 5000, variant: "standard" });
+    expect(
+      pickFeeAmount({ ...tiered, tier: "reimbursable", hasReimbursableVariant: false }),
     ).toEqual({ amount: 5000, variant: "standard" });
   });
 });

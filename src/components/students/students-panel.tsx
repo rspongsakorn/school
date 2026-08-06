@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { priceTierBadgeClass, priceTierLabel } from "@/lib/finance/price-tier";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   AlertDialog,
@@ -241,7 +242,7 @@ export function StudentsPanel() {
       gender: selectedStudent.gender,
       dateOfBirth: selectedStudent.dateOfBirth,
       status: selectedStudent.statusRaw,
-      isReimbursable: selectedStudent.isReimbursable,
+      priceTier: selectedStudent.priceTier,
       deletable: selectedStudent.deletable,
     };
   }, [selectedStudent]);
@@ -346,9 +347,9 @@ export function StudentsPanel() {
                           <Badge className={statusBadgeClass(student.statusRaw)}>
                             {student.status}
                           </Badge>
-                          {student.isReimbursable && (
-                            <Badge className="bg-sky-50 text-sky-700 hover:bg-sky-50">
-                              เบิกได้
+                          {student.priceTier !== "standard" && (
+                            <Badge className={priceTierBadgeClass(student.priceTier)}>
+                              {priceTierLabel(student.priceTier)}
                             </Badge>
                           )}
                         </div>
@@ -421,9 +422,11 @@ export function StudentsPanel() {
                                   <Badge className={statusBadgeClass(student.statusRaw)}>
                                     {student.status}
                                   </Badge>
-                                  {student.isReimbursable && (
-                                    <Badge className="ml-1 bg-sky-50 text-sky-700 hover:bg-sky-50">
-                                      เบิกได้
+                                  {student.priceTier !== "standard" && (
+                                    <Badge
+                                      className={`ml-1 ${priceTierBadgeClass(student.priceTier)}`}
+                                    >
+                                      {priceTierLabel(student.priceTier)}
                                     </Badge>
                                   )}
                                 </TableCell>

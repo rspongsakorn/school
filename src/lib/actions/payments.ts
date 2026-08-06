@@ -8,6 +8,7 @@ import {
   deriveInvoiceStatus,
 } from "@/lib/finance/amounts";
 import { getStudentOutstandingInvoices } from "@/lib/data/invoices";
+import { parsePriceTier } from "@/lib/finance/price-tier";
 import { getDefaultInvoiceTypeId } from "@/lib/data/invoice-types";
 import { resolveSingleInvoicePayment } from "@/lib/finance/single-invoice-allocation";
 import { resolvePaymentDiscounts } from "@/lib/finance/payment-discount";
@@ -277,7 +278,7 @@ export async function getXlsxImportPreviewAction(
     student_id: string;
     total_amount: number;
     status: "unpaid" | "partial" | "paid";
-    is_reimbursable: boolean;
+    price_tier: string;
     invoice_lines: { fee_items: { name: string } | null }[] | null;
   };
 
@@ -286,7 +287,7 @@ export async function getXlsxImportPreviewAction(
     const { data: invoices } = await supabase
       .from("student_invoices")
       .select(
-        "id, student_id, total_amount, status, is_reimbursable, invoice_lines(fee_items(name))",
+        "id, student_id, total_amount, status, price_tier, invoice_lines(fee_items(name))",
       )
       .in("student_id", studentIds)
       .eq("semester_id", semesterId) as unknown as { data: InvoiceRow[] | null };
@@ -294,7 +295,7 @@ export async function getXlsxImportPreviewAction(
     for (const inv of invoices ?? []) {
       const candidate: InvoiceCandidate = {
         id: inv.id,
-        isReimbursable: inv.is_reimbursable,
+        priceTier: parsePriceTier(inv.price_tier) ?? "standard",
         totalAmount: Number(inv.total_amount),
         status: inv.status,
         feeItemNames: (inv.invoice_lines ?? [])

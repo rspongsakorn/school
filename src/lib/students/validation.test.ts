@@ -9,7 +9,7 @@ const base = {
   status: "active" as const,
   gender: "" as const,
   dateOfBirth: "",
-  isReimbursable: false,
+  priceTier: "standard" as const,
 };
 
 describe("validateStudentForm", () => {
@@ -32,7 +32,7 @@ describe("validateStudentForm", () => {
         status: "active",
         gender: "",
         dateOfBirth: "",
-        isReimbursable: false,
+        priceTier: "standard" as const,
       },
       { mode: "create" },
     );

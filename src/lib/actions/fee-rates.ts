@@ -13,6 +13,7 @@ export type FeeRateUpsertEntry = {
   feeItemId: string;
   amount: number;
   amountReimbursable: number | null;
+  amountPrivate: number | null;
 };
 
 function revalidateFeePaths() {
@@ -58,6 +59,9 @@ export async function upsertFeeRates(
     if (entry.amountReimbursable != null && entry.amountReimbursable < 0) {
       return { ok: false, error: "ราคาเบิกได้ต้องไม่ติดลบ" };
     }
+    if (entry.amountPrivate != null && entry.amountPrivate < 0) {
+      return { ok: false, error: "ราคาเอกชนต้องไม่ติดลบ" };
+    }
 
     const { error } = await supabase.from("fee_rates").upsert(
       {
@@ -67,6 +71,7 @@ export async function upsertFeeRates(
         fee_item_id: entry.feeItemId,
         amount: entry.amount,
         amount_reimbursable: entry.amountReimbursable,
+        amount_private: entry.amountPrivate,
         invoice_type_id: defaultInvoiceTypeId,
       },
       { onConflict: "academic_year_id,semester_id,grade_level_id,fee_item_id" },
