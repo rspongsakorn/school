@@ -395,7 +395,7 @@ export function FeeItemsSection({ items, invoiceTypeId, lockedItemIds }: FeeItem
                   onChange={(e) => setHasReimbursableVariant(e.target.checked)}
                   disabled={editLocked}
                 />
-                มีราคาเบิกได้แยก
+                มีราคาแยกตามสถานะเบิก (3 ราคา)
               </Label>
               {mode === "edit" ? (
                 <Label className="flex w-fit cursor-pointer items-center gap-3">

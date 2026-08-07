@@ -28,7 +28,7 @@ import { Label } from "@/components/ui/label";
 import { generateInvoices } from "@/lib/actions/invoices";
 import type { InvoiceCandidateRow } from "@/lib/data/invoices";
 import type { FeeItemRow } from "@/lib/data/fee-items";
-import { defaultPriceTiers } from "@/lib/finance/price-tier-selection";
+import { effectivePriceTiers } from "@/lib/finance/price-tier-selection";
 import { PRICE_TIERS, priceTierLabel, type PriceTier } from "@/lib/finance/price-tier";
 import { cn } from "@/lib/utils";
 
@@ -80,8 +80,10 @@ export function InvoiceGenerateDialog({
     () => new Set(activeItems.map((i) => i.id)),
   );
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
-  const [tierByStudentId, setTierByStudentId] = useState<Map<string, PriceTier>>(
-    () => defaultPriceTiers(candidates),
+  // Only what the operator changed for this batch; the rest resolves from the
+  // student's own tier, so a slow candidate fetch can't silently reset anyone.
+  const [tierOverrides, setTierOverrides] = useState<Map<string, PriceTier>>(
+    () => new Map(),
   );
   const [classroomFilter, setClassroomFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
@@ -95,7 +97,7 @@ export function InvoiceGenerateDialog({
     setInvoiceTypeId("");
     setSelectedFeeItemIds(new Set(activeItems.map((i) => i.id)));
     setSelectedStudentIds(new Set());
-    setTierByStudentId(defaultPriceTiers(candidates));
+    setTierOverrides(new Map());
     setClassroomFilter("all");
     setSearch("");
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -151,12 +153,17 @@ export function InvoiceGenerateDialog({
     });
   }
 
+  const effectiveTiers = useMemo(
+    () => effectivePriceTiers(selectableCandidates, tierOverrides),
+    [selectableCandidates, tierOverrides],
+  );
+
   function setStudentTier(id: string, tier: PriceTier) {
-    setTierByStudentId((prev) => new Map(prev).set(id, tier));
+    setTierOverrides((prev) => new Map(prev).set(id, tier));
   }
 
   function tierOf(id: string): PriceTier {
-    return tierByStudentId.get(id) ?? "standard";
+    return effectiveTiers.get(id) ?? "standard";
   }
 
   const allFeeSelected =
@@ -184,7 +191,7 @@ export function InvoiceGenerateDialog({
       mode === "selected"
         ? [...selectedStudentIds]
         : selectableCandidates.map((c) => c.studentId);
-    setTierByStudentId((prev) => {
+    setTierOverrides((prev) => {
       const next = new Map(prev);
       for (const id of pool) next.set(id, tier);
       return next;
@@ -204,9 +211,9 @@ export function InvoiceGenerateDialog({
       reimbursable: 0,
       private: 0,
     };
-    for (const id of ids) counts[tierByStudentId.get(id) ?? "standard"] += 1;
+    for (const id of ids) counts[effectiveTiers.get(id) ?? "standard"] += 1;
     return counts;
-  }, [mode, selectableCandidates, selectedStudentIds, tierByStudentId]);
+  }, [mode, selectableCandidates, selectedStudentIds, effectiveTiers]);
 
   // For action-row label when a room chip is active
   const roomCount = classroomFilter === "all" ? null : filtered.length;
@@ -243,7 +250,7 @@ export function InvoiceGenerateDialog({
       invoiceTypeId,
       feeItemIds,
       studentIds,
-      priceTierByStudentId: Object.fromEntries(tierByStudentId),
+      priceTierByStudentId: Object.fromEntries(effectiveTiers),
     });
     setSubmitting(false);
 
@@ -511,7 +518,7 @@ export function InvoiceGenerateDialog({
                     />
                   ) : null}
                   <span className="flex-1">นักเรียน</span>
-                  <span>เบิกได้</span>
+                  <span>การเบิก</span>
                 </div>
 
                 <div className="max-h-64 divide-y divide-border/60 overflow-y-auto">
