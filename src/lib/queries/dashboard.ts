@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { fetchAllPages } from "@/lib/supabase/paginate";
 import { formatStudentName, formatThaiDate } from "@/lib/format";
 import type {
   DashboardData,
@@ -41,30 +42,23 @@ type InvoiceStatusRow = {
 
 // Supabase caps a single select at 1000 rows regardless of table size, so a
 // semester with more invoices than that needs to be paged through in full.
-async function fetchAllInvoiceStatusRows(
+// Sorted by id so the OFFSET/LIMIT pages stay stable across requests — see
+// fetchAllPages for why an unordered range() can duplicate or skip rows.
+function fetchAllInvoiceStatusRows(
   supabase: ReturnType<typeof createClient>,
   academicYearId: string,
   semesterId: string,
 ): Promise<InvoiceStatusRow[]> {
-  const rows: InvoiceStatusRow[] = [];
-  const pageSize = 1000;
-  let from = 0;
-
-  while (true) {
-    const { data, error } = await supabase
-      .from("student_invoices")
-      .select("student_id, total_amount, paid_amount, status")
-      .eq("academic_year_id", academicYearId)
-      .eq("semester_id", semesterId)
-      .range(from, from + pageSize - 1);
-
-    if (error || !data || data.length === 0) break;
-    rows.push(...data);
-    if (data.length < pageSize) break;
-    from += pageSize;
-  }
-
-  return rows;
+  return fetchAllPages<InvoiceStatusRow>(
+    async (from, to) =>
+      await supabase
+        .from("student_invoices")
+        .select("student_id, total_amount, paid_amount, status")
+        .eq("academic_year_id", academicYearId)
+        .eq("semester_id", semesterId)
+        .order("id", { ascending: true })
+        .range(from, to),
+  );
 }
 
 async function getStudentGradeMap(semesterId: string): Promise<Map<string, string>> {

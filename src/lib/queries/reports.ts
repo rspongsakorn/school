@@ -1,5 +1,6 @@
 import { parsePriceTier, type PriceTier } from "@/lib/finance/price-tier";
 import { createClient } from "@/lib/supabase/client";
+import { fetchAllPages } from "@/lib/supabase/paginate";
 import { formatClassroom, formatStudentName, formatThaiTime, formatThaiDate } from "@/lib/format";
 import { bangkokDateKey } from "@/lib/reports/date";
 import { groupDailyRevenue, type DailyRevenueRow } from "@/lib/reports/daily";
@@ -125,49 +126,6 @@ export async function fetchOutstandingReport(params: {
     if (allowedStudentIds.length === 0) return [];
   }
 
-  let query = supabase
-    .from("student_invoices")
-    .select(
-      `
-      id,
-      student_id,
-      subtotal,
-      total_amount,
-      paid_amount,
-      status,
-      price_tier,
-      created_at,
-      discount_type,
-      discount_value,
-      invoice_types ( name ),
-      students!inner ( student_code, first_name, last_name )
-    `,
-    )
-    .eq("academic_year_id", params.academicYearId)
-    .eq("semester_id", params.semesterId)
-    .order("student_code", { ascending: true, foreignTable: "students" });
-
-  if (params.status && params.status !== "all") {
-    query = query.eq("status", params.status);
-  } else if (!params.includeAllStatuses) {
-    query = query.in("status", ["unpaid", "partial"]);
-  }
-
-  const variantTier = parsePriceTier(params.variant);
-  if (variantTier) {
-    query = query.eq("price_tier", variantTier);
-  }
-
-  if (params.invoiceTypeId) {
-    query = query.eq("invoice_type_id", params.invoiceTypeId);
-  }
-
-  if (allowedStudentIds) {
-    query = query.in("student_id", allowedStudentIds);
-  }
-
-  const { data } = await query;
-
   type Row = {
     id: string;
     student_id: string;
@@ -183,7 +141,58 @@ export async function fetchOutstandingReport(params: {
     students: { student_code: string; first_name: string; last_name: string };
   };
 
-  const rows = (data ?? []) as unknown as Row[];
+  const variantTier = parsePriceTier(params.variant);
+
+  // A semester can carry more invoices than PostgREST's 1000-row response cap
+  // (a normal school already does), so this has to page through the whole
+  // result rather than take a single select() at face value. Sorted by the
+  // invoice's own id — unique and stable — rather than the joined student's
+  // code, which repeats across a student's several invoice lines and can't
+  // keep OFFSET/LIMIT pages from overlapping; the caller re-sorts by student
+  // code for display anyway, so fetch order here doesn't need to match it.
+  const rows = await fetchAllPages<Row>(async (from, to) => {
+    let query = supabase
+      .from("student_invoices")
+      .select(
+        `
+        id,
+        student_id,
+        subtotal,
+        total_amount,
+        paid_amount,
+        status,
+        price_tier,
+        created_at,
+        discount_type,
+        discount_value,
+        invoice_types ( name ),
+        students!inner ( student_code, first_name, last_name )
+      `,
+      )
+      .eq("academic_year_id", params.academicYearId)
+      .eq("semester_id", params.semesterId)
+      .order("id", { ascending: true });
+
+    if (params.status && params.status !== "all") {
+      query = query.eq("status", params.status);
+    } else if (!params.includeAllStatuses) {
+      query = query.in("status", ["unpaid", "partial"]);
+    }
+
+    if (variantTier) {
+      query = query.eq("price_tier", variantTier);
+    }
+
+    if (params.invoiceTypeId) {
+      query = query.eq("invoice_type_id", params.invoiceTypeId);
+    }
+
+    if (allowedStudentIds) {
+      query = query.in("student_id", allowedStudentIds);
+    }
+
+    return (await query.range(from, to)) as unknown as { data: Row[] | null; error: unknown };
+  });
   const invoiceIds = rows.map((row) => row.id);
   const lastPaidByInvoice = await fetchLastPaidAtByInvoiceIds(supabase, invoiceIds);
 
