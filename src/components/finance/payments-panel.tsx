@@ -99,7 +99,10 @@ export function PaymentsPanel() {
   const [selectedInvoice, setSelectedInvoice] = useState<OutstandingInvoiceRow | null>(null);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<"cash" | "transfer">("cash");
-  const [transferRef, setTransferRef] = useState("");
+  // Free-text remark printed on the receipt (stored in the reused
+  // payments.transfer_reference column).
+  const [remark, setRemark] = useState("");
+  // Internal note — stored only, never printed.
   const [note, setNote] = useState("");
   // invoiceLineId -> { value: string; unit: "fixed" | "percent" } — applies to the selected invoice's lines
   const [lineDiscounts, setLineDiscounts] = useState<
@@ -322,7 +325,7 @@ export function PaymentsPanel() {
       semesterId: ctx.semesterId,
       amount: parsedAmount,
       paymentMethod: method,
-      transferReference: method === "transfer" ? transferRef : undefined,
+      remark,
       note,
       discounts: discounts.length > 0 ? discounts : undefined,
     });
@@ -342,7 +345,7 @@ export function PaymentsPanel() {
     setSelectedInvoice(null);
     setAmount("");
     setNote("");
-    setTransferRef("");
+    setRemark("");
     setLineDiscounts({});
     invalidateFinanceQueries(queryClient);
     router.refresh();
@@ -778,20 +781,24 @@ export function PaymentsPanel() {
                       </p>
                     </div>
 
-                    {method === "transfer" ? (
-                      <div className="grid gap-2">
-                        <Label htmlFor="transfer-ref">เลขอ้างอิงโอน</Label>
-                        <Input
-                          id="transfer-ref"
-                          value={transferRef}
-                          onChange={(e) => setTransferRef(e.target.value)}
-                        />
-                      </div>
-                    ) : null}
+                    <div className="grid gap-2">
+                      <Label htmlFor="pay-remark">หมายเหตุ</Label>
+                      <Input
+                        id="pay-remark"
+                        value={remark}
+                        onChange={(e) => setRemark(e.target.value)}
+                        placeholder="แสดงในใบเสร็จ (ไม่บังคับ)"
+                      />
+                    </div>
 
                     <div className="grid gap-2">
-                      <Label htmlFor="pay-note">หมายเหตุ</Label>
-                      <Input id="pay-note" value={note} onChange={(e) => setNote(e.target.value)} />
+                      <Label htmlFor="pay-note">หมายเหตุภายใน</Label>
+                      <Input
+                        id="pay-note"
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        placeholder="ไม่แสดงในใบเสร็จ (ไม่บังคับ)"
+                      />
                     </div>
 
                     <Button
@@ -1014,10 +1021,10 @@ export function PaymentsPanel() {
                   <span className="text-muted-foreground">วิธีชำระ</span>
                   <span>{PAYMENT_METHOD_LABELS[method]}</span>
                 </div>
-                {method === "transfer" && transferRef ? (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">เลขอ้างอิงโอน</span>
-                    <span className="tabular-nums">{transferRef}</span>
+                {remark.trim() ? (
+                  <div className="flex justify-between gap-3">
+                    <span className="shrink-0 text-muted-foreground">หมายเหตุ</span>
+                    <span className="break-words">{remark.trim()}</span>
                   </div>
                 ) : null}
               </div>

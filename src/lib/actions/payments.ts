@@ -31,7 +31,11 @@ type RecordPaymentInput = {
   semesterId: string;
   amount: number;
   paymentMethod: "cash" | "transfer";
-  transferReference?: string;
+  // Free-text remark printed on the receipt. Persisted in the reused
+  // payments.transfer_reference column (no migration needed — it only ever
+  // held a free-text bank reference).
+  remark?: string;
+  // Internal note — stored only, never printed.
   note?: string;
   discounts?: {
     invoiceLineId: string;
@@ -132,7 +136,7 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
     studentName: formatStudentName(student.first_name, student.last_name),
     gradeClassroom,
     paymentMethod: input.paymentMethod,
-    transferReference: input.transferReference?.trim() || null,
+    transferReference: input.remark?.trim() || null,
     amount: paidTotal,
     allocations: [{ invoiceId: invoice.id, invoiceName, amount: paidTotal }],
     recordedBy: auth.profile.display_name ?? "เจ้าหน้าที่",
@@ -150,7 +154,7 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
     p_net_total: netTotal,
     p_new_paid: newPaid,
     p_payment_method: input.paymentMethod,
-    p_transfer_reference: input.transferReference?.trim() || null,
+    p_transfer_reference: input.remark?.trim() || null,
     p_note: input.note?.trim() || null,
     p_recorded_by: auth.profile.id,
     p_invoice_type_id: invoiceTypeId,

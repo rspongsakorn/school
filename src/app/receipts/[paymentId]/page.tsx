@@ -263,7 +263,13 @@ function ReceiptCopy({ data, label }: { data: ReceiptPrintData; label: string })
           paddingTop: "6px",
         }}
       >
-        หมายเหตุ: ใบเสร็จฉบับนี้จะสมบูรณ์เมื่อผู้รับเงินลงลายมือชื่อ
+        {data.remark ? (
+          <div style={{ marginBottom: "4px", fontSize: "11px", color: "#111" }}>
+            <span style={{ color: "#6b7280" }}>หมายเหตุ: </span>
+            {data.remark}
+          </div>
+        ) : null}
+        * ใบเสร็จฉบับนี้จะสมบูรณ์เมื่อผู้รับเงินลงลายมือชื่อ
       </div>
 
       {/* ── Signature ── */}

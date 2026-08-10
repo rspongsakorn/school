@@ -5,7 +5,9 @@ export type ReceiptPrintData = {
   receiptNumber: string;
   paidAt: string;
   paymentMethod: "cash" | "transfer";
-  transferReference: string | null;
+  // Free-text remark printed on the receipt, stored in the reused
+  // payments.transfer_reference column.
+  remark: string | null;
   amount: number;
   academicYearName: string;
   semesterNumber: number;
@@ -99,7 +101,7 @@ export async function getReceiptPrintData(
     receiptNumber: payment.receipt_number,
     paidAt: payment.paid_at,
     paymentMethod: payment.payment_method,
-    transferReference: payment.transfer_reference,
+    remark: payment.transfer_reference?.trim() || null,
     amount: Number(payment.amount),
     academicYearName: payment.academic_years?.name ?? "—",
     semesterNumber,

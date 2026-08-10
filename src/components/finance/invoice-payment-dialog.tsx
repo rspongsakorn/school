@@ -66,6 +66,9 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
 
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<"cash" | "transfer">("cash");
+  // Free-text remark printed on the receipt.
+  const [remark, setRemark] = useState("");
+  // Internal note — stored only, never printed.
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -103,6 +106,7 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
   useEffect(() => {
     if (!open || !invoice) return;
     setMethod("cash");
+    setRemark("");
     setNote("");
     setAmount(invoice.outstanding > 0 ? String(invoice.outstanding) : "");
     setLineDiscounts({});
@@ -164,6 +168,7 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
       semesterId: ctx.semesterId,
       amount: Number.parseFloat(effectiveAmount),
       paymentMethod: method,
+      remark: remark.trim() || undefined,
       note: note.trim() || undefined,
       discounts: discounts.length > 0 ? discounts : undefined,
     });
@@ -333,12 +338,22 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="pay-note">หมายเหตุ</Label>
+                  <Label htmlFor="pay-remark">หมายเหตุ</Label>
+                  <Input
+                    id="pay-remark"
+                    value={remark}
+                    onChange={(e) => setRemark(e.target.value)}
+                    placeholder="แสดงในใบเสร็จ (ไม่บังคับ)"
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="pay-note">หมายเหตุภายใน</Label>
                   <Input
                     id="pay-note"
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
-                    placeholder="หมายเหตุ (ไม่บังคับ)"
+                    placeholder="ไม่แสดงในใบเสร็จ (ไม่บังคับ)"
                   />
                 </div>
 
@@ -366,6 +381,12 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
               ({method === "cash" ? "เงินสด" : "โอน"})
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {remark.trim() ? (
+            <div className="flex justify-between gap-3 rounded-lg border border-border bg-muted/30 p-3 text-sm">
+              <span className="shrink-0 text-muted-foreground">หมายเหตุ</span>
+              <span className="break-words">{remark.trim()}</span>
+            </div>
+          ) : null}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={submitting}>ยกเลิก</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirm} disabled={submitting}>
