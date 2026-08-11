@@ -33,6 +33,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatBaht, formatThaiDate } from "@/lib/format";
+import { aggregateOutstandingByStudent } from "@/lib/reports/per-student";
 import { INVOICE_STATUS_LABELS } from "@/lib/finance/constants";
 import { ReportToolbar } from "@/components/finance/report-toolbar";
 import { ReportLetterhead } from "@/components/finance/report-letterhead";
@@ -65,6 +66,7 @@ const STATUS_BADGE_CLASSES: Record<"unpaid" | "partial" | "paid", string> = {
 const VIEW_ITEMS = [
   { value: "list", label: "ตามรายชื่อ" },
   { value: "byRoom", label: "จัดกลุ่มตามห้อง" },
+  { value: "perStudent", label: "รวมรายคน" },
 ];
 
 export function OutstandingReportPanel() {
@@ -89,8 +91,9 @@ export function OutstandingReportPanel() {
 
   const invoiceTypeParam = searchParams.get("invoiceType") ?? "all";
 
-  const viewParam: "list" | "byRoom" =
-    searchParams.get("view") === "byRoom" ? "byRoom" : "list";
+  const rawView = searchParams.get("view");
+  const viewParam: "list" | "byRoom" | "perStudent" =
+    rawView === "byRoom" || rawView === "perStudent" ? rawView : "list";
 
   const teacherProfileId = profile?.role === "teacher" ? profile.id : undefined;
 
@@ -206,6 +209,18 @@ export function OutstandingReportPanel() {
     }
     return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0], "th"));
   })();
+
+  const perStudentRows = aggregateOutstandingByStudent(rows);
+  const perStudentTotals = perStudentRows.reduce(
+    (acc, r) => ({
+      subtotal: acc.subtotal + r.subtotal,
+      totalAmount: acc.totalAmount + r.totalAmount,
+      paidAmount: acc.paidAmount + r.paidAmount,
+      outstanding: acc.outstanding + r.outstanding,
+      discountAmount: acc.discountAmount + r.discountAmount,
+    }),
+    { subtotal: 0, totalAmount: 0, paidAmount: 0, outstanding: 0, discountAmount: 0 },
+  );
 
   return (
     <>
@@ -326,6 +341,44 @@ export function OutstandingReportPanel() {
             <p className="sm:hidden py-6 text-center text-sm text-muted-foreground">
               ไม่พบรายการค้างชำระ
             </p>
+          ) : viewParam === "perStudent" ? (
+            <div className="sm:hidden space-y-2">
+              {perStudentRows.map((row) => (
+                <div key={row.studentId} className="rounded-lg border border-border px-4 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate font-medium">{row.studentName}</p>
+                        {row.priceTier !== "standard" ? (
+                          <Badge className={priceTierBadgeClass(row.priceTier)}>
+                            {priceTierLabel(row.priceTier)}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <p className="mt-0.5 text-sm text-muted-foreground">
+                        {row.studentCode} · {row.gradeClassroom} · {row.invoiceCount} ใบแจ้ง
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span className="font-semibold tabular-nums text-amber-700">
+                        ค้าง {formatBaht(row.outstanding)}
+                      </span>
+                      <Badge variant="outline" className={STATUS_BADGE_CLASSES[row.status]}>{INVOICE_STATUS_LABELS[row.status]}</Badge>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex gap-4 text-sm text-muted-foreground">
+                    <span>ต้องชำระ <span className="tabular-nums text-foreground">{formatBaht(row.totalAmount)}</span></span>
+                    <span>ชำระแล้ว <span className="tabular-nums text-foreground">{formatBaht(row.paidAmount)}</span></span>
+                    {row.discountAmount > 0 ? (
+                      <span className="text-red-700">ลด {formatBaht(row.discountAmount)}</span>
+                    ) : null}
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    จ่ายล่าสุด {row.lastPaidAt ? formatThaiDate(row.lastPaidAt) : "—"}
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
             <div className="sm:hidden space-y-2">
               {rows.map((row) => (
@@ -368,7 +421,81 @@ export function OutstandingReportPanel() {
           )}
 
           {/* Desktop table */}
-          {viewParam === "byRoom" ? (
+          {viewParam === "perStudent" ? (
+            rowsLoading ? (
+              <div className="hidden sm:block">
+                <TableSkeleton rows={8} />
+              </div>
+            ) : perStudentRows.length === 0 ? (
+              <p className="hidden sm:block py-6 text-center text-sm text-muted-foreground">
+                ไม่พบรายการค้างชำระ
+              </p>
+            ) : (
+              <div className="hidden sm:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-10">ลำดับ</TableHead>
+                      <TableHead>รหัส</TableHead>
+                      <TableHead>ชื่อ-นามสกุล</TableHead>
+                      <TableHead>ชั้น/ห้อง</TableHead>
+                      <TableHead className="text-right">ใบแจ้ง</TableHead>
+                      <TableHead className="text-right">ค่าใช้จ่าย</TableHead>
+                      <TableHead className="text-right">ส่วนลด</TableHead>
+                      <TableHead className="text-right">ต้องชำระ</TableHead>
+                      <TableHead className="text-right">ชำระแล้ว</TableHead>
+                      <TableHead className="text-right">ค้าง</TableHead>
+                      <TableHead>สถานะ</TableHead>
+                      <TableHead>จ่ายล่าสุด</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {perStudentRows.map((row, index) => (
+                      <TableRow key={row.studentId}>
+                        <TableCell className="tabular-nums text-muted-foreground">{index + 1}</TableCell>
+                        <TableCell className="tabular-nums">{row.studentCode}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span>{row.studentName}</span>
+                            {row.priceTier !== "standard" ? (
+                              <Badge className={priceTierBadgeClass(row.priceTier)}>
+                                {priceTierLabel(row.priceTier)}
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                        <TableCell>{row.gradeClassroom}</TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">{row.invoiceCount}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatBaht(row.subtotal)}</TableCell>
+                        <TableCell className="text-right tabular-nums text-red-700">
+                          {row.discountAmount > 0 ? formatBaht(row.discountAmount) : "—"}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">{formatBaht(row.totalAmount)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatBaht(row.paidAmount)}</TableCell>
+                        <TableCell className="text-right tabular-nums font-medium">{formatBaht(row.outstanding)}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={STATUS_BADGE_CLASSES[row.status]}>{INVOICE_STATUS_LABELS[row.status]}</Badge>
+                        </TableCell>
+                        <TableCell>{row.lastPaidAt ? formatThaiDate(row.lastPaidAt) : "—"}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="border-t-2 font-semibold">
+                      <TableCell colSpan={4}>รวม {perStudentRows.length} คน</TableCell>
+                      <TableCell className="text-right tabular-nums">—</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatBaht(perStudentTotals.subtotal)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-red-700">
+                        {formatBaht(perStudentTotals.discountAmount)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{formatBaht(perStudentTotals.totalAmount)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatBaht(perStudentTotals.paidAmount)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatBaht(perStudentTotals.outstanding)}</TableCell>
+                      <TableCell colSpan={2} />
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            )
+          ) : viewParam === "byRoom" ? (
             rowsLoading ? (
               <div className="hidden sm:block">
                 <TableSkeleton rows={8} />
