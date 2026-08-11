@@ -46,7 +46,7 @@ describe("computeReceiptLineItems", () => {
     expect(result.discounts).toEqual([{ name: "ค่าอาหารกลางวัน", amount: 200 }]);
   });
 
-  it("consolidates a partial payment (no discount) into one line named after the invoice type", () => {
+  it("splits a partial payment (no discount) across the fee lines proportionally", () => {
     const result = computeReceiptLineItems(
       [
         {
@@ -62,7 +62,10 @@ describe("computeReceiptLineItems", () => {
       ],
       [],
     );
-    expect(result.lineItems).toEqual([{ name: "ค่าเทอม", amount: 500 }]);
+    expect(result.lineItems).toEqual([
+      { name: "ค่าเทอม", amount: 375 },
+      { name: "ค่าอาหารกลางวัน", amount: 125 },
+    ]);
     expect(result.subtotal).toBe(500);
   });
 
