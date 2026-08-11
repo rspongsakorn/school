@@ -5,6 +5,12 @@ import { formatClassroom, formatStudentName, formatThaiTime, formatThaiDate } fr
 import { bangkokDateKey } from "@/lib/reports/date";
 import { groupDailyRevenue, type DailyRevenueRow } from "@/lib/reports/daily";
 import { latestPaidAtByInvoice } from "@/lib/reports/last-paid";
+import {
+  buildDebtorRows,
+  summarizeEnrollments,
+  type DebtorRow,
+  type EnrollmentStatus,
+} from "@/lib/reports/debtors";
 
 export type OutstandingReportRow = {
   invoiceId: string;
@@ -218,6 +224,183 @@ export async function fetchOutstandingReport(params: {
       discountType: row.discount_type,
       discountValue: row.discount_value != null ? Number(row.discount_value) : null,
     };
+  });
+}
+
+/**
+ * Runs `query` over batched id chunks, paging each chunk.
+ *
+ * Both limits bite here: a few thousand UUIDs in one `.in()` overflows the
+ * gateway's URL length, and one chunk can still return more rows than
+ * PostgREST's 1000-row cap.
+ */
+async function fetchInBatches<T>(
+  ids: string[],
+  query: (chunk: string[], from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>,
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let i = 0; i < ids.length; i += STUDENT_ID_BATCH_SIZE) {
+    const chunk = ids.slice(i, i + STUDENT_ID_BATCH_SIZE);
+    const page = await fetchAllPages<T>(
+      async (from, to) =>
+        (await query(chunk, from, to)) as unknown as { data: T[] | null; error: unknown },
+    );
+    rows.push(...page);
+  }
+  return rows;
+}
+
+const STUDENT_ID_BATCH_SIZE = 200;
+
+/**
+ * Every student whose most recent room is one of the selected rooms, with the
+ * debt they carry across *all* academic years — the per-room debtor listing.
+ *
+ * Deliberately not scoped to the selected semester the way
+ * fetchOutstandingReport is: a student's unpaid balance follows them from year
+ * to year, and a student who has left still owes it. The semester only decides
+ * which rooms the caller can pick from; rooms are matched by their printed
+ * label (ปวช.2/1) rather than by classroom id, because the same room is a
+ * different row in `classrooms` in every academic year.
+ */
+export async function fetchClassroomDebtors(params: {
+  semesterId: string;
+  gradeLevelId?: string;
+  classroomId?: string;
+  teacherProfileId?: string;
+}): Promise<DebtorRow[]> {
+  const supabase = createClient();
+
+  type ClassroomRow = {
+    id: string;
+    name: string;
+    semester_id: string;
+    grade_level_id: string;
+    grade_levels: { name: string } | null;
+  };
+
+  const allClassrooms = await fetchAllPages<ClassroomRow>(
+    async (from, to) =>
+      (await supabase
+        .from("classrooms")
+        .select("id, name, semester_id, grade_level_id, grade_levels ( name )")
+        .order("id", { ascending: true })
+        .range(from, to)) as unknown as { data: ClassroomRow[] | null; error: unknown },
+  );
+
+  let selectable = allClassrooms.filter((c) => c.semester_id === params.semesterId);
+
+  if (params.teacherProfileId) {
+    const { data: assignments } = await supabase
+      .from("teacher_assignments")
+      .select("classroom_id")
+      .eq("profile_id", params.teacherProfileId)
+      .eq("semester_id", params.semesterId);
+    const assigned = new Set((assignments ?? []).map((a) => a.classroom_id));
+    selectable = selectable.filter((c) => assigned.has(c.id));
+  }
+
+  if (params.classroomId) {
+    selectable = selectable.filter((c) => c.id === params.classroomId);
+  } else if (params.gradeLevelId) {
+    selectable = selectable.filter((c) => c.grade_level_id === params.gradeLevelId);
+  }
+
+  const targetLabels = new Set(
+    selectable.map((c) => formatClassroom(c.grade_levels?.name ?? null, c.name)),
+  );
+  if (targetLabels.size === 0) return [];
+
+  const labelByClassroomId = new Map(
+    allClassrooms.map((c) => [c.id, formatClassroom(c.grade_levels?.name ?? null, c.name)]),
+  );
+  // Same rooms in every year — that history is what lets a student who left in
+  // an earlier year still show up under the room they left from.
+  const historicClassroomIds = allClassrooms
+    .filter((c) => targetLabels.has(labelByClassroomId.get(c.id) ?? ""))
+    .map((c) => c.id);
+  if (historicClassroomIds.length === 0) return [];
+
+  const candidateRows = await fetchInBatches<{ student_id: string }>(
+    historicClassroomIds,
+    (chunk, from, to) =>
+      supabase
+        .from("student_enrollments")
+        .select("student_id")
+        .in("classroom_id", chunk)
+        .order("id", { ascending: true })
+        .range(from, to),
+  );
+
+  const candidateIds = [...new Set(candidateRows.map((r) => r.student_id))];
+  if (candidateIds.length === 0) return [];
+
+  type EnrollmentHistoryRow = {
+    student_id: string;
+    classroom_id: string;
+    status: EnrollmentStatus;
+    semesters: { number: number } | null;
+    academic_years: { name: string; start_date: string } | null;
+  };
+
+  const history = await fetchInBatches<EnrollmentHistoryRow>(candidateIds, (chunk, from, to) =>
+    supabase
+      .from("student_enrollments")
+      .select("student_id, classroom_id, status, semesters ( number ), academic_years ( name, start_date )")
+      .in("student_id", chunk)
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
+
+  const summaries = summarizeEnrollments(
+    history.map((row) => ({
+      studentId: row.student_id,
+      status: row.status,
+      roomLabel: labelByClassroomId.get(row.classroom_id) ?? "—",
+      termLabel: `${row.semesters?.number ?? "—"}/${row.academic_years?.name ?? "—"}`,
+      sortKey: `${row.academic_years?.start_date ?? ""}#${row.semesters?.number ?? 0}`,
+    })),
+  );
+
+  // A student who moved on to another room belongs to that room's report now,
+  // not to this one.
+  const studentIds = candidateIds.filter((id) =>
+    targetLabels.has(summaries.get(id)?.roomLabel ?? ""),
+  );
+  if (studentIds.length === 0) return [];
+
+  type StudentRow = { id: string; student_code: string; first_name: string; last_name: string };
+  const students = await fetchInBatches<StudentRow>(studentIds, (chunk, from, to) =>
+    supabase
+      .from("students")
+      .select("id, student_code, first_name, last_name")
+      .in("id", chunk)
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
+
+  type InvoiceRow = { student_id: string; total_amount: number; paid_amount: number };
+  const invoices = await fetchInBatches<InvoiceRow>(studentIds, (chunk, from, to) =>
+    supabase
+      .from("student_invoices")
+      .select("student_id, total_amount, paid_amount")
+      .in("student_id", chunk)
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
+
+  return buildDebtorRows({
+    students: students.map((s) => ({
+      studentId: s.id,
+      studentCode: s.student_code,
+      studentName: formatStudentName(s.first_name, s.last_name),
+    })),
+    enrollments: summaries,
+    invoices: invoices.map((i) => ({
+      studentId: i.student_id,
+      totalAmount: Number(i.total_amount),
+      paidAmount: Number(i.paid_amount),
+    })),
   });
 }
 

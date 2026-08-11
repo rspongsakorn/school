@@ -40,6 +40,7 @@ const reportsNav = [
   { href: "/reports/daily", label: "รายรับรายวัน", roles: ["admin", "finance"] as Role[] },
   { href: "/reports/discounts", label: "รายงานส่วนลด", roles: ["admin", "finance"] as Role[] },
   { href: "/reports/outstanding", label: "รายงานค้างชำระ", roles: ["admin", "finance", "teacher"] as Role[] },
+  { href: "/reports/debtors", label: "ลูกหนี้รายห้อง", roles: ["admin", "finance", "teacher"] as Role[] },
   { href: "/reports/collections", label: "สถิติการเก็บ", roles: ["admin", "finance", "teacher"] as Role[] },
   { href: "/reports/students", label: "รายบุคคล", roles: ["admin", "finance", "teacher"] as Role[] },
 ];
