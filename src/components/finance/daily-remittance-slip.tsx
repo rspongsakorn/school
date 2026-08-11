@@ -24,10 +24,9 @@ export function DailyRemittanceSlip({ items, dateFrom, dateTo }: DailyRemittance
         <p className="text-sm text-muted-foreground">
           ประจำวัน {formatThaiDate(`${dateFrom}T00:00:00+07:00`)} ถึง {formatThaiDate(`${dateTo}T00:00:00+07:00`)}
         </p>
-        <p className="mt-2 text-xs text-muted-foreground print:hidden">กดพิมพ์เพื่อดูรายละเอียดใบนำส่งเงิน</p>
       </div>
 
-      <div className="hidden print:block">
+      <div className="space-y-4">
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b">
@@ -38,6 +37,13 @@ export function DailyRemittanceSlip({ items, dateFrom, dateTo }: DailyRemittance
             </tr>
           </thead>
           <tbody>
+            {items.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="py-6 text-center text-muted-foreground">
+                  ไม่มีรายการในช่วงที่เลือก
+                </td>
+              </tr>
+            ) : null}
             {items.map((item, index) => (
               <tr key={item.receiptTypeId}>
                 <td className="py-1">{index + 1}</td>
@@ -66,7 +72,7 @@ export function DailyRemittanceSlip({ items, dateFrom, dateTo }: DailyRemittance
 
         <p className="border-y py-2 text-center font-medium">({bahtText(netTotal)})</p>
 
-        <div className="grid grid-cols-2 gap-8 pt-12 text-center text-sm">
+        <div className="grid grid-cols-2 gap-8 pt-8 text-center text-sm print:pt-12">
           <div>
             <p>ลงชื่อ ..................................................</p>
             <p className="mt-1 text-xs text-muted-foreground">ฝ่ายบัญชีและการเงิน</p>
