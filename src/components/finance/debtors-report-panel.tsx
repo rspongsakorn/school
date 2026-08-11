@@ -31,6 +31,11 @@ import { ReportLetterhead } from "@/components/finance/report-letterhead";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 
+const FORM_ITEMS = [
+  { value: "full", label: "ลูกหนี้รายห้อง (เต็ม)" },
+  { value: "unpaid", label: "เฉพาะผู้ค้างชำระ" },
+];
+
 const STATUS_LABELS = {
   enrolled: "กำลังเรียน",
   transferred: "ย้ายออก",
@@ -54,6 +59,7 @@ export function DebtorsReportPanel() {
 
   const gradeParam = searchParams.get("grade") ?? "all";
   const classroomParam = searchParams.get("classroom") ?? "all";
+  const formParam: "full" | "unpaid" = searchParams.get("form") === "unpaid" ? "unpaid" : "full";
   const teacherProfileId = profile?.role === "teacher" ? profile.id : undefined;
 
   const { data: rows = [], isLoading } = useQuery({
@@ -81,19 +87,22 @@ export function DebtorsReportPanel() {
   });
 
   const pushParams = useCallback(
-    (next: { grade?: string; classroom?: string }) => {
+    (next: { grade?: string; classroom?: string; form?: "full" | "unpaid" }) => {
       const query = new URLSearchParams(window.location.search);
       const grade = next.grade ?? gradeParam;
       const classroom = next.classroom ?? classroomParam;
+      const form = next.form ?? formParam;
 
       if (grade !== "all") query.set("grade", grade);
       else query.delete("grade");
       if (classroom !== "all") query.set("classroom", classroom);
       else query.delete("classroom");
+      if (form !== "full") query.set("form", form);
+      else query.delete("form");
 
       router.push(`${pathname}?${query.toString()}`);
     },
-    [gradeParam, classroomParam, pathname, router],
+    [gradeParam, classroomParam, formParam, pathname, router],
   );
 
   const gradeItems = [
@@ -115,13 +124,20 @@ export function DebtorsReportPanel() {
   const roomLabel = rows.length > 0 ? rows[0].roomLabel : null;
   const singleRoom = roomLabel !== null && rows.every((r) => r.roomLabel === roomLabel);
 
+  const unpaidRows = rows.filter((r) => r.outstanding > 0);
+  const unpaidTotal = unpaidRows.reduce((sum, r) => sum + r.outstanding, 0);
+
   return (
     <>
       <AppHeader title="รายชื่อลูกหนี้รายห้อง" basePath="/reports/debtors" />
       <style>{"@media print { @page { size: A4 portrait; margin: 10mm; } }"}</style>
       <main className="p-4 lg:p-6 print:p-0">
         <ReportLetterhead
-          title="รายงานรายชื่อลูกหนี้รายห้อง"
+          title={
+            formParam === "unpaid"
+              ? "รายงานรายชื่อนักเรียนค้างชำระค่าธรรมเนียม"
+              : "รายงานรายชื่อลูกหนี้รายห้อง"
+          }
           yearName={ctx?.academicYearName}
           semesterNumber={ctx?.semesterNumber}
           subtitle={
@@ -163,6 +179,22 @@ export function DebtorsReportPanel() {
                   ))}
                 </SelectContent>
               </Select>
+              <Select
+                value={formParam}
+                onValueChange={(v) => pushParams({ form: (v ?? "full") as "full" | "unpaid" })}
+                items={FORM_ITEMS}
+              >
+                <SelectTrigger className="w-[190px]">
+                  <SelectValue placeholder="รูปแบบรายงาน" />
+                </SelectTrigger>
+                <SelectContent>
+                  {FORM_ITEMS.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <p className="text-xs text-muted-foreground print:hidden">
                 ยอดค้างรวมทุกใบแจ้งหนี้ทุกปีการศึกษาของนักเรียนแต่ละคน
               </p>
@@ -175,6 +207,55 @@ export function DebtorsReportPanel() {
               <TableSkeleton rows={8} />
             ) : rows.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">ไม่พบนักเรียนในห้องที่เลือก</p>
+            ) : formParam === "unpaid" ? (
+              unpaidRows.length === 0 ? (
+                <p className="py-6 text-center text-sm">
+                  {singleRoom ? `${roomLabel} — ` : null}ไม่มีนักเรียนค้างชำระ
+                </p>
+              ) : (
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10">ลำดับที่</TableHead>
+                        <TableHead>รหัสนักเรียน</TableHead>
+                        <TableHead>ชื่อ-สกุล</TableHead>
+                        {singleRoom ? null : <TableHead>ห้อง</TableHead>}
+                        <TableHead className="text-right">ค้างชำระ</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {unpaidRows.map((row, index) => (
+                        <TableRow key={row.studentId}>
+                          <TableCell className="tabular-nums text-muted-foreground">{index + 1}</TableCell>
+                          <TableCell className="tabular-nums">{row.studentCode}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <span>{row.studentName}</span>
+                              {row.status === "enrolled" ? null : (
+                                <Badge variant="outline" className={STATUS_BADGE_CLASSES[row.status]}>
+                                  {STATUS_LABELS[row.status]}
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          {singleRoom ? null : <TableCell>{row.roomLabel}</TableCell>}
+                          <TableCell className="text-right tabular-nums font-medium">
+                            {formatBaht(row.outstanding)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow className="border-t-2 font-semibold">
+                        <TableCell colSpan={singleRoom ? 3 : 4}>
+                          รวมค้างชำระ {unpaidRows.length} คน (จากทั้งหมด {rows.length} คน)
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">{formatBaht(unpaidTotal)}</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                  <p className="hidden pt-4 text-center text-sm print:block">จบการรายงาน</p>
+                </>
+              )
             ) : (
               <Table>
                 <TableHeader>
