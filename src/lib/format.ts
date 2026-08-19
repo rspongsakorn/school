@@ -47,6 +47,21 @@ export function formatClassroom(gradeName: string | null, classroomName: string 
   return "—";
 }
 
+// Thai school levels sort alphabetically in the wrong order (ป. before ตอ./อ.),
+// so a grade name comparison needs this level ranking, not locale order.
+const GRADE_LEVEL_PREFIX_ORDER = ["ตอ.", "อ.", "ป.", "ม.", "ปวช.", "ปวส."];
+
+function gradeLevelRank(name: string): number {
+  const idx = GRADE_LEVEL_PREFIX_ORDER.findIndex((prefix) => name.startsWith(prefix));
+  return idx === -1 ? GRADE_LEVEL_PREFIX_ORDER.length : idx;
+}
+
+/** Compares grade-level names by school level first (อ. < ป. < ม. < ปวช. < ปวส.), then by number. */
+export function compareGradeLevelNames(a: string, b: string): number {
+  const rankDiff = gradeLevelRank(a) - gradeLevelRank(b);
+  return rankDiff !== 0 ? rankDiff : a.localeCompare(b, "th", { numeric: true });
+}
+
 /** แปลงจำนวนเงิน (บาท) เป็นตัวอักษรภาษาไทย เช่น 3100 → "สามพันหนึ่งร้อยบาทถ้วน" */
 export function bahtText(amount: number): string {
   const satang = Math.round((amount % 1) * 100);

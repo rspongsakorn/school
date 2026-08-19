@@ -46,6 +46,15 @@ export function CollectionsReportPanel() {
 
   const [level, setLevel] = useState<"all" | "grade" | "classroom">("grade");
 
+  const sumRows = (list: Array<{ studentCount: number; totalDue: number; totalPaid: number; outstanding: number }>) => {
+    const studentCount = list.reduce((s, r) => s + r.studentCount, 0);
+    const totalDue = list.reduce((s, r) => s + r.totalDue, 0);
+    const totalPaid = list.reduce((s, r) => s + r.totalPaid, 0);
+    const outstanding = list.reduce((s, r) => s + r.outstanding, 0);
+    const ratePercent = totalDue > 0 ? Math.round((totalPaid / totalDue) * 10000) / 100 : 0;
+    return { studentCount, totalDue, totalPaid, outstanding, ratePercent };
+  };
+
   const { data: rows = [], isLoading } = useQuery({
     queryKey: [
       "collections-report",
@@ -135,6 +144,12 @@ export function CollectionsReportPanel() {
               </Card>
               <Card>
                 <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground">ค้างชำระ</p>
+                  <p className="text-2xl font-semibold tabular-nums">{formatBaht(summary?.outstanding ?? 0)}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
                   <p className="text-xs text-muted-foreground">อัตราเก็บได้</p>
                   <p className="text-2xl font-semibold tabular-nums">{summary?.ratePercent ?? 0}%</p>
                 </CardContent>
@@ -150,7 +165,7 @@ export function CollectionsReportPanel() {
                       <span className="font-medium">{row.classroomLabel}</span>
                       <span className="text-sm text-muted-foreground">{row.studentCount} คน</span>
                     </div>
-                    <div className="mt-2 grid grid-cols-3 gap-2 text-sm">
+                    <div className="mt-2 grid grid-cols-4 gap-2 text-sm">
                       <div>
                         <p className="text-xs text-muted-foreground">ต้องเก็บ</p>
                         <p className="tabular-nums">{formatBaht(row.totalDue)}</p>
@@ -158,6 +173,10 @@ export function CollectionsReportPanel() {
                       <div>
                         <p className="text-xs text-muted-foreground">เก็บได้</p>
                         <p className="tabular-nums">{formatBaht(row.totalPaid)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">ค้างชำระ</p>
+                        <p className="tabular-nums">{formatBaht(row.outstanding)}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-xs text-muted-foreground">อัตรา</p>
@@ -177,6 +196,7 @@ export function CollectionsReportPanel() {
                       <TableHead className="text-right">จำนวนนักเรียน</TableHead>
                       <TableHead className="text-right">ยอดที่ต้องเก็บ</TableHead>
                       <TableHead className="text-right">ยอดที่เก็บได้</TableHead>
+                      <TableHead className="text-right">ค้างชำระ</TableHead>
                       <TableHead className="text-right">อัตรา (%)</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -187,9 +207,23 @@ export function CollectionsReportPanel() {
                         <TableCell className="text-right tabular-nums">{row.studentCount}</TableCell>
                         <TableCell className="text-right tabular-nums">{formatBaht(row.totalDue)}</TableCell>
                         <TableCell className="text-right tabular-nums">{formatBaht(row.totalPaid)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatBaht(row.outstanding)}</TableCell>
                         <TableCell className="text-right tabular-nums">{row.ratePercent}%</TableCell>
                       </TableRow>
                     ))}
+                    {(() => {
+                      const t = sumRows(classroomRows);
+                      return (
+                        <TableRow className="border-t-2 font-semibold">
+                          <TableCell>รวม</TableCell>
+                          <TableCell className="text-right tabular-nums">{t.studentCount}</TableCell>
+                          <TableCell className="text-right tabular-nums">{formatBaht(t.totalDue)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{formatBaht(t.totalPaid)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{formatBaht(t.outstanding)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{t.ratePercent}%</TableCell>
+                        </TableRow>
+                      );
+                    })()}
                   </TableBody>
                 </Table>
               </div>
@@ -208,7 +242,7 @@ export function CollectionsReportPanel() {
                       <span className="font-medium">{row.gradeName}</span>
                       <span className="text-sm text-muted-foreground">{row.studentCount} คน</span>
                     </div>
-                    <div className="mt-2 grid grid-cols-3 gap-2 text-sm">
+                    <div className="mt-2 grid grid-cols-4 gap-2 text-sm">
                       <div>
                         <p className="text-xs text-muted-foreground">ต้องเก็บ</p>
                         <p className="tabular-nums">{formatBaht(row.totalDue)}</p>
@@ -216,6 +250,10 @@ export function CollectionsReportPanel() {
                       <div>
                         <p className="text-xs text-muted-foreground">เก็บได้</p>
                         <p className="tabular-nums">{formatBaht(row.totalPaid)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">ค้างชำระ</p>
+                        <p className="tabular-nums">{formatBaht(row.outstanding)}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-xs text-muted-foreground">อัตรา</p>
@@ -235,6 +273,7 @@ export function CollectionsReportPanel() {
                       <TableHead className="text-right">จำนวนนักเรียน</TableHead>
                       <TableHead className="text-right">ยอดที่ต้องเก็บ</TableHead>
                       <TableHead className="text-right">ยอดที่เก็บได้</TableHead>
+                      <TableHead className="text-right">ค้างชำระ</TableHead>
                       <TableHead className="text-right">อัตรา (%)</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -245,9 +284,23 @@ export function CollectionsReportPanel() {
                         <TableCell className="text-right tabular-nums">{row.studentCount}</TableCell>
                         <TableCell className="text-right tabular-nums">{formatBaht(row.totalDue)}</TableCell>
                         <TableCell className="text-right tabular-nums">{formatBaht(row.totalPaid)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatBaht(row.outstanding)}</TableCell>
                         <TableCell className="text-right tabular-nums">{row.ratePercent}%</TableCell>
                       </TableRow>
                     ))}
+                    {(() => {
+                      const t = sumRows(rows);
+                      return (
+                        <TableRow className="border-t-2 font-semibold">
+                          <TableCell>รวม</TableCell>
+                          <TableCell className="text-right tabular-nums">{t.studentCount}</TableCell>
+                          <TableCell className="text-right tabular-nums">{formatBaht(t.totalDue)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{formatBaht(t.totalPaid)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{formatBaht(t.outstanding)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{t.ratePercent}%</TableCell>
+                        </TableRow>
+                      );
+                    })()}
                   </TableBody>
                 </Table>
               </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatThaiDate, formatThaiDateLong, formatThaiTime } from "./format";
+import { formatThaiDate, formatThaiDateLong, formatThaiTime, compareGradeLevelNames } from "./format";
 
 describe("formatThaiDate", () => {
   it("uses Bangkok timezone — 23:00 UTC on May 28 is May 29 in Bangkok", () => {
@@ -52,5 +52,35 @@ describe("formatThaiTime", () => {
 
   it("accepts a Date object", () => {
     expect(formatThaiTime(new Date("2026-05-28T05:00:00Z"))).toBe("12:00");
+  });
+});
+
+describe("compareGradeLevelNames", () => {
+  it("orders by school level, not Thai alphabetical order (ป. sorts before ตอ./อ. alphabetically)", () => {
+    expect(["ป.1", "อ.1"].sort(compareGradeLevelNames)).toEqual(["อ.1", "ป.1"]);
+  });
+
+  it("puts ตอ. (nursery) ahead of อ. (kindergarten)", () => {
+    expect(["อ.1", "ตอ.1"].sort(compareGradeLevelNames)).toEqual(["ตอ.1", "อ.1"]);
+  });
+
+  it("orders every level low to high", () => {
+    const shuffled = ["ปวส.1", "ม.1", "อ.2", "ปวช.1", "ป.6", "ตอ.1"];
+    expect(shuffled.sort(compareGradeLevelNames)).toEqual([
+      "ตอ.1",
+      "อ.2",
+      "ป.6",
+      "ม.1",
+      "ปวช.1",
+      "ปวส.1",
+    ]);
+  });
+
+  it("orders numbers within the same level numerically, not alphabetically", () => {
+    expect(["ป.10", "ป.2"].sort(compareGradeLevelNames)).toEqual(["ป.2", "ป.10"]);
+  });
+
+  it("puts unrecognized prefixes after known levels", () => {
+    expect(["พิเศษ", "ป.1"].sort(compareGradeLevelNames)).toEqual(["ป.1", "พิเศษ"]);
   });
 });

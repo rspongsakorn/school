@@ -1,7 +1,13 @@
 import { parsePriceTier, type PriceTier } from "@/lib/finance/price-tier";
 import { createClient } from "@/lib/supabase/client";
 import { fetchAllPages } from "@/lib/supabase/paginate";
-import { formatClassroom, formatStudentName, formatThaiTime, formatThaiDate } from "@/lib/format";
+import {
+  formatClassroom,
+  formatStudentName,
+  formatThaiTime,
+  formatThaiDate,
+  compareGradeLevelNames,
+} from "@/lib/format";
 import { bangkokDateKey } from "@/lib/reports/date";
 import { groupDailyRevenue, type DailyRevenueRow } from "@/lib/reports/daily";
 import { groupRevenueByUser, type UserRevenueRow } from "@/lib/reports/by-user";
@@ -37,6 +43,7 @@ export type CollectionsReportRow = {
   studentCount: number;
   totalDue: number;
   totalPaid: number;
+  outstanding: number;
   ratePercent: number;
 };
 
@@ -450,13 +457,17 @@ export async function fetchCollectionsByGrade(
 ): Promise<CollectionsReportRow[]> {
   const supabase = createClient();
 
-  const { data: grades } = await supabase
+  const { data: gradesData } = await supabase
     .from("grade_levels")
     .select("id, name, sort_order")
-    .eq("semester_id", semesterId)
-    .order("sort_order", { ascending: true });
+    .eq("semester_id", semesterId);
 
-  if (!grades || grades.length === 0) return [];
+  if (!gradesData || gradesData.length === 0) return [];
+
+  const grades = [...gradesData].sort((a, b) => {
+    const so = a.sort_order - b.sort_order;
+    return so !== 0 ? so : compareGradeLevelNames(a.name, b.name);
+  });
 
   const results: CollectionsReportRow[] = [];
 
@@ -486,6 +497,7 @@ export async function fetchCollectionsByGrade(
         studentCount: 0,
         totalDue: 0,
         totalPaid: 0,
+        outstanding: 0,
         ratePercent: 0,
       });
       continue;
@@ -505,6 +517,7 @@ export async function fetchCollectionsByGrade(
         studentCount: 0,
         totalDue: 0,
         totalPaid: 0,
+        outstanding: 0,
         ratePercent: 0,
       });
       continue;
@@ -526,6 +539,7 @@ export async function fetchCollectionsByGrade(
       studentCount: studentIds.length,
       totalDue: round2(totalDue),
       totalPaid: round2(totalPaid),
+      outstanding: Math.max(0, round2(totalDue - totalPaid)),
       ratePercent,
     });
   }
@@ -620,6 +634,7 @@ export type ClassroomCollectionsRow = {
   studentCount: number;
   totalDue: number;
   totalPaid: number;
+  outstanding: number;
   ratePercent: number;
 };
 
@@ -654,7 +669,10 @@ export async function fetchCollectionsByClassroom(
 
   list.sort((a, b) => {
     const so = (a.grade_levels?.sort_order ?? 0) - (b.grade_levels?.sort_order ?? 0);
-    return so !== 0 ? so : a.name.localeCompare(b.name, "th");
+    if (so !== 0) return so;
+    const gradeNameCompare = compareGradeLevelNames(a.grade_levels?.name ?? "", b.grade_levels?.name ?? "");
+    if (gradeNameCompare !== 0) return gradeNameCompare;
+    return a.name.localeCompare(b.name, "th", { numeric: true });
   });
 
   const results: ClassroomCollectionsRow[] = [];
@@ -671,7 +689,14 @@ export async function fetchCollectionsByClassroom(
 
     const studentIds = (enrollments ?? []).map((e) => e.student_id);
     if (studentIds.length === 0) {
-      results.push({ classroomLabel: label, studentCount: 0, totalDue: 0, totalPaid: 0, ratePercent: 0 });
+      results.push({
+        classroomLabel: label,
+        studentCount: 0,
+        totalDue: 0,
+        totalPaid: 0,
+        outstanding: 0,
+        ratePercent: 0,
+      });
       continue;
     }
 
@@ -689,6 +714,7 @@ export async function fetchCollectionsByClassroom(
       studentCount: studentIds.length,
       totalDue: round2(totalDue),
       totalPaid: round2(totalPaid),
+      outstanding: Math.max(0, round2(totalDue - totalPaid)),
       ratePercent: totalDue > 0 ? round2((totalPaid / totalDue) * 100) : 0,
     });
   }
