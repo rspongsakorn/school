@@ -4,6 +4,7 @@ import { fetchAllPages } from "@/lib/supabase/paginate";
 import { formatClassroom, formatStudentName, formatThaiTime, formatThaiDate } from "@/lib/format";
 import { bangkokDateKey } from "@/lib/reports/date";
 import { groupDailyRevenue, type DailyRevenueRow } from "@/lib/reports/daily";
+import { groupRevenueByUser, type UserRevenueRow } from "@/lib/reports/by-user";
 import { latestPaidAtByInvoice } from "@/lib/reports/last-paid";
 import {
   buildDebtorRows,
@@ -706,12 +707,15 @@ export type DailyDetailReceipt = {
   paymentMethod: "cash" | "transfer";
   amount: number;
   status: "active" | "voided";
+  recordedByProfileId: string;
   recordedByName: string;
 };
 
 export type DailyRevenueResult = {
   summary: DailyRevenueRow[];
   receiptsByDate: Record<string, DailyDetailReceipt[]>;
+  byUser: UserRevenueRow[];
+  receiptsByUser: Record<string, DailyDetailReceipt[]>;
 };
 
 export async function fetchDailyRevenue(params: {
@@ -737,6 +741,7 @@ export async function fetchDailyRevenue(params: {
       paid_at,
       status,
       student_id,
+      recorded_by,
       students!inner ( student_code, first_name, last_name ),
       profiles!payments_recorded_by_fkey ( display_name )
     `,
@@ -758,6 +763,7 @@ export async function fetchDailyRevenue(params: {
     paid_at: string;
     status: "active" | "voided";
     student_id: string;
+    recorded_by: string;
     students: { student_code: string; first_name: string; last_name: string };
     profiles: { display_name: string } | null;
   };
@@ -778,9 +784,9 @@ export async function fetchDailyRevenue(params: {
   );
 
   const receiptsByDate: Record<string, DailyDetailReceipt[]> = {};
+  const receiptsByUser: Record<string, DailyDetailReceipt[]> = {};
   for (const r of rows) {
-    const key = bangkokDateKey(r.paid_at);
-    (receiptsByDate[key] ??= []).push({
+    const receipt: DailyDetailReceipt = {
       paymentId: r.id,
       receiptNumber: r.receipt_number,
       paidAt: r.paid_at,
@@ -791,11 +797,28 @@ export async function fetchDailyRevenue(params: {
       paymentMethod: r.payment_method,
       amount: Number(r.amount),
       status: r.status,
+      recordedByProfileId: r.recorded_by ?? "unknown",
       recordedByName: r.profiles?.display_name ?? "—",
-    });
+    };
+
+    const dateKey = bangkokDateKey(r.paid_at);
+    (receiptsByDate[dateKey] ??= []).push(receipt);
+
+    const userKey = r.recorded_by ?? "unknown";
+    (receiptsByUser[userKey] ??= []).push(receipt);
   }
 
-  return { summary, receiptsByDate };
+  const byUser = groupRevenueByUser(
+    rows.map((r) => ({
+      profileId: r.recorded_by ?? null,
+      recordedByName: r.profiles?.display_name ?? "—",
+      amount: Number(r.amount),
+      paymentMethod: r.payment_method,
+      status: r.status,
+    })),
+  );
+
+  return { summary, receiptsByDate, byUser, receiptsByUser };
 }
 
 export function flattenReceiptsForIssuanceReport(

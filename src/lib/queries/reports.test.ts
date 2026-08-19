@@ -12,6 +12,7 @@ const r = (over: Partial<DailyDetailReceipt>): DailyDetailReceipt => ({
   paymentMethod: "cash",
   amount: 150,
   status: "active",
+  recordedByProfileId: "profile-1",
   recordedByName: "นันทิศา",
   ...over,
 });

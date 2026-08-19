@@ -10,6 +10,7 @@ import { ReportToolbar } from "@/components/finance/report-toolbar";
 import { ReportLetterhead } from "@/components/finance/report-letterhead";
 import { ReceiptIssuanceView } from "@/components/finance/receipt-issuance-view";
 import { DailyRemittanceSlip } from "@/components/finance/daily-remittance-slip";
+import { ReceiptsByUserPanel } from "@/components/finance/receipts-by-user-panel";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -40,6 +41,7 @@ const DOC_TYPE_ITEMS = [
   { value: "summary", label: "สรุปรายวัน" },
   { value: "receipts", label: "รายงานการออกใบเสร็จ" },
   { value: "remittance", label: "ใบนำส่งเงินประจำวัน" },
+  { value: "by-user", label: "สรุปยอดตามผู้ใช้งาน" },
 ];
 
 function firstOfMonth(): string {
@@ -59,7 +61,7 @@ export function DailyRevenuePanel() {
   const [dateFrom, setDateFrom] = useState(firstOfMonth());
   const [dateTo, setDateTo] = useState(today());
   const [method, setMethod] = useState<"all" | "cash" | "transfer">("all");
-  const [docType, setDocType] = useState<"summary" | "receipts" | "remittance">("summary");
+  const [docType, setDocType] = useState<"summary" | "receipts" | "remittance" | "by-user">("summary");
   const [openDate, setOpenDate] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
@@ -89,6 +91,8 @@ export function DailyRevenuePanel() {
 
   const summary = data?.summary ?? [];
   const receiptsByDate = data?.receiptsByDate ?? {};
+  const byUser = data?.byUser ?? [];
+  const receiptsByUser = data?.receiptsByUser ?? {};
 
   const totals = summary.reduce(
     (acc, r) => ({
@@ -160,6 +164,8 @@ export function DailyRevenuePanel() {
             <ReceiptIssuanceView receiptsByDate={receiptsByDate} yearSemesterLabel={yearSemesterLabel} />
           ) : docType === "remittance" ? (
             <DailyRemittanceSlip items={remittanceItems ?? []} dateFrom={dateFrom} dateTo={dateTo} />
+          ) : docType === "by-user" ? (
+            <ReceiptsByUserPanel byUser={byUser} receiptsByUser={receiptsByUser} />
           ) : (
             <Table>
               <TableHeader>
