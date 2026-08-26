@@ -79,7 +79,7 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
   }
 
   const discountInput = input.discounts ?? [];
-  let resolvedDiscounts: { invoiceLineId: string; feeItemId: string; discountType: "percent" | "fixed"; discountValue: number; amount: number }[] = [];
+  let resolvedDiscounts: PaymentDiscountRow[] = [];
   let netTotal = Number(invoice.total_amount);
 
   if (discountInput.length > 0) {
@@ -125,62 +125,37 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
   const gradeByStudent = await getStudentGradeMap(input.semesterId);
   const gradeClassroom = gradeByStudent.get(input.studentId) ?? "—";
 
-  const invoiceName = invoice.invoice_types?.name ?? "—";
-
-  // The receipt number is assigned inside the RPC (under an advisory lock) and
-  // stamped back into the snapshot there; the placeholder here is overwritten.
-  const snapshot: Record<string, unknown> = {
-    receiptNumber: "",
-    paidAt: new Date().toISOString(),
+  const executed = await executeRecordPayment({
+    supabase,
+    invoiceId: invoice.id,
+    invoiceTypeId,
+    invoiceName: invoice.invoice_types?.name ?? "—",
+    studentId: input.studentId,
     studentCode: student.student_code,
     studentName: formatStudentName(student.first_name, student.last_name),
     gradeClassroom,
-    paymentMethod: input.paymentMethod,
-    transferReference: input.remark?.trim() || null,
+    academicYearId: input.academicYearId,
+    academicYearName: input.academicYearName,
     amount: paidTotal,
-    allocations: [{ invoiceId: invoice.id, invoiceName, amount: paidTotal }],
-    recordedBy: auth.profile.display_name ?? "เจ้าหน้าที่",
-  };
-
-  // Record everything (payment, allocation, discounts, receipt, invoice update)
-  // atomically in one transaction so a mid-way failure can't leave a committed
-  // receipt against an un-updated invoice balance.
-  const { data: rpcRows, error: rpcError } = await supabase.rpc("record_payment", {
-    p_invoice_id: invoice.id,
-    p_student_id: input.studentId,
-    p_academic_year_id: input.academicYearId,
-    p_academic_year_name: input.academicYearName,
-    p_amount: paidTotal,
-    p_net_total: netTotal,
-    p_new_paid: newPaid,
-    p_payment_method: input.paymentMethod,
-    p_transfer_reference: input.remark?.trim() || null,
-    p_note: input.note?.trim() || null,
-    p_recorded_by: auth.profile.id,
-    p_invoice_type_id: invoiceTypeId,
-    p_snapshot: snapshot,
-    p_discounts: resolvedDiscounts.map((d) => ({
-      invoiceLineId: d.invoiceLineId,
-      feeItemId: d.feeItemId,
-      discountType: d.discountType,
-      discountValue: d.discountValue,
-      amount: d.amount,
-    })),
+    netTotal,
+    newPaid,
+    paymentMethod: input.paymentMethod,
+    remark: input.remark?.trim() || null,
+    note: input.note?.trim() || null,
+    recordedById: auth.profile.id,
+    recordedByName: auth.profile.display_name ?? "เจ้าหน้าที่",
+    paidAtIso: new Date().toISOString(),
+    discounts: resolvedDiscounts,
   });
 
-  const result = rpcRows?.[0];
-  if (rpcError || !result) {
-    return { ok: false, error: "ไม่สามารถบันทึกการชำระได้" };
-  }
-
-  snapshot.receiptNumber = result.receipt_number;
+  if (!executed.ok) return executed;
 
   revalidateFinancePaths();
   return {
     ok: true,
-    paymentId: result.payment_id,
-    receiptNumber: result.receipt_number,
-    snapshot,
+    paymentId: executed.paymentId,
+    receiptNumber: executed.receiptNumber,
+    snapshot: executed.snapshot,
   };
 }
 
@@ -711,6 +686,104 @@ export async function voidPayment(paymentId: string, reason: string): Promise<Ac
 
   revalidateFinancePaths();
   return { ok: true };
+}
+
+type PaymentDiscountRow = {
+  invoiceLineId: string;
+  feeItemId: string;
+  discountType: "percent" | "fixed";
+  discountValue: number;
+  amount: number;
+};
+
+type ExecuteRecordPaymentArgs = {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  invoiceId: string;
+  invoiceTypeId: string;
+  invoiceName: string;
+  studentId: string;
+  studentCode: string;
+  studentName: string;
+  gradeClassroom: string;
+  academicYearId: string;
+  academicYearName: string;
+  amount: number;
+  netTotal: number;
+  newPaid: number;
+  paymentMethod: "cash" | "transfer";
+  remark: string | null;
+  note: string | null;
+  recordedById: string;
+  recordedByName: string;
+  paidAtIso: string;
+  discounts: PaymentDiscountRow[];
+};
+
+/**
+ * Writes one payment (payment row, allocation, discounts, receipt, invoice
+ * balance) through the `record_payment` RPC, which does all of it in a single
+ * transaction and assigns the receipt number under an advisory lock. Shared by
+ * the single-invoice and bulk actions so the snapshot shape can never drift.
+ */
+async function executeRecordPayment(
+  args: ExecuteRecordPaymentArgs,
+): Promise<
+  | { ok: true; paymentId: string; receiptNumber: string; snapshot: Record<string, unknown> }
+  | { ok: false; error: string }
+> {
+  // The receipt number is assigned inside the RPC and stamped back into the
+  // snapshot there; the placeholder here is overwritten.
+  const snapshot: Record<string, unknown> = {
+    receiptNumber: "",
+    paidAt: args.paidAtIso,
+    studentCode: args.studentCode,
+    studentName: args.studentName,
+    gradeClassroom: args.gradeClassroom,
+    paymentMethod: args.paymentMethod,
+    transferReference: args.remark,
+    amount: args.amount,
+    allocations: [
+      { invoiceId: args.invoiceId, invoiceName: args.invoiceName, amount: args.amount },
+    ],
+    recordedBy: args.recordedByName,
+  };
+
+  const { data: rpcRows, error: rpcError } = await args.supabase.rpc("record_payment", {
+    p_invoice_id: args.invoiceId,
+    p_student_id: args.studentId,
+    p_academic_year_id: args.academicYearId,
+    p_academic_year_name: args.academicYearName,
+    p_amount: args.amount,
+    p_net_total: args.netTotal,
+    p_new_paid: args.newPaid,
+    p_payment_method: args.paymentMethod,
+    p_transfer_reference: args.remark,
+    p_note: args.note,
+    p_recorded_by: args.recordedById,
+    p_invoice_type_id: args.invoiceTypeId,
+    p_snapshot: snapshot,
+    p_discounts: args.discounts.map((d) => ({
+      invoiceLineId: d.invoiceLineId,
+      feeItemId: d.feeItemId,
+      discountType: d.discountType,
+      discountValue: d.discountValue,
+      amount: d.amount,
+    })),
+  });
+
+  const result = rpcRows?.[0];
+  if (rpcError || !result) {
+    return { ok: false, error: "ไม่สามารถบันทึกการชำระได้" };
+  }
+
+  snapshot.receiptNumber = result.receipt_number;
+
+  return {
+    ok: true,
+    paymentId: result.payment_id,
+    receiptNumber: result.receipt_number,
+    snapshot,
+  };
 }
 
 function revalidateFinancePaths() {
