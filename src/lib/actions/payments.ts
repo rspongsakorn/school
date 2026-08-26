@@ -224,10 +224,23 @@ export async function recordPaymentsBulk(
     invoice_types: { name: string } | null;
   };
 
-  const { data: invoiceRows } = (await supabase
-    .from("student_invoices")
-    .select("id, student_id, total_amount, paid_amount, invoice_type_id, invoice_types ( name )")
-    .in("id", ids)) as unknown as { data: BulkInvoiceRow[] | null };
+  // The grade map doesn't depend on the invoice/student prefetch below, so
+  // fetch it in parallel instead of paying for an extra round trip.
+  const [invoicesResponse, gradeByStudent] = await Promise.all([
+    supabase
+      .from("student_invoices")
+      .select("id, student_id, total_amount, paid_amount, invoice_type_id, invoice_types ( name )")
+      .in("id", ids),
+    getStudentGradeMap(input.semesterId),
+  ]);
+
+  const { data: invoiceRows, error: invoicesError } = invoicesResponse as unknown as {
+    data: BulkInvoiceRow[] | null;
+    error: { message: string } | null;
+  };
+  if (invoicesError) {
+    return { ok: false, error: "โหลดข้อมูลใบแจ้งชำระไม่สำเร็จ" };
+  }
 
   const invoiceById = new Map((invoiceRows ?? []).map((row) => [row.id, row]));
 
@@ -237,14 +250,15 @@ export async function recordPaymentsBulk(
     { id: string; student_code: string; first_name: string; last_name: string }
   >();
   if (studentIds.length > 0) {
-    const { data: studentRows } = await supabase
+    const { data: studentRows, error: studentsError } = await supabase
       .from("students")
       .select("id, student_code, first_name, last_name")
       .in("id", studentIds);
+    if (studentsError) {
+      return { ok: false, error: "โหลดข้อมูลนักเรียนไม่สำเร็จ" };
+    }
     for (const s of studentRows ?? []) studentById.set(s.id, s);
   }
-
-  const gradeByStudent = await getStudentGradeMap(input.semesterId);
 
   const remark = input.remark?.trim() || null;
   const note = input.note?.trim() || null;
@@ -254,77 +268,107 @@ export async function recordPaymentsBulk(
   const failed: BulkPaymentFailure[] = [];
 
   for (const invoiceId of ids) {
-    const invoice = invoiceById.get(invoiceId);
-    if (!invoice) {
-      failed.push({ invoiceId, studentCode: "—", studentName: "—", reason: "ไม่พบใบแจ้งชำระ" });
-      continue;
-    }
+    let studentCode = "—";
+    let studentName = "—";
+    try {
+      const invoice = invoiceById.get(invoiceId);
+      if (!invoice) {
+        failed.push({ invoiceId, studentCode, studentName, reason: "ไม่พบใบแจ้งชำระ" });
+        continue;
+      }
 
-    const student = studentById.get(invoice.student_id);
-    if (!student) {
-      failed.push({ invoiceId, studentCode: "—", studentName: "—", reason: "ไม่พบนักเรียน" });
-      continue;
-    }
+      const student = studentById.get(invoice.student_id);
+      if (!student) {
+        failed.push({ invoiceId, studentCode, studentName, reason: "ไม่พบนักเรียน" });
+        continue;
+      }
 
-    const studentCode = student.student_code;
-    const studentName = formatStudentName(student.first_name, student.last_name);
+      studentCode = student.student_code;
+      studentName = formatStudentName(student.first_name, student.last_name);
 
-    if (!invoice.invoice_type_id) {
-      failed.push({
-        invoiceId,
+      if (!invoice.invoice_type_id) {
+        failed.push({
+          invoiceId,
+          studentCode,
+          studentName,
+          reason: "ใบแจ้งชำระไม่มีประเภทใบแจ้ง",
+        });
+        continue;
+      }
+
+      // Re-read this invoice's money columns right before use instead of
+      // trusting the batch's opening prefetch. The RPC below overwrites
+      // total_amount with whatever net total we pass it and only validates
+      // paid_amount against the row it locks — it never checks net total
+      // against the current total_amount. A price-tier change or discount
+      // (both allowed while paid_amount is 0) landing on this invoice between
+      // the prefetch and this row's turn — this loop runs up to 100
+      // sequential RPCs, holding that window open far longer than the single
+      // -invoice path's one request — would otherwise get silently
+      // clobbered. Starting from a fresh read here is what lets the RPC's
+      // `FOR UPDATE` lock make the final write safe.
+      const { data: fresh, error: freshError } = await supabase
+        .from("student_invoices")
+        .select("total_amount, paid_amount")
+        .eq("id", invoiceId)
+        .maybeSingle();
+
+      if (freshError) {
+        failed.push({ invoiceId, studentCode, studentName, reason: "อ่านยอดคงค้างไม่สำเร็จ" });
+        continue;
+      }
+      if (!fresh) {
+        failed.push({ invoiceId, studentCode, studentName, reason: "ไม่พบใบแจ้งชำระ" });
+        continue;
+      }
+
+      const netTotal = Number(fresh.total_amount);
+      const paidAmount = Number(fresh.paid_amount);
+      const outstanding = round2(netTotal - paidAmount);
+      if (outstanding <= 0) {
+        failed.push({ invoiceId, studentCode, studentName, reason: "ไม่มียอดค้างชำระ" });
+        continue;
+      }
+
+      const executed = await executeRecordPayment({
+        supabase,
+        invoiceId: invoice.id,
+        invoiceTypeId: invoice.invoice_type_id,
+        invoiceName: invoice.invoice_types?.name ?? "—",
+        studentId: invoice.student_id,
         studentCode,
         studentName,
-        reason: "ใบแจ้งชำระไม่มีประเภทใบแจ้ง",
+        gradeClassroom: gradeByStudent.get(invoice.student_id) ?? "—",
+        academicYearId: input.academicYearId,
+        academicYearName: input.academicYearName,
+        amount: outstanding,
+        netTotal,
+        newPaid: round2(paidAmount + outstanding),
+        paymentMethod: input.paymentMethod,
+        remark,
+        note,
+        recordedById: auth.profile.id,
+        recordedByName,
+        paidAtIso: new Date().toISOString(),
+        discounts: [],
       });
-      continue;
-    }
 
-    // Recomputed from the database, never trusted from the client — another
-    // cashier may have taken this payment while the rows were ticked.
-    const netTotal = Number(invoice.total_amount);
-    const paidAmount = Number(invoice.paid_amount);
-    const outstanding = round2(netTotal - paidAmount);
-    if (outstanding <= 0) {
-      failed.push({ invoiceId, studentCode, studentName, reason: "ไม่มียอดค้างชำระ" });
-      continue;
-    }
+      if (!executed.ok) {
+        failed.push({ invoiceId, studentCode, studentName, reason: "บันทึกการชำระไม่ได้" });
+        continue;
+      }
 
-    const executed = await executeRecordPayment({
-      supabase,
-      invoiceId: invoice.id,
-      invoiceTypeId: invoice.invoice_type_id,
-      invoiceName: invoice.invoice_types?.name ?? "—",
-      studentId: invoice.student_id,
-      studentCode,
-      studentName,
-      gradeClassroom: gradeByStudent.get(invoice.student_id) ?? "—",
-      academicYearId: input.academicYearId,
-      academicYearName: input.academicYearName,
-      amount: outstanding,
-      netTotal,
-      newPaid: round2(paidAmount + outstanding),
-      paymentMethod: input.paymentMethod,
-      remark,
-      note,
-      recordedById: auth.profile.id,
-      recordedByName,
-      paidAtIso: new Date().toISOString(),
-      discounts: [],
-    });
-
-    if (!executed.ok) {
+      succeeded.push({
+        invoiceId,
+        paymentId: executed.paymentId,
+        receiptNumber: executed.receiptNumber,
+        studentCode,
+        studentName,
+        amount: outstanding,
+      });
+    } catch {
       failed.push({ invoiceId, studentCode, studentName, reason: "บันทึกการชำระไม่ได้" });
-      continue;
     }
-
-    succeeded.push({
-      invoiceId,
-      paymentId: executed.paymentId,
-      receiptNumber: executed.receiptNumber,
-      studentCode,
-      studentName,
-      amount: outstanding,
-    });
   }
 
   revalidateFinancePaths();
