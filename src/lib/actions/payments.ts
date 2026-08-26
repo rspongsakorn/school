@@ -11,7 +11,7 @@ import { getStudentOutstandingInvoices } from "@/lib/data/invoices";
 import { parsePriceTier } from "@/lib/finance/price-tier";
 import { getDefaultInvoiceTypeId } from "@/lib/data/invoice-types";
 import { resolveSingleInvoicePayment } from "@/lib/finance/single-invoice-allocation";
-import { resolvePaymentDiscounts } from "@/lib/finance/payment-discount";
+import { resolvePaymentDiscounts, type ResolvedDiscountRow } from "@/lib/finance/payment-discount";
 import { createClient } from "@/lib/supabase/server";
 import { formatStudentName } from "@/lib/format";
 import { searchStudentsForPayment } from "@/lib/data/payments";
@@ -79,7 +79,7 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
   }
 
   const discountInput = input.discounts ?? [];
-  let resolvedDiscounts: PaymentDiscountRow[] = [];
+  let resolvedDiscounts: ResolvedDiscountRow[] = [];
   let netTotal = Number(invoice.total_amount);
 
   if (discountInput.length > 0) {
@@ -688,15 +688,10 @@ export async function voidPayment(paymentId: string, reason: string): Promise<Ac
   return { ok: true };
 }
 
-type PaymentDiscountRow = {
-  invoiceLineId: string;
-  feeItemId: string;
-  discountType: "percent" | "fixed";
-  discountValue: number;
-  amount: number;
-};
-
 type ExecuteRecordPaymentArgs = {
+  // Keep this as the inferred client type, not a bare SupabaseClient — that
+  // would lose the Database generic. Don't "fix" it to match
+  // src/lib/actions/students.ts.
   supabase: Awaited<ReturnType<typeof createClient>>;
   invoiceId: string;
   invoiceTypeId: string;
@@ -716,21 +711,21 @@ type ExecuteRecordPaymentArgs = {
   recordedById: string;
   recordedByName: string;
   paidAtIso: string;
-  discounts: PaymentDiscountRow[];
+  discounts: ResolvedDiscountRow[];
 };
 
 /**
  * Writes one payment (payment row, allocation, discounts, receipt, invoice
  * balance) through the `record_payment` RPC, which does all of it in a single
- * transaction and assigns the receipt number under an advisory lock. Shared by
- * the single-invoice and bulk actions so the snapshot shape can never drift.
+ * transaction so a mid-way failure can't leave a committed receipt against an
+ * un-updated invoice balance, with the receipt number assigned under an
+ * advisory lock. Factored out of `recordPayment` so a caller recording
+ * several invoices in one action can reuse the same write path instead of
+ * duplicating the snapshot construction and RPC call.
  */
 async function executeRecordPayment(
   args: ExecuteRecordPaymentArgs,
-): Promise<
-  | { ok: true; paymentId: string; receiptNumber: string; snapshot: Record<string, unknown> }
-  | { ok: false; error: string }
-> {
+): Promise<RecordPaymentResult> {
   // The receipt number is assigned inside the RPC and stamped back into the
   // snapshot there; the placeholder here is overwritten.
   const snapshot: Record<string, unknown> = {
