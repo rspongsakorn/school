@@ -159,6 +159,179 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
   };
 }
 
+export const BULK_PAYMENT_MAX = 100;
+
+export type RecordPaymentsBulkInput = {
+  invoiceIds: string[];
+  academicYearId: string;
+  academicYearName: string;
+  semesterId: string;
+  paymentMethod: "cash" | "transfer";
+  remark?: string;
+  note?: string;
+};
+
+export type BulkPaymentSuccess = {
+  invoiceId: string;
+  paymentId: string;
+  receiptNumber: string;
+  studentCode: string;
+  studentName: string;
+  amount: number;
+};
+
+export type BulkPaymentFailure = {
+  invoiceId: string;
+  studentCode: string;
+  studentName: string;
+  reason: string;
+};
+
+export type RecordPaymentsBulkResult =
+  | { ok: true; succeeded: BulkPaymentSuccess[]; failed: BulkPaymentFailure[] }
+  | { ok: false; error: string };
+
+/**
+ * Records a full-outstanding payment for every given invoice, one receipt per
+ * student. Invoices are processed sequentially and in the order given so the
+ * receipt numbers follow the order the cashier saw on screen. A row that fails
+ * is reported and skipped — money already collected for the other students
+ * still gets recorded. Discounts are not supported here by design; an invoice
+ * needing one goes through the single-invoice dialog.
+ */
+export async function recordPaymentsBulk(
+  input: RecordPaymentsBulkInput,
+): Promise<RecordPaymentsBulkResult> {
+  const auth = await requireFinanceAction();
+  if (!auth.ok) return auth;
+
+  const ids = [...new Set(input.invoiceIds.map((id) => id.trim()).filter(Boolean))];
+  if (ids.length === 0) {
+    return { ok: false, error: "กรุณาเลือกใบแจ้งชำระ" };
+  }
+  if (ids.length > BULK_PAYMENT_MAX) {
+    return { ok: false, error: `เลือกได้ครั้งละไม่เกิน ${BULK_PAYMENT_MAX} ใบ` };
+  }
+
+  const supabase = await createClient();
+
+  type BulkInvoiceRow = {
+    id: string;
+    student_id: string;
+    total_amount: number;
+    paid_amount: number;
+    invoice_type_id: string | null;
+    invoice_types: { name: string } | null;
+  };
+
+  const { data: invoiceRows } = (await supabase
+    .from("student_invoices")
+    .select("id, student_id, total_amount, paid_amount, invoice_type_id, invoice_types ( name )")
+    .in("id", ids)) as unknown as { data: BulkInvoiceRow[] | null };
+
+  const invoiceById = new Map((invoiceRows ?? []).map((row) => [row.id, row]));
+
+  const studentIds = [...new Set((invoiceRows ?? []).map((row) => row.student_id))];
+  const studentById = new Map<
+    string,
+    { id: string; student_code: string; first_name: string; last_name: string }
+  >();
+  if (studentIds.length > 0) {
+    const { data: studentRows } = await supabase
+      .from("students")
+      .select("id, student_code, first_name, last_name")
+      .in("id", studentIds);
+    for (const s of studentRows ?? []) studentById.set(s.id, s);
+  }
+
+  const gradeByStudent = await getStudentGradeMap(input.semesterId);
+
+  const remark = input.remark?.trim() || null;
+  const note = input.note?.trim() || null;
+  const recordedByName = auth.profile.display_name ?? "เจ้าหน้าที่";
+
+  const succeeded: BulkPaymentSuccess[] = [];
+  const failed: BulkPaymentFailure[] = [];
+
+  for (const invoiceId of ids) {
+    const invoice = invoiceById.get(invoiceId);
+    if (!invoice) {
+      failed.push({ invoiceId, studentCode: "—", studentName: "—", reason: "ไม่พบใบแจ้งชำระ" });
+      continue;
+    }
+
+    const student = studentById.get(invoice.student_id);
+    if (!student) {
+      failed.push({ invoiceId, studentCode: "—", studentName: "—", reason: "ไม่พบนักเรียน" });
+      continue;
+    }
+
+    const studentCode = student.student_code;
+    const studentName = formatStudentName(student.first_name, student.last_name);
+
+    if (!invoice.invoice_type_id) {
+      failed.push({
+        invoiceId,
+        studentCode,
+        studentName,
+        reason: "ใบแจ้งชำระไม่มีประเภทใบแจ้ง",
+      });
+      continue;
+    }
+
+    // Recomputed from the database, never trusted from the client — another
+    // cashier may have taken this payment while the rows were ticked.
+    const netTotal = Number(invoice.total_amount);
+    const paidAmount = Number(invoice.paid_amount);
+    const outstanding = round2(netTotal - paidAmount);
+    if (outstanding <= 0) {
+      failed.push({ invoiceId, studentCode, studentName, reason: "ไม่มียอดค้างชำระ" });
+      continue;
+    }
+
+    const executed = await executeRecordPayment({
+      supabase,
+      invoiceId: invoice.id,
+      invoiceTypeId: invoice.invoice_type_id,
+      invoiceName: invoice.invoice_types?.name ?? "—",
+      studentId: invoice.student_id,
+      studentCode,
+      studentName,
+      gradeClassroom: gradeByStudent.get(invoice.student_id) ?? "—",
+      academicYearId: input.academicYearId,
+      academicYearName: input.academicYearName,
+      amount: outstanding,
+      netTotal,
+      newPaid: round2(paidAmount + outstanding),
+      paymentMethod: input.paymentMethod,
+      remark,
+      note,
+      recordedById: auth.profile.id,
+      recordedByName,
+      paidAtIso: new Date().toISOString(),
+      discounts: [],
+    });
+
+    if (!executed.ok) {
+      failed.push({ invoiceId, studentCode, studentName, reason: "บันทึกการชำระไม่ได้" });
+      continue;
+    }
+
+    succeeded.push({
+      invoiceId,
+      paymentId: executed.paymentId,
+      receiptNumber: executed.receiptNumber,
+      studentCode,
+      studentName,
+      amount: outstanding,
+    });
+  }
+
+  revalidateFinancePaths();
+
+  return { ok: true, succeeded, failed };
+}
+
 export async function getStudentOutstandingAction(studentId: string, semesterId: string) {
   const auth = await requireFinanceAction();
   if (!auth.ok) return auth;
