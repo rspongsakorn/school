@@ -188,18 +188,34 @@ export function InvoicesPanel() {
     };
   }
 
-  // Selection now means "rows I might act on". Any row with money still owed
-  // can be ticked; each bulk action filters the selection for itself.
-  const payableRows = useMemo(
-    () => data.rows.filter((row) => row.outstanding > 0),
+  // Selection now means "rows I might act on". A row qualifies if either bulk
+  // action could use it — payment needs money still owed, delete needs every
+  // receipt already voided — and each action then filters the selection down
+  // to its own eligible subset.
+  const selectableRows = useMemo(
+    () =>
+      data.rows.filter(
+        (row) => row.outstanding > 0 || canDeleteInvoice(deleteContextFor(row)),
+      ),
     [data.rows],
   );
 
-  const allPayableSelected =
-    payableRows.length > 0 && payableRows.every((row) => selectedIds.has(row.id));
+  const allSelectableSelected =
+    selectableRows.length > 0 && selectableRows.every((row) => selectedIds.has(row.id));
 
   const bulkTargets = useMemo(
     () => resolveBulkPaymentTargets(data.rows, selectedIds),
+    [data.rows, selectedIds],
+  );
+
+  // The two bulk actions have different eligibility rules, so each derives its
+  // own subset from the shared selection: payment needs an outstanding
+  // balance, delete needs every receipt voided first.
+  const deletableSelectedIds = useMemo(
+    () =>
+      data.rows
+        .filter((row) => selectedIds.has(row.id) && canDeleteInvoice(deleteContextFor(row)))
+        .map((row) => row.id),
     [data.rows, selectedIds],
   );
 
@@ -280,7 +296,7 @@ export function InvoicesPanel() {
       setSelectedIds(new Set());
       return;
     }
-    setSelectedIds(new Set(payableRows.map((row) => row.id)));
+    setSelectedIds(new Set(selectableRows.map((row) => row.id)));
   }
 
   async function confirmDelete() {
@@ -311,7 +327,7 @@ export function InvoicesPanel() {
     router.refresh();
   }
 
-  const bulkDeleteCount = selectedIds.size;
+  const bulkDeleteCount = deletableSelectedIds.length;
 
   function paymentsHref(studentCode: string) {
     const params = new URLSearchParams({ q: studentCode });
@@ -425,7 +441,7 @@ export function InvoicesPanel() {
                         type="button"
                         variant="outline"
                         className="text-destructive"
-                        onClick={() => setDeleteTargetIds([...selectedIds])}
+                        onClick={() => setDeleteTargetIds(deletableSelectedIds)}
                       >
                         ลบที่เลือก ({bulkDeleteCount})
                       </Button>
@@ -542,9 +558,9 @@ export function InvoicesPanel() {
                           <input
                             type="checkbox"
                             className="size-4 rounded border-border"
-                            checked={allPayableSelected}
-                            disabled={payableRows.length === 0}
-                            aria-label="เลือกทั้งหมดที่ยังมียอดค้าง"
+                            checked={allSelectableSelected}
+                            disabled={selectableRows.length === 0}
+                            aria-label="เลือกทั้งหมดที่เลือกได้"
                             onChange={(e) => toggleSelectAll(e.target.checked)}
                           />
                         </TableHead>
@@ -570,6 +586,7 @@ export function InvoicesPanel() {
                           const deleteCtx = deleteContextFor(row);
                           const deletable = canDeleteInvoice(deleteCtx);
                           const blockedReason = invoiceDeleteBlockedReason(deleteCtx);
+                          const selectable = row.outstanding > 0 || deletable;
                           return (
                             <TableRow key={row.id}>
                               <TableCell>
@@ -577,8 +594,8 @@ export function InvoicesPanel() {
                                   type="checkbox"
                                   className="size-4 rounded border-border"
                                   checked={selectedIds.has(row.id)}
-                                  disabled={row.outstanding <= 0}
-                                  title={row.outstanding <= 0 ? "ไม่มียอดค้างชำระ" : undefined}
+                                  disabled={!selectable}
+                                  title={!selectable ? (blockedReason ?? "ไม่มียอดค้างชำระ") : undefined}
                                   aria-label={`เลือก ${row.studentCode}`}
                                   onChange={(e) => toggleRow(row.id, e.target.checked)}
                                 />
