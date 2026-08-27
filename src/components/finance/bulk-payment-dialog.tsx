@@ -118,36 +118,45 @@ export function BulkPaymentDialog({
 
   async function handleConfirm() {
     setSubmitting(true);
-    const res = await recordPaymentsBulk({
-      invoiceIds: targets.payable.map((row) => row.id),
-      academicYearId,
-      academicYearName,
-      semesterId,
-      paymentMethod: method,
-      remark: remark.trim() || undefined,
-      note: note.trim() || undefined,
-    });
-    setSubmitting(false);
-    setConfirmOpen(false);
+    try {
+      const res = await recordPaymentsBulk({
+        invoiceIds: targets.payable.map((row) => row.id),
+        academicYearId,
+        academicYearName,
+        semesterId,
+        paymentMethod: method,
+        remark: remark.trim() || undefined,
+        note: note.trim() || undefined,
+      });
 
-    if (!res.ok) {
-      toast.error(res.error);
-      return;
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+
+      setResult({ succeeded: res.succeeded, failed: res.failed });
+
+      if (res.succeeded.length > 0) {
+        toast.success(`บันทึกการชำระแล้ว ${res.succeeded.length} ใบ`);
+        printBatch(res.succeeded.map((row) => row.paymentId));
+      }
+      if (res.failed.length > 0) {
+        toast.error(`ไม่สำเร็จ ${res.failed.length} ใบ`);
+      }
+
+      invalidateFinanceQueries(queryClient);
+      router.refresh();
+      onCompleted();
+    } catch {
+      // Each invoice commits in its own transaction, so a thrown error (a
+      // dropped connection, or the request exceeding a platform timeout —
+      // realistic here since a full batch can be up to 100 sequential RPCs)
+      // may still have recorded some payments. Don't invite a blind retry.
+      toast.error("บันทึกไม่สำเร็จ — กรุณาตรวจสอบรายการชำระก่อนทำซ้ำ");
+    } finally {
+      setSubmitting(false);
+      setConfirmOpen(false);
     }
-
-    setResult({ succeeded: res.succeeded, failed: res.failed });
-
-    if (res.succeeded.length > 0) {
-      toast.success(`บันทึกการชำระแล้ว ${res.succeeded.length} ใบ`);
-      printBatch(res.succeeded.map((row) => row.paymentId));
-    }
-    if (res.failed.length > 0) {
-      toast.error(`ไม่สำเร็จ ${res.failed.length} ใบ`);
-    }
-
-    invalidateFinanceQueries(queryClient);
-    router.refresh();
-    onCompleted();
   }
 
   return (
@@ -200,13 +209,15 @@ export function BulkPaymentDialog({
                   <p className="text-sm font-medium text-destructive">
                     ไม่สำเร็จ {result.failed.length} ใบ
                   </p>
-                  <ul className="space-y-1 text-sm text-muted-foreground">
-                    {result.failed.map((row) => (
-                      <li key={row.invoiceId}>
-                        {row.studentName} ({row.studentCode}) — {row.reason}
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="max-h-40 overflow-y-auto rounded-lg border border-border p-2">
+                    <ul className="space-y-1 text-sm text-muted-foreground">
+                      {result.failed.map((row) => (
+                        <li key={row.invoiceId}>
+                          {row.studentName} ({row.studentCode}) — {row.reason}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
               ) : null}
 
