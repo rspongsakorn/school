@@ -7,6 +7,7 @@ import {
   allocatePaymentFifo,
   deriveInvoiceStatus,
 } from "@/lib/finance/amounts";
+import { BULK_PAYMENT_MAX } from "@/lib/finance/constants";
 import { getStudentOutstandingInvoices } from "@/lib/data/invoices";
 import { parsePriceTier } from "@/lib/finance/price-tier";
 import { getDefaultInvoiceTypeId } from "@/lib/data/invoice-types";
@@ -158,8 +159,6 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
     snapshot: executed.snapshot,
   };
 }
-
-export const BULK_PAYMENT_MAX = 100;
 
 export type RecordPaymentsBulkInput = {
   invoiceIds: string[];
