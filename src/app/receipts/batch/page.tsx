@@ -19,17 +19,17 @@ export default async function BatchReceiptsPage({
   await requireFinancePage();
 
   const { ids, autoprint } = await searchParams;
-  const paymentIds = (ids ?? "")
-    .split(",")
-    .map((id) => id.trim())
-    .filter(Boolean)
-    .slice(0, MAX_RECEIPTS);
+  const paymentIds = [...new Set(
+    (ids ?? "").split(",").map((id) => id.trim()).filter(Boolean),
+  )].slice(0, MAX_RECEIPTS);
 
   if (paymentIds.length === 0) notFound();
 
   const fetched = await Promise.all(paymentIds.map((id) => getReceiptPrintData(id)));
   const receipts = fetched.filter((d): d is ReceiptPrintData => d !== null);
   if (receipts.length === 0) notFound();
+
+  const missingCount = paymentIds.length - receipts.length;
 
   return (
     <>
@@ -47,6 +47,22 @@ export default async function BatchReceiptsPage({
         }}
       />
 
+      {missingCount > 0 ? (
+        <div
+          className="no-print"
+          style={{
+            textAlign: "center",
+            margin: "24px 0 0",
+            position: "relative",
+            zIndex: 1,
+            fontSize: "13px",
+            color: "#b91c1c",
+          }}
+        >
+          โหลดใบเสร็จไม่ได้ {missingCount} ใบ
+        </div>
+      ) : null}
+
       <div
         className="no-print"
         style={{
@@ -54,7 +70,7 @@ export default async function BatchReceiptsPage({
           justifyContent: "center",
           alignItems: "center",
           gap: "12px",
-          margin: "24px 0 0",
+          margin: missingCount > 0 ? "8px 0 0" : "24px 0 0",
           position: "relative",
           zIndex: 1,
         }}
