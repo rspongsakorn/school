@@ -48,13 +48,13 @@ import {
   summarizeTargets,
   type BulkPaymentTargets,
 } from "@/lib/finance/bulk-payment-selection";
+import { PAYMENT_METHOD_LABELS } from "@/lib/finance/constants";
 import { formatBaht } from "@/lib/format";
 import { invalidateFinanceQueries } from "@/lib/queries/invalidate";
 
-const METHOD_ITEMS = [
-  { value: "cash", label: "เงินสด" },
-  { value: "transfer", label: "โอน" },
-];
+const METHOD_ITEMS = (
+  Object.entries(PAYMENT_METHOD_LABELS) as [keyof typeof PAYMENT_METHOD_LABELS, string][]
+).map(([value, label]) => ({ value, label }));
 
 type Props = {
   open: boolean;
@@ -199,6 +199,16 @@ export function BulkPaymentDialog({
                           </TableCell>
                         </TableRow>
                       ))}
+                      <TableRow className="border-t-2 font-semibold">
+                        <TableCell colSpan={2}>รวม {result.succeeded.length} ใบ</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatBaht(
+                            Math.round(
+                              result.succeeded.reduce((sum, row) => sum + row.amount, 0) * 100,
+                            ) / 100,
+                          )}
+                        </TableCell>
+                      </TableRow>
                     </TableBody>
                   </Table>
                 </div>
@@ -286,9 +296,20 @@ export function BulkPaymentDialog({
               </div>
 
               {targets.skipped.length > 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  ข้าม {targets.skipped.length} รายการที่ไม่มียอดค้างชำระ
-                </p>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    ข้าม {targets.skipped.length} รายการ
+                  </p>
+                  <div className="max-h-40 overflow-y-auto rounded-lg border border-border p-2">
+                    <ul className="space-y-1 text-sm text-muted-foreground">
+                      {targets.skipped.map((row) => (
+                        <li key={row.id}>
+                          {row.studentName} — {row.reason}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
               ) : null}
 
               <div className="grid gap-2">
@@ -345,7 +366,7 @@ export function BulkPaymentDialog({
             <AlertDialogTitle>ยืนยันการรับชำระ</AlertDialogTitle>
             <AlertDialogDescription>
               รับชำระ {count} คน รวม {formatBaht(totalAmount)} (
-              {method === "cash" ? "เงินสด" : "โอน"}) — ระบบจะออกใบเสร็จแยกใบให้แต่ละคน
+              {PAYMENT_METHOD_LABELS[method]}) — ระบบจะออกใบเสร็จแยกใบให้แต่ละคน
             </AlertDialogDescription>
           </AlertDialogHeader>
           {remark.trim() ? (
