@@ -92,9 +92,12 @@ export function BulkPaymentDialog({
 
   const { count, totalAmount } = summarizeTargets(targets.payable);
 
+  // The dialog is controlled by the parent and keeps its own form state, so
+  // each time it opens it must start from a clean form rather than the
+  // previous batch's inputs or result.
   useEffect(() => {
     if (!open) return;
-    setMethod("cash");
+    setMethod("cash"); // eslint-disable-line react-hooks/set-state-in-effect
     setRemark("");
     setNote("");
     setResult(null);
