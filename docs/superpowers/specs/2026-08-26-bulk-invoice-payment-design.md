@@ -173,15 +173,21 @@ delegates the write; the bulk action delegates once per invoice with
 
 `src/components/finance/invoices-panel.tsx`:
 
-- The row checkbox's `disabled` condition changes from `!canDeleteInvoice(...)`
-  to `row.outstanding <= 0`, and its `title` shows the delete-blocked reason only
-  when the row is also not deletable — a partially paid row is now selectable but
-  still cannot be deleted. The header select-all checkbox switches from "all
-  deletable rows" to "all rows with `outstanding > 0`".
-- This is safe for the existing bulk delete: `deleteInvoices`
-  (`src/lib/actions/invoices.ts`) already filters out non-deletable ids
-  server-side and reports how many were skipped, and the confirm dialog already
-  says `เฉพาะใบที่ยกเลิกใบเสร็จครบแล้วจะถูกลบ`.
+- Selection stops meaning "rows I might delete" and starts meaning "rows I might
+  act on": a row is selectable when `row.outstanding > 0 || canDeleteInvoice(...)`,
+  so a partially paid invoice can be ticked for payment even though it cannot be
+  deleted, and a fully waived zero-total invoice keeps the bulk-delete it had
+  before. The `title` on a disabled checkbox explains why. The header select-all
+  covers the same selectable set.
+- Each bulk action then derives its own subset from that one selection: payment
+  through `resolveBulkPaymentTargets`, delete through a `deletableSelectedIds`
+  memo filtered by `canDeleteInvoice`. **Scoping delete client-side is required,
+  not cosmetic** — without it, ticking a single partially paid row offers a
+  confidently worded, irreversible-sounding delete confirmation that then
+  silently deletes nothing, because `deleteInvoices`
+  (`src/lib/actions/invoices.ts`) drops non-deletable ids server-side. With the
+  scoping, the delete button hides when nothing ticked is deletable and its count
+  states what will actually be removed.
 - New button next to `ลบที่เลือก`, shown when at least one selected row is
   payable: `รับชำระที่เลือก (n)` where n is the payable count. It opens the new
   dialog.
@@ -200,21 +206,32 @@ Two states inside one dialog:
 **Form state**
 - Table: `รหัสนักเรียน`, `ชื่อ`, `ชั้น/ห้อง`, `ใบแจ้ง`, `ยอดที่จะรับ`
   (right-aligned, tabular), plus a total row `รวม n คน` and the summed amount.
-- Any `skipped` rows render below in a muted note so nothing silently vanishes.
-- Fields: `วิธีชำระ` (เงินสด / โอน, reusing the `METHOD_ITEMS` shape from
-  `invoice-payment-dialog.tsx`), `หมายเหตุ (พิมพ์บนใบเสร็จ)`,
+- Any `skipped` rows render below as one muted line per student
+  (`{studentName} — {reason}`, using the reason the selection module already
+  computes) so nothing silently vanishes.
+- Fields: `วิธีชำระ` (labels from `PAYMENT_METHOD_LABELS` in
+  `src/lib/finance/constants.ts` — the payments list already uses them, and the
+  older dialogs' local copies disagree with it), `หมายเหตุ (พิมพ์บนใบเสร็จ)`,
   `โน้ตภายใน (ไม่พิมพ์)`.
 - Submit `ยืนยัน ออกใบเสร็จ n ใบ` opens an `AlertDialog` confirm showing count,
   total, and method — same guard-rail as the single-payment flow.
 
 **Result state**
-- `บันทึกแล้ว n ใบ` listing student name + receipt number, and, if any failed,
-  `ไม่สำเร็จ m ใบ` with the per-row reason.
+- `บันทึกแล้ว n ใบ` listing student name + receipt number + amount, closing with
+  a total row — the cashier reconciles that figure against the cash the teacher
+  handed over, and it can legitimately differ from the total quoted at confirm
+  time if a balance moved in between. If any failed, `ไม่สำเร็จ m ใบ` with the
+  per-row reason.
 - `พิมพ์ใบเสร็จทั้งชุด` sets the hidden iframe's `src` to the batch receipts URL
   (auto-print fires on load); the button stays available so a failed print run
   can be repeated.
-- Closing the dialog invalidates the finance queries via
-  `invalidateFinanceQueries(queryClient)` and clears the selection.
+- As soon as the batch returns, the dialog invalidates the finance queries via
+  `invalidateFinanceQueries(queryClient)`, refreshes the route, and clears the
+  page's selection — the result view keeps its own copy of the response, so it
+  stays readable while the table behind it updates.
+- A thrown request (a dropped connection, or the batch exceeding a platform
+  timeout) must still return the dialog to a usable state, and must warn rather
+  than invite a retry: payments commit per invoice, so some may already exist.
 
 ## Combined receipts page
 
@@ -248,7 +265,15 @@ and `AutoPrint` are reused as they are.
   three invoices produces three sequential receipt numbers, and a batch where one
   invoice was paid concurrently reports one failure and two successes.
 - Manual check of the batch receipts page: print preview shows 2 sheets per
-  student in selection order.
+  student in selection order. Run this at a realistic classroom size (~40 rows,
+  ~80 sheets), not just a handful — that is the size this feature exists for,
+  and it is also the only way to see how long a full batch takes, since the
+  action performs two sequential round trips per invoice.
+- `npm run build` is part of the check, not an afterthought. `src/lib/actions/
+  payments.ts` carries `"use server"`, where a non-async export silently voids
+  every export in the module; `tsc --noEmit` and the vitest suite both pass
+  while the build fails. That is exactly how `BULK_PAYMENT_MAX` ended up in
+  `src/lib/finance/constants.ts`.
 
 ## Out of scope
 

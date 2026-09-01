@@ -39,6 +39,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AppHeader } from "@/components/app-header";
+import { BulkPaymentDialog } from "@/components/finance/bulk-payment-dialog";
 import { InvoicePaymentDialog } from "@/components/finance/invoice-payment-dialog";
 import { InvoicePriceTierDialog } from "@/components/finance/invoice-price-tier-dialog";
 import {
@@ -59,6 +60,7 @@ import {
   canDeleteInvoice,
   invoiceDeleteBlockedReason,
 } from "@/lib/finance/invoice-delete-eligibility";
+import { resolveBulkPaymentTargets } from "@/lib/finance/bulk-payment-selection";
 import { invalidateFinanceQueries } from "@/lib/queries/invalidate";
 import { fetchInvoicesPaginated, fetchInvoiceCandidates } from "@/lib/queries/invoices";
 import { fetchGradeLevels, fetchClassroomsBySemester } from "@/lib/queries/classrooms";
@@ -111,6 +113,7 @@ export function InvoicesPanel() {
   const [reimbursableTarget, setReimbursableTarget] = useState<InvoiceListRow | null>(null);
   const [paymentTarget, setPaymentTarget] = useState<InvoiceListRow | null>(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [bulkPayOpen, setBulkPayOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [deleteTargetIds, setDeleteTargetIds] = useState<string[] | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -185,13 +188,36 @@ export function InvoicesPanel() {
     };
   }
 
-  const deletableRows = useMemo(
-    () => data.rows.filter((row) => canDeleteInvoice(deleteContextFor(row))),
+  // Selection now means "rows I might act on". A row qualifies if either bulk
+  // action could use it — payment needs money still owed, delete needs every
+  // receipt already voided — and each action then filters the selection down
+  // to its own eligible subset.
+  const selectableRows = useMemo(
+    () =>
+      data.rows.filter(
+        (row) => row.outstanding > 0 || canDeleteInvoice(deleteContextFor(row)),
+      ),
     [data.rows],
   );
 
-  const allDeletableSelected =
-    deletableRows.length > 0 && deletableRows.every((row) => selectedIds.has(row.id));
+  const allSelectableSelected =
+    selectableRows.length > 0 && selectableRows.every((row) => selectedIds.has(row.id));
+
+  const bulkTargets = useMemo(
+    () => resolveBulkPaymentTargets(data.rows, selectedIds),
+    [data.rows, selectedIds],
+  );
+
+  // The two bulk actions have different eligibility rules, so each derives its
+  // own subset from the shared selection: payment needs an outstanding
+  // balance, delete needs every receipt voided first.
+  const deletableSelectedIds = useMemo(
+    () =>
+      data.rows
+        .filter((row) => selectedIds.has(row.id) && canDeleteInvoice(deleteContextFor(row)))
+        .map((row) => row.id),
+    [data.rows, selectedIds],
+  );
 
   useEffect(() => {
     startTransition(() => setSelectedIds(new Set()));
@@ -270,7 +296,7 @@ export function InvoicesPanel() {
       setSelectedIds(new Set());
       return;
     }
-    setSelectedIds(new Set(deletableRows.map((row) => row.id)));
+    setSelectedIds(new Set(selectableRows.map((row) => row.id)));
   }
 
   async function confirmDelete() {
@@ -301,7 +327,7 @@ export function InvoicesPanel() {
     router.refresh();
   }
 
-  const bulkDeleteCount = selectedIds.size;
+  const bulkDeleteCount = deletableSelectedIds.length;
 
   function paymentsHref(studentCode: string) {
     const params = new URLSearchParams({ q: studentCode });
@@ -405,12 +431,17 @@ export function InvoicesPanel() {
                     </Select>
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    {bulkTargets.payable.length > 0 ? (
+                      <Button type="button" onClick={() => setBulkPayOpen(true)}>
+                        รับชำระที่เลือก ({bulkTargets.payable.length})
+                      </Button>
+                    ) : null}
                     {bulkDeleteCount > 0 ? (
                       <Button
                         type="button"
                         variant="outline"
                         className="text-destructive"
-                        onClick={() => setDeleteTargetIds([...selectedIds])}
+                        onClick={() => setDeleteTargetIds(deletableSelectedIds)}
                       >
                         ลบที่เลือก ({bulkDeleteCount})
                       </Button>
@@ -527,9 +558,9 @@ export function InvoicesPanel() {
                           <input
                             type="checkbox"
                             className="size-4 rounded border-border"
-                            checked={allDeletableSelected}
-                            disabled={deletableRows.length === 0}
-                            aria-label="เลือกทั้งหมดที่ลบได้"
+                            checked={allSelectableSelected}
+                            disabled={selectableRows.length === 0}
+                            aria-label="เลือกทั้งหมดที่เลือกได้"
                             onChange={(e) => toggleSelectAll(e.target.checked)}
                           />
                         </TableHead>
@@ -555,6 +586,7 @@ export function InvoicesPanel() {
                           const deleteCtx = deleteContextFor(row);
                           const deletable = canDeleteInvoice(deleteCtx);
                           const blockedReason = invoiceDeleteBlockedReason(deleteCtx);
+                          const selectable = row.outstanding > 0 || deletable;
                           return (
                             <TableRow key={row.id}>
                               <TableCell>
@@ -562,8 +594,8 @@ export function InvoicesPanel() {
                                   type="checkbox"
                                   className="size-4 rounded border-border"
                                   checked={selectedIds.has(row.id)}
-                                  disabled={!deletable}
-                                  title={blockedReason ?? undefined}
+                                  disabled={!selectable}
+                                  title={!selectable ? (blockedReason ?? "ไม่มียอดค้างชำระ") : undefined}
                                   aria-label={`เลือก ${row.studentCode}`}
                                   onChange={(e) => toggleRow(row.id, e.target.checked)}
                                 />
@@ -702,6 +734,16 @@ export function InvoicesPanel() {
                     setPaymentOpen(open);
                     if (!open) setPaymentTarget(null);
                   }}
+                />
+
+                <BulkPaymentDialog
+                  open={bulkPayOpen}
+                  onOpenChange={setBulkPayOpen}
+                  targets={bulkTargets}
+                  academicYearId={ctx.academicYearId}
+                  academicYearName={ctx.academicYearName}
+                  semesterId={ctx.semesterId}
+                  onCompleted={() => setSelectedIds(new Set())}
                 />
 
                 <InvoicePriceTierDialog
