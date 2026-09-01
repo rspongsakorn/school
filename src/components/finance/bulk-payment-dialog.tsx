@@ -199,18 +199,20 @@ export function BulkPaymentDialog({
                           </TableCell>
                         </TableRow>
                       ))}
-                      <TableRow className="border-t-2 font-semibold">
-                        <TableCell colSpan={2}>รวม {result.succeeded.length} ใบ</TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatBaht(
-                            Math.round(
-                              result.succeeded.reduce((sum, row) => sum + row.amount, 0) * 100,
-                            ) / 100,
-                          )}
-                        </TableCell>
-                      </TableRow>
                     </TableBody>
                   </Table>
+                </div>
+                {/* Outside the scroll box: this is the figure the cashier tallies
+                    against the cash in hand, so it must never need scrolling to. */}
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2 font-semibold">
+                  <span>รวม {result.succeeded.length} ใบ</span>
+                  <span className="tabular-nums">
+                    {formatBaht(
+                      Math.round(
+                        result.succeeded.reduce((sum, row) => sum + row.amount, 0) * 100,
+                      ) / 100,
+                    )}
+                  </span>
                 </div>
               </div>
 
@@ -285,14 +287,14 @@ export function BulkPaymentDialog({
                         </TableCell>
                       </TableRow>
                     ))}
-                    <TableRow className="border-t-2 font-semibold">
-                      <TableCell colSpan={4}>รวม {count} คน</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatBaht(totalAmount)}
-                      </TableCell>
-                    </TableRow>
                   </TableBody>
                 </Table>
+              </div>
+              {/* Kept out of the scroll box so the amount being committed to is
+                  always on screen, however long the classroom list is. */}
+              <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2 font-semibold">
+                <span>รวม {count} คน</span>
+                <span className="tabular-nums">{formatBaht(totalAmount)}</span>
               </div>
 
               {targets.skipped.length > 0 ? (
