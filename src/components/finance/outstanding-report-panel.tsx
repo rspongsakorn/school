@@ -32,7 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatBaht, formatThaiDate } from "@/lib/format";
+import { compareGradeLevelNames, formatBaht, formatThaiDate } from "@/lib/format";
 import { aggregateOutstandingByStudent } from "@/lib/reports/per-student";
 import { INVOICE_STATUS_LABELS } from "@/lib/finance/constants";
 import { ReportToolbar } from "@/components/finance/report-toolbar";
@@ -207,7 +207,9 @@ export function OutstandingReportPanel() {
       list.push(row);
       groups.set(key, list);
     }
-    return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0], "th"));
+    // Room labels ("ตอ./1", "ป.1/1") need school-level order, not Thai
+    // alphabetical order — the latter buries อ. below ป. and ม.
+    return [...groups.entries()].sort((a, b) => compareGradeLevelNames(a[0], b[0]));
   })();
 
   const perStudentRows = aggregateOutstandingByStudent(rows);

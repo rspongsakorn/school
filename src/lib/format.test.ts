@@ -124,3 +124,17 @@ describe("gradeLevelSortKey", () => {
     expect(gradeLevelSortKey("ตอ.", 1)).toBeGreaterThan(gradeLevelSortKey("ม.1", 0));
   });
 });
+
+describe("compareGradeLevelNames on room labels", () => {
+  it("orders grade/room labels by school level, keeping อ. above ป.", () => {
+    const rooms = ["ป.1/1", "ม.1/2", "อ.2/1", "ตอ./1", "ป.1/3", "ป.10/1"];
+    expect(rooms.sort(compareGradeLevelNames)).toEqual([
+      "ตอ./1",
+      "อ.2/1",
+      "ป.1/1",
+      "ป.1/3",
+      "ป.10/1",
+      "ม.1/2",
+    ]);
+  });
+});
