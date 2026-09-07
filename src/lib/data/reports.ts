@@ -1,5 +1,5 @@
 import { parsePriceTier, type PriceTier } from "@/lib/finance/price-tier";
-import { formatStudentName } from "@/lib/format";
+import { compareGradeLevels, formatStudentName } from "@/lib/format";
 import { getStudentGradeMap } from "@/lib/data/enrollments";
 import { createClient } from "@/lib/supabase/server";
 
@@ -157,6 +157,7 @@ export async function listCollectionsByGrade(
     .eq("semester_id", semesterId)
     .order("sort_order", { ascending: true });
   if (!grades || grades.length === 0) return [];
+  grades.sort(compareGradeLevels);
 
   // Pull the whole semester up front, then aggregate in memory. Avoids the
   // previous per-grade N+1 (2–3 round-trips × every grade).

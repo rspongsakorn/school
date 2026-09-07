@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { compareGradeLevels } from "@/lib/format";
 import { feeRateKey } from "@/lib/finance/fee-rate-keys";
 import type { FeeItemRow } from "@/lib/data/fee-items";
 import type { FeeRateMatrix } from "@/lib/data/fee-rates";
@@ -111,7 +112,9 @@ export async function fetchFeeRateMatrix(
     }));
 
   return {
-    grades: (gradeData ?? []).map((g) => ({ id: g.id, name: g.name })),
+    grades: [...(gradeData ?? [])]
+      .sort(compareGradeLevels)
+      .map((g) => ({ id: g.id, name: g.name })),
     items: activeItems,
     rates,
   };

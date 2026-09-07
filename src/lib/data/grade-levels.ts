@@ -1,3 +1,4 @@
+import { compareGradeLevels } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 
 export type GradeLevelRow = {
@@ -18,5 +19,5 @@ export async function listGradeLevels(semesterId: string): Promise<GradeLevelRow
     .order("name", { ascending: true });
 
   if (error || !data) return [];
-  return data;
+  return [...data].sort(compareGradeLevels);
 }

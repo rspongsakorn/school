@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { formatThaiDate, formatThaiDateLong, formatThaiTime, compareGradeLevelNames } from "./format";
+import {
+  formatThaiDate,
+  formatThaiDateLong,
+  formatThaiTime,
+  compareGradeLevelNames,
+  compareGradeLevels,
+  gradeLevelSortKey,
+} from "./format";
 
 describe("formatThaiDate", () => {
   it("uses Bangkok timezone — 23:00 UTC on May 28 is May 29 in Bangkok", () => {
@@ -82,5 +89,38 @@ describe("compareGradeLevelNames", () => {
 
   it("puts unrecognized prefixes after known levels", () => {
     expect(["พิเศษ", "ป.1"].sort(compareGradeLevelNames)).toEqual(["ป.1", "พิเศษ"]);
+  });
+});
+
+describe("compareGradeLevels", () => {
+  const g = (name: string, sort_order = 0) => ({ name, sort_order });
+
+  it("falls back to school-level order when every sort_order is the default 0", () => {
+    const shuffled = [g("ม.3"), g("ป.1"), g("ตอ."), g("อ.2"), g("ม.1")];
+    expect(shuffled.sort(compareGradeLevels).map((x) => x.name)).toEqual([
+      "ตอ.",
+      "อ.2",
+      "ป.1",
+      "ม.1",
+      "ม.3",
+    ]);
+  });
+
+  it("honours an explicitly configured sort_order over the name", () => {
+    const rows = [g("ตอ.", 2), g("ม.1", 1)];
+    expect(rows.sort(compareGradeLevels).map((x) => x.name)).toEqual(["ม.1", "ตอ."]);
+  });
+});
+
+describe("gradeLevelSortKey", () => {
+  it("sorts numerically in the same order as compareGradeLevels", () => {
+    const names = ["ม.3", "ป.1", "ตอ.", "อ.2", "ป.10"];
+    const sorted = [...names].sort((a, b) => gradeLevelSortKey(a) - gradeLevelSortKey(b));
+    expect(sorted).toEqual(["ตอ.", "อ.2", "ป.1", "ป.10", "ม.3"]);
+  });
+
+  it("lets a configured sort_order outrank the name", () => {
+    expect(gradeLevelSortKey("ม.1", 1)).toBeGreaterThan(gradeLevelSortKey("ตอ.", 0));
+    expect(gradeLevelSortKey("ตอ.", 1)).toBeGreaterThan(gradeLevelSortKey("ม.1", 0));
   });
 });
