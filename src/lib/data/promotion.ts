@@ -1,4 +1,4 @@
-import { formatStudentName } from "@/lib/format";
+import { compareGradeLevels, formatStudentName } from "@/lib/format";
 import {
   mapClassroomsByName,
   mapGradesByOrder,
@@ -79,8 +79,8 @@ export async function buildPromotionPlan(
       .order("sort_order", { ascending: true }),
   ]);
 
-  const sourceGrades = (sourceGradesRes.data ?? []) as GradeRow[];
-  const targetGrades = (targetGradesRes.data ?? []) as GradeRow[];
+  const sourceGrades = ((sourceGradesRes.data ?? []) as GradeRow[]).sort(compareGradeLevels);
+  const targetGrades = ((targetGradesRes.data ?? []) as GradeRow[]).sort(compareGradeLevels);
 
   const [sourceClassroomsRes, targetClassroomsRes] = await Promise.all([
     supabase

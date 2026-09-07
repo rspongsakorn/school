@@ -1,3 +1,4 @@
+import { compareGradeLevels, gradeLevelSortKey } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
 
 export type GradeLevel = { id: string; name: string; sort_order: number };
@@ -8,17 +9,16 @@ export async function fetchGradeLevels(semesterId: string): Promise<GradeLevel[]
   const { data, error } = await supabase
     .from("grade_levels")
     .select("id, name, sort_order")
-    .eq("semester_id", semesterId)
-    .order("sort_order", { ascending: true });
+    .eq("semester_id", semesterId);
   if (error || !data) return [];
-  return data;
+  return [...data].sort(compareGradeLevels);
 }
 
 export async function fetchClassroomsBySemester(semesterId: string): Promise<Classroom[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("classrooms")
-    .select("id, name, grade_level_id, grade_levels ( sort_order )")
+    .select("id, name, grade_level_id, grade_levels ( name, sort_order )")
     .eq("semester_id", semesterId);
   if (error || !data) return [];
 
@@ -26,7 +26,7 @@ export async function fetchClassroomsBySemester(semesterId: string): Promise<Cla
     id: string;
     name: string;
     grade_level_id: string;
-    grade_levels: { sort_order: number } | null;
+    grade_levels: { name: string; sort_order: number } | null;
   };
 
   return (data as unknown as Row[])
@@ -34,7 +34,10 @@ export async function fetchClassroomsBySemester(semesterId: string): Promise<Cla
       id: row.id,
       name: row.name,
       grade_level_id: row.grade_level_id,
-      gradeSortOrder: row.grade_levels?.sort_order ?? 0,
+      gradeSortOrder: gradeLevelSortKey(
+        row.grade_levels?.name ?? "",
+        row.grade_levels?.sort_order ?? 0,
+      ),
     }))
     .sort((a, b) => {
       const diff = a.gradeSortOrder - b.gradeSortOrder;

@@ -62,6 +62,27 @@ export function compareGradeLevelNames(a: string, b: string): number {
   return rankDiff !== 0 ? rankDiff : a.localeCompare(b, "th", { numeric: true });
 }
 
+/**
+ * Compares grade levels by their configured sort_order, falling back to school-level
+ * name order when sort_order ties (it defaults to 0 for every grade).
+ */
+export function compareGradeLevels(
+  a: { name: string; sort_order: number },
+  b: { name: string; sort_order: number },
+): number {
+  const diff = a.sort_order - b.sort_order;
+  return diff !== 0 ? diff : compareGradeLevelNames(a.name, b.name);
+}
+
+/**
+ * Same ordering as {@link compareGradeLevels}, collapsed into a single number so
+ * callers that can only carry a numeric sort key still order ตอ. → อ. → ป. → ม.
+ */
+export function gradeLevelSortKey(name: string, sortOrder = 0): number {
+  const year = /(\d+)/.exec(name);
+  return sortOrder * 100_000 + gradeLevelRank(name) * 1_000 + (year ? Number(year[1]) : 0);
+}
+
 /** แปลงจำนวนเงิน (บาท) เป็นตัวอักษรภาษาไทย เช่น 3100 → "สามพันหนึ่งร้อยบาทถ้วน" */
 export function bahtText(amount: number): string {
   const satang = Math.round((amount % 1) * 100);

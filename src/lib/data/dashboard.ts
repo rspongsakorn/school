@@ -1,4 +1,4 @@
-import { formatStudentName, formatThaiDate } from "@/lib/format";
+import { compareGradeLevels, formatStudentName, formatThaiDate } from "@/lib/format";
 import { getStudentGradeMap } from "@/lib/data/enrollments";
 import { createClient } from "@/lib/supabase/server";
 import type { YearSemesterContext } from "@/lib/data/context";
@@ -189,7 +189,7 @@ export async function getDashboardData(
     };
   });
 
-  const gradeLevels = gradeLevelsRes.data ?? [];
+  const gradeLevels = [...(gradeLevelsRes.data ?? [])].sort(compareGradeLevels);
   const gradeStats: GradeStatRow[] = await Promise.all(
     gradeLevels.map(async (gl) => {
       const { data: classrooms } = await supabase

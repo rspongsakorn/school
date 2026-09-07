@@ -1,3 +1,4 @@
+import { compareGradeLevels } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 
 export type ClassroomRow = {
@@ -88,9 +89,11 @@ export async function listClassroomsBySemester(
       grade_sort_order: c.grade_levels?.sort_order ?? 0,
     }))
     .sort((a, b) => {
-      if (a.grade_sort_order !== b.grade_sort_order) {
-        return a.grade_sort_order - b.grade_sort_order;
-      }
+      const gradeDiff = compareGradeLevels(
+        { name: a.grade_name, sort_order: a.grade_sort_order },
+        { name: b.grade_name, sort_order: b.grade_sort_order },
+      );
+      if (gradeDiff !== 0) return gradeDiff;
       return a.name.localeCompare(b.name, "th");
     });
 }

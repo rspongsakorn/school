@@ -1,5 +1,5 @@
 import { parsePriceTier, type PriceTier } from "@/lib/finance/price-tier";
-import { formatClassroom, formatStudentName } from "@/lib/format";
+import { formatClassroom, formatStudentName, gradeLevelSortKey } from "@/lib/format";
 import { buildStudentSearchOrFilter } from "@/lib/students/search";
 import { createClient } from "@/lib/supabase/client";
 import { fetchAllPages } from "@/lib/supabase/paginate";
@@ -86,18 +86,19 @@ async function getStudentGradeSortMap(semesterId: string): Promise<Map<string, n
 
   type GradeSortRow = {
     student_id: string;
-    classrooms: { grade_levels: { sort_order: number } | null } | null;
+    classrooms: { grade_levels: { name: string; sort_order: number } | null } | null;
   };
 
   const { data } = await supabase
     .from("student_enrollments")
-    .select("student_id, classrooms ( grade_levels ( sort_order ) )")
+    .select("student_id, classrooms ( grade_levels ( name, sort_order ) )")
     .eq("semester_id", semesterId)
     .eq("status", "enrolled");
 
   const map = new Map<string, number>();
   for (const row of (data ?? []) as unknown as GradeSortRow[]) {
-    map.set(row.student_id, row.classrooms?.grade_levels?.sort_order ?? 0);
+    const grade = row.classrooms?.grade_levels;
+    map.set(row.student_id, gradeLevelSortKey(grade?.name ?? "", grade?.sort_order ?? 0));
   }
   return map;
 }
