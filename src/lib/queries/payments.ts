@@ -3,13 +3,19 @@ import { buildStudentSearchOrFilter } from "@/lib/students/search";
 import { createClient } from "@/lib/supabase/client";
 import { computeReceiptLineItems, type ReceiptLineItem, type ReceiptDiscount } from "@/lib/finance/receipt-line-items";
 
-async function getStudentGradeMap(semesterId: string): Promise<Map<string, string>> {
+async function getStudentGradeMap(
+  semesterId: string,
+  opts: { studentIds?: string[]; signal?: AbortSignal } = {},
+): Promise<Map<string, string>> {
   const supabase = createClient();
-  const { data } = await supabase
+  let query = supabase
     .from("student_enrollments")
     .select("student_id, classrooms(name, grade_levels(name))")
     .eq("semester_id", semesterId)
     .eq("status", "enrolled");
+  if (opts.studentIds) query = query.in("student_id", opts.studentIds);
+  if (opts.signal) query = query.abortSignal(opts.signal);
+  const { data } = await query;
   const map = new Map<string, string>();
   for (const row of (data ?? []) as unknown as {
     student_id: string;
@@ -74,6 +80,7 @@ async function studentIdsForPaymentFilter(params: {
   semesterId: string;
   gradeLevelId?: string;
   classroomId?: string;
+  signal?: AbortSignal;
 }): Promise<string[]> {
   const supabase = createClient();
 
@@ -89,19 +96,29 @@ async function studentIdsForPaymentFilter(params: {
     query = query.eq("classrooms.grade_level_id", params.gradeLevelId);
   }
 
+  if (params.signal) query = query.abortSignal(params.signal);
+
   const { data } = await query;
   const ids = [...new Set((data ?? []).map((row) => row.student_id))];
   return ids;
 }
+
+export const PAYMENTS_PAGE_SIZE = 20;
+
+export type PaymentsPage = { rows: PaymentListRow[]; total: number };
 
 export async function fetchPaymentsFiltered(params: {
   academicYearId: string;
   semesterId: string;
   gradeLevelId?: string;
   classroomId?: string;
-}): Promise<PaymentListRow[]> {
+  search?: string;
+  page: number;
+  pageSize?: number;
+}): Promise<PaymentsPage> {
   const supabase = createClient();
-  const gradeByStudent = await getStudentGradeMap(params.semesterId);
+  const pageSize = params.pageSize ?? PAYMENTS_PAGE_SIZE;
+  const from = (params.page - 1) * pageSize;
 
   const hasFilter = Boolean(params.gradeLevelId || params.classroomId);
 
@@ -114,7 +131,7 @@ export async function fetchPaymentsFiltered(params: {
       gradeLevelId: params.gradeLevelId,
       classroomId: params.classroomId,
     });
-    if (ids.length === 0) return [];
+    if (ids.length === 0) return { rows: [], total: 0 };
     studentIds = ids;
   }
 
@@ -132,17 +149,38 @@ export async function fetchPaymentsFiltered(params: {
       students!inner ( student_code, first_name, last_name ),
       receipts ( snapshot_data )
     `,
+      { count: "exact" },
     )
     .eq("academic_year_id", params.academicYearId)
-    .order("paid_at", { ascending: false });
+    .order("paid_at", { ascending: false })
+    // Tie-breaker: imported payments share one paid_at, and without a unique
+    // sort key .range() pages can repeat or skip rows.
+    .order("id", { ascending: false })
+    .range(from, from + pageSize - 1);
 
   if (studentIds) {
     query = query.in("student_id", studentIds);
   }
 
-  const { data: payments } = await query;
+  // Every whitespace-separated word must match the code, first or last name,
+  // so a full name like "first last" still finds the student.
+  for (const word of params.search?.split(/\s+/) ?? []) {
+    const searchFilter = buildStudentSearchOrFilter(word);
+    if (searchFilter) query = query.or(searchFilter, { referencedTable: "students" });
+  }
 
-  return mapPaymentRows((payments ?? []) as unknown as PaymentQueryRow[], gradeByStudent);
+  const { data: payments, count } = await query;
+  const rows = (payments ?? []) as unknown as PaymentQueryRow[];
+
+  // Label only this page's students instead of the whole semester's enrollments.
+  const gradeByStudent =
+    rows.length > 0
+      ? await getStudentGradeMap(params.semesterId, {
+          studentIds: [...new Set(rows.map((r) => r.student_id))],
+        })
+      : new Map<string, string>();
+
+  return { rows: mapPaymentRows(rows, gradeByStudent), total: count ?? rows.length };
 }
 
 export type PaymentDetail = {
@@ -256,9 +294,15 @@ export type SearchStudentsForPaymentOptions = {
   classroomId?: string;
 };
 
+/**
+ * Browser-side student search. Pass `signal` to abort the in-flight requests
+ * when a newer search starts; an aborted supabase call yields no data, so this
+ * resolves to `[]` (callers must ignore results once `signal.aborted`).
+ */
 export async function searchStudentsForPayment(
   semesterId: string,
   options: SearchStudentsForPaymentOptions,
+  signal?: AbortSignal,
 ): Promise<StudentSearchHit[]> {
   const q = options.query?.trim() ?? "";
   const hasScope = Boolean(options.gradeLevelId || options.classroomId);
@@ -266,14 +310,13 @@ export async function searchStudentsForPayment(
   if (!q && !hasScope) return [];
   if (q.length > 0 && q.length < 2 && !hasScope) return [];
 
-  const gradeByStudent = await getStudentGradeMap(semesterId);
-
   let studentIds: string[] | undefined;
   if (hasScope) {
     const scopedIds = await studentIdsForPaymentFilter({
       semesterId,
       gradeLevelId: options.gradeLevelId,
       classroomId: options.classroomId,
+      signal,
     });
     if (scopedIds.length === 0) return [];
     studentIds = scopedIds;
@@ -287,6 +330,8 @@ export async function searchStudentsForPayment(
     .order("student_code", { ascending: true })
     .limit(50);
 
+  if (signal) studentQuery = studentQuery.abortSignal(signal);
+
   if (studentIds) {
     studentQuery = studentQuery.in("id", studentIds);
   }
@@ -297,8 +342,15 @@ export async function searchStudentsForPayment(
   }
 
   const { data } = await studentQuery;
+  if (!data || data.length === 0) return [];
 
-  return (data ?? []).map((s) => ({
+  // Label only the (≤50) hits instead of loading the whole semester's enrollments.
+  const gradeByStudent = await getStudentGradeMap(semesterId, {
+    studentIds: data.map((s) => s.id),
+    signal,
+  });
+
+  return data.map((s) => ({
     id: s.id,
     studentCode: s.student_code,
     name: formatStudentName(s.first_name, s.last_name),

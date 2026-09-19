@@ -1,8 +1,9 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,11 +46,14 @@ import { PAYMENT_METHOD_LABELS } from "@/lib/finance/constants";
 import {
   getStudentOutstandingAction,
   recordPayment,
-  searchStudentsForPaymentAction,
   voidPayment,
 } from "@/lib/actions/payments";
 import { invalidateFinanceQueries } from "@/lib/queries/invalidate";
-import { fetchPaymentsFiltered } from "@/lib/queries/payments";
+import {
+  PAYMENTS_PAGE_SIZE,
+  fetchPaymentsFiltered,
+  searchStudentsForPayment,
+} from "@/lib/queries/payments";
 import { fetchGradeLevels, fetchClassroomsBySemester } from "@/lib/queries/classrooms";
 import type { OutstandingInvoiceRow } from "@/lib/data/invoices";
 import type { PaymentListRow } from "@/lib/queries/payments";
@@ -70,6 +74,151 @@ function resolveOne(lineAmount: number, raw?: { value: string; unit: "fixed" | "
 }
 
 
+// Memoized so search-state changes elsewhere in the panel (student search
+// spinner/results) don't re-render every payment row.
+const PaymentHistoryList = memo(function PaymentHistoryList({
+  payments: displayedPayments,
+  onVoid,
+  onDetail,
+}: {
+  payments: PaymentListRow[];
+  onVoid: (p: PaymentListRow) => void;
+  onDetail: (p: PaymentListRow) => void;
+}) {
+  return (
+    <>
+      {/* Mobile stacked cards */}
+      {displayedPayments.length === 0 ? (
+        <p className="px-4 py-6 text-center text-sm text-muted-foreground sm:hidden">
+          ไม่พบรายการการชำระ
+        </p>
+      ) : (
+        <div className="sm:hidden divide-y divide-border">
+          {displayedPayments.map((p) => (
+            <div key={p.id} className="space-y-2 px-4 py-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{p.studentName}</p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {p.paidAtLabel} · {PAYMENT_METHOD_LABELS[p.paymentMethod]}
+                  </p>
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <span className="font-semibold tabular-nums">
+                    {formatBaht(p.amount)}
+                  </span>
+                  {p.status === "active" ? (
+                    <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50">
+                      ปกติ
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100">ยกเลิก</Badge>
+                  )}
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <a href={`/receipts/${p.id}`} target="_blank" rel="noopener noreferrer">
+                  <Button type="button" size="sm" variant="outline">
+                    ใบเสร็จ
+                  </Button>
+                </a>
+                {p.status === "active" ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="text-destructive"
+                    onClick={() => onVoid(p)}
+                  >
+                    ยกเลิก
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Desktop table */}
+      <div className="hidden sm:block">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>เลขที่</TableHead>
+              <TableHead>รหัส</TableHead>
+              <TableHead>นักเรียน</TableHead>
+              <TableHead>ชั้น/ห้อง</TableHead>
+              <TableHead>วันที่</TableHead>
+              <TableHead>วิธี</TableHead>
+              <TableHead className="text-right">จำนวน</TableHead>
+              <TableHead>สถานะ</TableHead>
+              <TableHead className="text-right">จัดการ</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {displayedPayments.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={9} className="py-6 text-center text-muted-foreground">
+                  ไม่พบรายการการชำระ
+                </TableCell>
+              </TableRow>
+            ) : (
+              displayedPayments.map((p) => (
+                <TableRow
+                  key={p.id}
+                  className="cursor-pointer"
+                  onClick={() => onDetail(p)}
+                >
+                  <TableCell className="tabular-nums">{p.receiptNumber}</TableCell>
+                  <TableCell className="tabular-nums">{p.studentCode}</TableCell>
+                  <TableCell>{p.studentName}</TableCell>
+                  <TableCell className="text-muted-foreground">{p.gradeClassroom}</TableCell>
+                  <TableCell className="whitespace-nowrap text-muted-foreground">
+                    {p.paidAtLabel}
+                  </TableCell>
+                  <TableCell>{PAYMENT_METHOD_LABELS[p.paymentMethod]}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatBaht(p.amount)}
+                  </TableCell>
+                  <TableCell>
+                    {p.status === "active" ? (
+                      <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50">
+                        ปกติ
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100">ยกเลิก</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex justify-end gap-2">
+                      <a href={`/receipts/${p.id}`} target="_blank" rel="noopener noreferrer">
+                        <Button type="button" size="sm" variant="outline">
+                          ใบเสร็จ
+                        </Button>
+                      </a>
+                      {p.status === "active" ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="text-destructive"
+                          onClick={() => onVoid(p)}
+                        >
+                          ยกเลิก
+                        </Button>
+                      ) : null}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </>
+  );
+});
+
 export function PaymentsPanel() {
   useRequireRole(["admin", "finance"]);
 
@@ -84,6 +233,7 @@ export function PaymentsPanel() {
   const qParam = searchParams.get("q") ?? "";
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
   const [searchGrade, setSearchGrade] = useState("all");
   const [searchClassroom, setSearchClassroom] = useState("all");
   const [searchResults, setSearchResults] = useState<
@@ -113,15 +263,23 @@ export function PaymentsPanel() {
   const [importOpen, setImportOpen] = useState(false);
   const [xlsxImportOpen, setXlsxImportOpen] = useState(false);
   const [lastPayment, setLastPayment] = useState<{ id: string; receiptNumber: string; amount: number } | null>(null);
-  const [voidTarget, setVoidTarget] = useState<PaymentListRow | null>(null);
+  const [voidTarget, setVoidTarget] = useState<Pick<PaymentListRow, "id" | "receiptNumber"> | null>(null);
   const [detailPayment, setDetailPayment] = useState<PaymentListRow | null>(null);
   const [voidReason, setVoidReason] = useState("");
   const [paymentSearch, setPaymentSearch] = useState(qParam);
+  // Debounced copy of `paymentSearch` — this is what the server query uses.
+  const [debouncedPaymentSearch, setDebouncedPaymentSearch] = useState(qParam.trim());
+  // Page is tied to the filters it was chosen under; changing any filter
+  // falls back to page 1 without needing an effect.
+  const [pageState, setPageState] = useState({ key: "", page: 1 });
   const [prevQParam, setPrevQParam] = useState(qParam);
   const [voiding, setVoiding] = useState(false);
   const [isNavigating, startTransition] = useTransition();
+  // Separate from `isNavigating` so clearing search results never dims the page.
+  const [, startSearchTransition] = useTransition();
 
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const amountInputRef = useRef<HTMLInputElement>(null);
   const receiptIframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -150,13 +308,27 @@ export function PaymentsPanel() {
     staleTime: 60_000,
   });
 
-  const { data: filteredPayments = [], isLoading: paymentsLoading } = useQuery({
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedPaymentSearch(paymentSearch.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [paymentSearch]);
+
+  const historyFilterKey = `${gradeParam}|${classroomParam}|${debouncedPaymentSearch}`;
+  const historyPage = pageState.key === historyFilterKey ? pageState.page : 1;
+
+  const {
+    data: paymentsPage,
+    isLoading: paymentsLoading,
+    isPlaceholderData: paymentsPageChanging,
+  } = useQuery({
     queryKey: [
       "payments",
       ctx?.academicYearId,
       ctx?.semesterId,
       gradeParam,
       classroomParam,
+      debouncedPaymentSearch,
+      historyPage,
     ],
     queryFn: () =>
       fetchPaymentsFiltered({
@@ -164,10 +336,16 @@ export function PaymentsPanel() {
         semesterId: ctx!.semesterId,
         gradeLevelId: gradeParam !== "all" ? gradeParam : undefined,
         classroomId: classroomParam !== "all" ? classroomParam : undefined,
+        search: debouncedPaymentSearch || undefined,
+        page: historyPage,
       }),
     enabled: Boolean(ctx?.semesterId),
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });
+  const displayedPayments = useMemo(() => paymentsPage?.rows ?? [], [paymentsPage]);
+  const paymentsTotal = paymentsPage?.total ?? 0;
+  const paymentsPageCount = Math.max(1, Math.ceil(paymentsTotal / PAYMENTS_PAGE_SIZE));
 
   // Build a grade name lookup map from the fetched grades
   const gradeNameById = new Map(grades.map((g) => [g.id, g.name]));
@@ -224,26 +402,33 @@ export function PaymentsPanel() {
     const hasScope = searchGrade !== "all" || searchClassroom !== "all";
 
     if (q.length < 2 && !hasScope) {
-      startTransition(() => setSearchResults([]));
+      startSearchTransition(() => setSearchResults([]));
       return;
     }
 
-    // Guard against out-of-order responses: if the inputs change (or the
-    // component unmounts) before this request resolves, drop its result so a
-    // slower earlier request can't overwrite fresher results.
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      const result = await searchStudentsForPaymentAction(ctx.semesterId, {
-        query: q.length >= 2 ? q : undefined,
-        gradeLevelId: searchGrade !== "all" ? searchGrade : undefined,
-        classroomId: searchClassroom !== "all" ? searchClassroom : undefined,
-      });
-      if (!cancelled && result.ok) setSearchResults(result.students);
-    }, 300);
+    // A new search (or unmount) aborts the in-flight request outright.
+    const controller = new AbortController();
+    void (async () => {
+      setIsSearching(true);
+      try {
+        const students = await searchStudentsForPayment(
+          ctx.semesterId,
+          {
+            query: q.length >= 2 ? q : undefined,
+            gradeLevelId: searchGrade !== "all" ? searchGrade : undefined,
+            classroomId: searchClassroom !== "all" ? searchClassroom : undefined,
+          },
+          controller.signal,
+        );
+        if (!controller.signal.aborted) setSearchResults(students);
+      } finally {
+        if (!controller.signal.aborted) setIsSearching(false);
+      }
+    })();
 
     return () => {
-      cancelled = true;
-      clearTimeout(timer);
+      controller.abort();
+      setIsSearching(false);
     };
   }, [searchQuery, searchGrade, searchClassroom, ctx?.semesterId]);
 
@@ -255,6 +440,7 @@ export function PaymentsPanel() {
   if (qParam !== prevQParam) {
     setPrevQParam(qParam);
     setPaymentSearch(qParam);
+    setDebouncedPaymentSearch(qParam.trim());
   }
 
   async function selectStudent(student: (typeof searchResults)[number]) {
@@ -263,6 +449,8 @@ export function PaymentsPanel() {
     setSelectedStudent(student);
     setSelectedInvoice(null);
     setLineDiscounts({});
+    clearTimeout(searchDebounceRef.current);
+    if (searchInputRef.current) searchInputRef.current.value = "";
     setSearchQuery("");
     setSearchResults([]);
 
@@ -339,6 +527,8 @@ export function PaymentsPanel() {
     setConfirmOpen(false);
     toast.success("บันทึกการชำระและออกใบเสร็จแล้ว");
     setLastPayment({ id: result.paymentId, receiptNumber: result.receiptNumber, amount: parsedAmount });
+    // Newest payment lands on page 1 — show it so "void this payment" can find it.
+    setPageState({ key: "", page: 1 });
     printReceipt(result.paymentId);
     setSelectedStudent(null);
     setOutstanding([]);
@@ -373,16 +563,6 @@ export function PaymentsPanel() {
   }
 
   const isLoading = ctxLoading || paymentsLoading;
-
-  const displayedPayments = paymentSearch.trim()
-    ? filteredPayments.filter((p) => {
-        const q = paymentSearch.trim().toLowerCase();
-        return (
-          p.studentCode.toLowerCase().includes(q) ||
-          p.studentName.toLowerCase().includes(q)
-        );
-      })
-    : filteredPayments;
 
   if (ctxLoading) {
     return (
@@ -448,10 +628,17 @@ export function PaymentsPanel() {
                 autoFocus
                 className="h-11 text-base"
                 placeholder="พิมพ์รหัสหรือชื่อ แล้วกด Enter"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  // Uncontrolled so typing never re-renders this large panel;
+                  // only the debounced value drives the search.
+                  const value = e.target.value;
+                  clearTimeout(searchDebounceRef.current);
+                  searchDebounceRef.current = setTimeout(() => setSearchQuery(value), 300);
+                }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && searchResults.length > 0) {
+                  // Ignore Enter while results are stale (typing pause or request in flight).
+                  const settled = !isSearching && searchInputRef.current?.value.trim() === searchQuery.trim();
+                  if (e.key === "Enter" && settled && searchResults.length > 0) {
                     e.preventDefault();
                     void selectStudent(searchResults[0]);
                   }
@@ -503,7 +690,12 @@ export function PaymentsPanel() {
                 </div>
               </details>
 
-              {searchResults.length > 0 ? (
+              {isSearching ? (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  กำลังค้นหา…
+                </p>
+              ) : searchResults.length > 0 ? (
                 <ul className="divide-y divide-border rounded-lg border border-border">
                   {searchResults.map((s, i) => (
                     <li key={s.id}>
@@ -572,8 +764,7 @@ export function PaymentsPanel() {
                         size="sm"
                         className="flex-1 text-destructive"
                         onClick={() => {
-                          const row = filteredPayments.find((p) => p.id === lastPayment.id);
-                          if (row) setVoidTarget(row);
+                          setVoidTarget({ id: lastPayment.id, receiptNumber: lastPayment.receiptNumber });
                         }}
                       >
                         ยกเลิกการชำระนี้
@@ -865,133 +1056,37 @@ export function PaymentsPanel() {
               />
               </CardHeader>
               <CardContent className="px-0 pb-0">
-                {/* Mobile stacked cards */}
-                {displayedPayments.length === 0 ? (
-                  <p className="px-4 py-6 text-center text-sm text-muted-foreground sm:hidden">
-                    ไม่พบรายการการชำระ
-                  </p>
-                ) : (
-                  <div className="sm:hidden divide-y divide-border">
-                    {displayedPayments.map((p) => (
-                      <div key={p.id} className="space-y-2 px-4 py-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="truncate font-medium">{p.studentName}</p>
-                            <p className="mt-0.5 text-sm text-muted-foreground">
-                              {p.paidAtLabel} · {PAYMENT_METHOD_LABELS[p.paymentMethod]}
-                            </p>
-                          </div>
-                          <div className="flex shrink-0 flex-col items-end gap-1">
-                            <span className="font-semibold tabular-nums">
-                              {formatBaht(p.amount)}
-                            </span>
-                            {p.status === "active" ? (
-                              <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50">
-                                ปกติ
-                              </Badge>
-                            ) : (
-                              <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100">ยกเลิก</Badge>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex justify-end gap-2">
-                          <a href={`/receipts/${p.id}`} target="_blank" rel="noopener noreferrer">
-                            <Button type="button" size="sm" variant="outline">
-                              ใบเสร็จ
-                            </Button>
-                          </a>
-                          {p.status === "active" ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="text-destructive"
-                              onClick={() => setVoidTarget(p)}
-                            >
-                              ยกเลิก
-                            </Button>
-                          ) : null}
-                        </div>
-                      </div>
-                    ))}
+                <div className={cn(paymentsPageChanging && "opacity-60 transition-opacity")}>
+                  <PaymentHistoryList
+                    payments={displayedPayments}
+                    onVoid={setVoidTarget}
+                    onDetail={setDetailPayment}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-2 border-t border-border px-4 py-3 text-sm">
+                  <span className="text-muted-foreground">
+                    {paymentsTotal} รายการ · หน้า {historyPage} / {paymentsPageCount}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={historyPage <= 1}
+                      onClick={() => setPageState({ key: historyFilterKey, page: historyPage - 1 })}
+                    >
+                      ก่อนหน้า
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={historyPage >= paymentsPageCount}
+                      onClick={() => setPageState({ key: historyFilterKey, page: historyPage + 1 })}
+                    >
+                      ถัดไป
+                    </Button>
                   </div>
-                )}
-
-                {/* Desktop table */}
-                <div className="hidden sm:block">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>เลขที่</TableHead>
-                        <TableHead>รหัส</TableHead>
-                        <TableHead>นักเรียน</TableHead>
-                        <TableHead>ชั้น/ห้อง</TableHead>
-                        <TableHead>วันที่</TableHead>
-                        <TableHead>วิธี</TableHead>
-                        <TableHead className="text-right">จำนวน</TableHead>
-                        <TableHead>สถานะ</TableHead>
-                        <TableHead className="text-right">จัดการ</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {displayedPayments.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={9} className="py-6 text-center text-muted-foreground">
-                            ไม่พบรายการการชำระ
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        displayedPayments.map((p) => (
-                          <TableRow
-                            key={p.id}
-                            className="cursor-pointer"
-                            onClick={() => setDetailPayment(p)}
-                          >
-                            <TableCell className="tabular-nums">{p.receiptNumber}</TableCell>
-                            <TableCell className="tabular-nums">{p.studentCode}</TableCell>
-                            <TableCell>{p.studentName}</TableCell>
-                            <TableCell className="text-muted-foreground">{p.gradeClassroom}</TableCell>
-                            <TableCell className="whitespace-nowrap text-muted-foreground">
-                              {p.paidAtLabel}
-                            </TableCell>
-                            <TableCell>{PAYMENT_METHOD_LABELS[p.paymentMethod]}</TableCell>
-                            <TableCell className="text-right tabular-nums">
-                              {formatBaht(p.amount)}
-                            </TableCell>
-                            <TableCell>
-                              {p.status === "active" ? (
-                                <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50">
-                                  ปกติ
-                                </Badge>
-                              ) : (
-                                <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100">ยกเลิก</Badge>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                              <div className="flex justify-end gap-2">
-                                <a href={`/receipts/${p.id}`} target="_blank" rel="noopener noreferrer">
-                                  <Button type="button" size="sm" variant="outline">
-                                    ใบเสร็จ
-                                  </Button>
-                                </a>
-                                {p.status === "active" ? (
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-destructive"
-                                    onClick={() => setVoidTarget(p)}
-                                  >
-                                    ยกเลิก
-                                  </Button>
-                                ) : null}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
                 </div>
               </CardContent>
             </Card>
