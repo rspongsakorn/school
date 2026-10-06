@@ -20,12 +20,15 @@ import { upsertFeeRates, type FeeRateUpsertEntry } from "@/lib/actions/fee-rates
 import { feeRateKey } from "@/lib/finance/fee-rate-keys";
 import { formatBaht } from "@/lib/format";
 import type { FeeRateMatrix } from "@/lib/data/fee-rates";
+import { fetchFeeRateMatrix } from "@/lib/queries/fee-rates";
 
 type FeeRatesMatrixProps = {
   semesterId: string;
   invoiceTypeId: string;
   matrix: FeeRateMatrix;
   lockedGradeIds: Set<string>;
+  /** Semesters rates can be copied from; the first is the default. */
+  sourceOptions?: { id: string; label: string }[];
 };
 
 export function FeeRatesMatrix({
@@ -33,6 +36,7 @@ export function FeeRatesMatrix({
   invoiceTypeId,
   matrix,
   lockedGradeIds,
+  sourceOptions = [],
 }: FeeRatesMatrixProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -60,6 +64,7 @@ export function FeeRatesMatrix({
     return initial;
   });
   const [saving, setSaving] = useState(false);
+  const [copying, setCopying] = useState(false);
 
   const hasGrades = matrix.grades.length > 0;
   const hasItems = matrix.items.length > 0;
@@ -138,6 +143,48 @@ export function FeeRatesMatrix({
     }));
   }
 
+  const [pickedSourceId, setPickedSourceId] = useState<string | null>(null);
+  const sourceSemester =
+    sourceOptions.find((o) => o.id === pickedSourceId) ?? sourceOptions[0] ?? null;
+  const sourceLabel = sourceSemester?.label ?? "";
+
+  // Grade levels belong to a semester, so match the source semester's grades by name.
+  async function handleCopyFromSource() {
+    if (!sourceSemester) return;
+    setCopying(true);
+    const source = await fetchFeeRateMatrix(sourceSemester.id, invoiceTypeId);
+    setCopying(false);
+
+    const sourceGradeByName = new Map(source.grades.map((g) => [g.name, g.id]));
+    const next: Record<string, DraftCell> = {};
+    let copied = 0;
+    for (const grade of matrix.grades) {
+      if (lockedGradeIds.has(grade.id)) continue;
+      const sourceGradeId = sourceGradeByName.get(grade.name);
+      if (!sourceGradeId) continue;
+      for (const item of matrix.items) {
+        const cell = source.rates[feeRateKey(sourceGradeId, item.id)];
+        if (!cell) continue;
+        next[feeRateKey(grade.id, item.id)] = {
+          amount: String(cell.amount),
+          amountReimbursable:
+            cell.amountReimbursable != null ? String(cell.amountReimbursable) : "",
+          amountPrivate: cell.amountPrivate != null ? String(cell.amountPrivate) : "",
+        };
+        copied += 1;
+      }
+    }
+
+    if (copied === 0) {
+      toast.error(`${sourceLabel} ยังไม่มีอัตราให้คัดลอก`);
+      return;
+    }
+    setDraft((prev) => ({ ...prev, ...next }));
+    toast.success(
+      `คัดลอกจาก${sourceLabel} แล้ว ${copied} ช่อง — ตรวจแล้วกด "บันทึกการเปลี่ยนแปลง"`,
+    );
+  }
+
   async function handleSave() {
     if (changedEntries.length === 0) {
       toast.message("ไม่มีการเปลี่ยนแปลง");
@@ -165,9 +212,36 @@ export function FeeRatesMatrix({
           <CardTitle className="text-base">อัตราค่าธรรมเนียมตามชั้น</CardTitle>
           <CardDescription>จำนวนเงิน (บาท) ต่อภาคเรียนที่เลือกใน header</CardDescription>
         </div>
-        <Button type="button" onClick={handleSave} disabled={saving || !hasGrades || !hasItems}>
-          {saving ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}
-        </Button>
+        <div className="flex items-center gap-2">
+          {sourceSemester ? (
+            <>
+              <select
+                aria-label="ภาคเรียนต้นทางที่จะคัดลอก"
+                className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                value={sourceSemester.id}
+                onChange={(e) => setPickedSourceId(e.target.value)}
+                disabled={copying || saving}
+              >
+                {sourceOptions.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCopyFromSource}
+                disabled={copying || saving || !hasGrades || !hasItems}
+              >
+                {copying ? "กำลังคัดลอก..." : "คัดลอก"}
+              </Button>
+            </>
+          ) : null}
+          <Button type="button" onClick={handleSave} disabled={saving || !hasGrades || !hasItems}>
+            {saving ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {!hasGrades ? (

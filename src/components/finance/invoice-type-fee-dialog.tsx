@@ -26,7 +26,7 @@ type Props = {
 };
 
 export function InvoiceTypeFeeDialog({ invoiceType, open, onOpenChange }: Props) {
-  const { ctx, isLoading: ctxLoading } = useSemesterContext();
+  const { ctx, years, semesters, isLoading: ctxLoading } = useSemesterContext();
   const invoiceTypeId = invoiceType?.id ?? null;
 
   const { data: feeItems = [] } = useQuery({
@@ -54,6 +54,24 @@ export function InvoiceTypeFeeDialog({ invoiceType, open, onOpenChange }: Props)
     queryFn: () => fetchInvoicedGradeIds(ctx!.semesterId, invoiceTypeId!),
     enabled: open && Boolean(ctx?.semesterId) && Boolean(invoiceTypeId),
   });
+
+  // Every other semester, newest first; the one right before this semester is the default.
+  const sourceOptions = useMemo(() => {
+    if (!ctx) return [];
+    const ordered = [...years].reverse().flatMap((y) =>
+      semesters
+        .filter((s) => s.academic_year_id === y.id)
+        .sort((a, b) => a.number - b.number)
+        .map((s) => ({ id: s.id, label: `ปีการศึกษา ${y.name} ภาคเรียนที่ ${s.number}` })),
+    );
+    const index = ordered.findIndex((s) => s.id === ctx.semesterId);
+    const others = ordered.filter((s) => s.id !== ctx.semesterId);
+    const prev = index > 0 ? ordered[index - 1] : null;
+    const reversed = others.reverse();
+    return prev
+      ? [prev, ...reversed.filter((s) => s.id !== prev.id)]
+      : reversed;
+  }, [ctx, years, semesters]);
 
   const lockedItemIds = useMemo(() => new Set(invoicedItemIds), [invoicedItemIds]);
   const lockedGradeIds = useMemo(() => new Set(invoicedGradeIds), [invoicedGradeIds]);
@@ -83,6 +101,7 @@ export function InvoiceTypeFeeDialog({ invoiceType, open, onOpenChange }: Props)
                 invoiceTypeId={invoiceTypeId}
                 matrix={matrix}
                 lockedGradeIds={lockedGradeIds}
+                sourceOptions={sourceOptions}
               />
             </>
           ) : null}
