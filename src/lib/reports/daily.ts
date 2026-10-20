@@ -58,3 +58,46 @@ export function groupDailyRevenue(payments: DailyPayment[]): DailyRevenueRow[] {
 
   return [...byDate.values()].sort((a, b) => (a.dateKey < b.dateKey ? 1 : -1));
 }
+
+export type MethodSummary = {
+  cashCount: number;
+  cashTotal: number;
+  transferCount: number;
+  transferTotal: number;
+  total: number;
+  voidedCount: number;
+  voidedAmount: number;
+};
+
+export function summarizeByMethod(
+  payments: Pick<DailyPayment, "amount" | "paymentMethod" | "status">[],
+): MethodSummary {
+  const s: MethodSummary = {
+    cashCount: 0,
+    cashTotal: 0,
+    transferCount: 0,
+    transferTotal: 0,
+    total: 0,
+    voidedCount: 0,
+    voidedAmount: 0,
+  };
+
+  for (const payment of payments) {
+    const amount = Number(payment.amount);
+    if (payment.status === "voided") {
+      s.voidedCount += 1;
+      s.voidedAmount = round2(s.voidedAmount + amount);
+      continue;
+    }
+    if (payment.paymentMethod === "cash") {
+      s.cashCount += 1;
+      s.cashTotal = round2(s.cashTotal + amount);
+    } else {
+      s.transferCount += 1;
+      s.transferTotal = round2(s.transferTotal + amount);
+    }
+    s.total = round2(s.total + amount);
+  }
+
+  return s;
+}
