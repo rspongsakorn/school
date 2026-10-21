@@ -47,7 +47,12 @@ import {
   getStudentOutstandingAction,
   recordPayment,
   voidPayment,
+  waiveInsuranceInvoice,
 } from "@/lib/actions/payments";
+import {
+  INSURANCE_WAIVER_DEFAULT_REASON,
+  canWaiveInsuranceInvoice,
+} from "@/lib/finance/insurance-waiver";
 import { invalidateFinanceQueries } from "@/lib/queries/invalidate";
 import {
   PAYMENTS_PAGE_SIZE,
@@ -274,6 +279,9 @@ export function PaymentsPanel() {
   const [pageState, setPageState] = useState({ key: "", page: 1 });
   const [prevQParam, setPrevQParam] = useState(qParam);
   const [voiding, setVoiding] = useState(false);
+  const [waiveTarget, setWaiveTarget] = useState<OutstandingInvoiceRow | null>(null);
+  const [waiveReason, setWaiveReason] = useState("");
+  const [waiving, setWaiving] = useState(false);
   const [isNavigating, startTransition] = useTransition();
   // Separate from `isNavigating` so clearing search results never dims the page.
   const [, startSearchTransition] = useTransition();
@@ -544,6 +552,30 @@ export function PaymentsPanel() {
     setTimeout(() => searchInputRef.current?.focus(), 100);
   }
 
+  async function handleWaive() {
+    if (!waiveTarget || !selectedStudent || !ctx) return;
+    const target = waiveTarget;
+    setWaiving(true);
+    const result = await waiveInsuranceInvoice({ invoiceId: target.id, reason: waiveReason });
+    setWaiving(false);
+
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+
+    setWaiveTarget(null);
+    toast.success("ยกเว้นค่าประกันเรียบร้อย");
+    setOutstanding((prev) => prev.filter((inv) => inv.id !== target.id));
+    if (selectedInvoice?.id === target.id) {
+      setSelectedInvoice(null);
+      setAmount("");
+      setLineDiscounts({});
+    }
+    invalidateFinanceQueries(queryClient);
+    router.refresh();
+  }
+
   async function handleVoid() {
     if (!voidTarget) return;
     setVoiding(true);
@@ -807,6 +839,25 @@ export function PaymentsPanel() {
                                   {formatBaht(inv.outstanding)}
                                 </TableCell>
                                 <TableCell className="text-right">
+                                  {canWaiveInsuranceInvoice({
+                                    paidAmount: inv.paidAmount,
+                                    discountValue: 0,
+                                    lineNames: inv.lines.map((l) => l.description),
+                                    alreadyWaived: false,
+                                  }) ? (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="ghost"
+                                      className="mr-1"
+                                      onClick={() => {
+                                        setWaiveReason(INSURANCE_WAIVER_DEFAULT_REASON);
+                                        setWaiveTarget(inv);
+                                      }}
+                                    >
+                                      ยกเว้น
+                                    </Button>
+                                  ) : null}
                                   <Button
                                     type="button"
                                     size="sm"
@@ -1155,6 +1206,32 @@ export function PaymentsPanel() {
                   disabled={voiding || !voidReason.trim()}
                 >
                   {voiding ? "กำลังยกเลิก..." : "ยืนยันยกเลิก"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          <AlertDialog open={Boolean(waiveTarget)} onOpenChange={(o) => !waiving && !o && setWaiveTarget(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>ยกเว้นค่าประกันทั้งใบ</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {waiveTarget?.invoiceName} {formatBaht(waiveTarget?.outstanding ?? 0)} ของ{" "}
+                  {selectedStudent?.name} จะถูกปิดโดยไม่มีการรับเงินและไม่ออกใบเสร็จ
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="py-2">
+                <Label htmlFor="waive-reason">เหตุผล</Label>
+                <Input
+                  id="waive-reason"
+                  value={waiveReason}
+                  onChange={(e) => setWaiveReason(e.target.value)}
+                />
+              </div>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={waiving}>ปิด</AlertDialogCancel>
+                <AlertDialogAction onClick={handleWaive} disabled={waiving || !waiveReason.trim()}>
+                  {waiving ? "กำลังบันทึก..." : "ยืนยันยกเว้น"}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

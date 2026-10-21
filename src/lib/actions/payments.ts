@@ -13,6 +13,7 @@ import { parsePriceTier } from "@/lib/finance/price-tier";
 import { getDefaultInvoiceTypeId } from "@/lib/data/invoice-types";
 import { resolveSingleInvoicePayment } from "@/lib/finance/single-invoice-allocation";
 import { resolvePaymentDiscounts, type ResolvedDiscountRow } from "@/lib/finance/payment-discount";
+import { insuranceWaiverBlockedReason } from "@/lib/finance/insurance-waiver";
 import { createClient } from "@/lib/supabase/server";
 import { formatStudentName } from "@/lib/format";
 import { searchStudentsForPayment } from "@/lib/data/payments";
@@ -833,6 +834,63 @@ export async function searchStudentsForPaymentAction(
   if (!auth.ok) return auth;
   const students = await searchStudentsForPayment(semesterId, options);
   return { ok: true as const, students };
+}
+
+/**
+ * Waives a whole insurance-only invoice with no cash collected — the school's
+ * promotion for parents who pay tuition by 31 May. No payment or receipt is
+ * written (a receipt means cash was received); the invoice closes through
+ * `record_backfill_invoice_discount`, which logs the reason and is already
+ * what the ledger reads as a write-off, netted against the insurance revenue.
+ */
+export async function waiveInsuranceInvoice(input: {
+  invoiceId: string;
+  reason: string;
+}): Promise<ActionState> {
+  const auth = await requireFinanceAction();
+  if (!auth.ok) return auth;
+
+  const reason = input.reason.trim();
+  if (!reason) return { ok: false, error: "กรุณาระบุเหตุผล" };
+
+  const supabase = await createClient();
+
+  type WaiverInvoiceRow = {
+    id: string;
+    subtotal: number;
+    paid_amount: number;
+    discount_value: number | null;
+    status: string;
+    invoice_lines: { description: string }[] | null;
+  };
+
+  const { data: invoice } = (await supabase
+    .from("student_invoices")
+    .select("id, subtotal, paid_amount, discount_value, status, invoice_lines ( description )")
+    .eq("id", input.invoiceId)
+    .maybeSingle()) as unknown as { data: WaiverInvoiceRow | null };
+
+  if (!invoice) return { ok: false, error: "ไม่พบใบแจ้งชำระ" };
+
+  const paidAmount = Number(invoice.paid_amount);
+  const blocked = insuranceWaiverBlockedReason({
+    paidAmount,
+    discountValue: Number(invoice.discount_value ?? 0),
+    lineNames: (invoice.invoice_lines ?? []).map((l) => l.description),
+    alreadyWaived: invoice.status === "paid" && paidAmount <= 0,
+  });
+  if (blocked) return { ok: false, error: blocked };
+
+  const { error: rpcError } = await supabase.rpc("record_backfill_invoice_discount", {
+    p_invoice_id: invoice.id,
+    p_discount_value: Number(invoice.subtotal),
+    p_note: `ยกเว้นค่าประกัน: ${reason}`,
+    p_recorded_by: auth.profile.id,
+  });
+  if (rpcError) return { ok: false, error: "ไม่สามารถยกเว้นใบแจ้งได้" };
+
+  revalidateFinancePaths();
+  return { ok: true };
 }
 
 export async function voidPayment(paymentId: string, reason: string): Promise<ActionState> {
