@@ -151,6 +151,14 @@ export type Database = {
         discount_value: number;
         amount: number;
       }>;
+      invoice_discount_log: TableDef<{
+        id: string;
+        invoice_id: string;
+        discount_value: number;
+        note: string | null;
+        recorded_by: string;
+        created_at: string;
+      }>;
       receipts: TableDef<{
         id: string;
         payment_id: string;

@@ -1,4 +1,5 @@
 import { parsePriceTier, type PriceTier } from "@/lib/finance/price-tier";
+import { buildDiscountReport, type DiscountReportResult } from "@/lib/finance/discount-report";
 import { createClient } from "@/lib/supabase/client";
 import { fetchAllPages } from "@/lib/supabase/paginate";
 import {
@@ -951,13 +952,7 @@ export async function fetchStudentStatement(
   };
 }
 
-export type DiscountReportItemRow = {
-  feeItemId: string;
-  feeItemName: string;
-  count: number;
-  totalDiscount: number;
-};
-export type DiscountReportResult = { rows: DiscountReportItemRow[]; grandTotal: number };
+export type { DiscountReportItemRow, DiscountReportResult } from "@/lib/finance/discount-report";
 
 export async function fetchDiscountReport(params: {
   academicYearId: string;
@@ -965,29 +960,53 @@ export async function fetchDiscountReport(params: {
   dateTo: string;
 }): Promise<DiscountReportResult> {
   const supabase = createClient();
-  const { data } = await supabase
-    .from("payment_discounts")
-    .select("amount, fee_item_id, fee_items ( name ), payments!inner ( status, academic_year_id, paid_at )")
-    .eq("payments.status", "active")
-    .eq("payments.academic_year_id", params.academicYearId)
-    .gte("payments.paid_at", `${params.dateFrom}T00:00:00+07:00`)
-    .lte("payments.paid_at", `${params.dateTo}T23:59:59+07:00`);
+  const from = `${params.dateFrom}T00:00:00+07:00`;
+  const to = `${params.dateTo}T23:59:59+07:00`;
 
-  type Row = { amount: string; fee_item_id: string; fee_items: { name: string } | null };
-  const byItem = new Map<string, DiscountReportItemRow>();
-  let grandTotal = 0;
-  for (const r of (data ?? []) as unknown as Row[]) {
-    const amount = Number(r.amount);
-    grandTotal += amount;
-    const e = byItem.get(r.fee_item_id);
-    if (e) {
-      e.count += 1;
-      e.totalDiscount = Math.round((e.totalDiscount + amount) * 100) / 100;
-    } else {
-      byItem.set(r.fee_item_id, { feeItemId: r.fee_item_id, feeItemName: r.fee_items?.name ?? "—", count: 1, totalDiscount: amount });
-    }
-  }
-  return { rows: [...byItem.values()].sort((a, b) => b.totalDiscount - a.totalDiscount), grandTotal: Math.round(grandTotal * 100) / 100 };
+  const [{ data }, { data: waiverData }] = await Promise.all([
+    supabase
+      .from("payment_discounts")
+      .select("amount, fee_item_id, fee_items ( name ), payments!inner ( status, academic_year_id, paid_at )")
+      .eq("payments.status", "active")
+      .eq("payments.academic_year_id", params.academicYearId)
+      .gte("payments.paid_at", from)
+      .lte("payments.paid_at", to),
+    // Invoices closed with no cash (the insurance promotion, XLSX write-offs)
+    // leave a log row instead of a payment_discounts row. Dated by the log row,
+    // like the ledger does.
+    supabase
+      .from("invoice_discount_log")
+      .select(
+        "discount_value, student_invoices!inner ( academic_year_id, invoice_lines ( amount, fee_item_id, fee_items ( name ) ) )",
+      )
+      .eq("student_invoices.academic_year_id", params.academicYearId)
+      .gte("created_at", from)
+      .lte("created_at", to),
+  ]);
+
+  type PaymentRow = { amount: string; fee_item_id: string; fee_items: { name: string } | null };
+  type WaiverRow = {
+    discount_value: string;
+    student_invoices: {
+      invoice_lines: { amount: string; fee_item_id: string; fee_items: { name: string } | null }[];
+    };
+  };
+
+  return buildDiscountReport(
+    ((data ?? []) as unknown as PaymentRow[]).map((r) => ({
+      feeItemId: r.fee_item_id,
+      feeItemName: r.fee_items?.name ?? "—",
+      amount: Number(r.amount),
+    })),
+    ((waiverData ?? []) as unknown as WaiverRow[]).map((r) => ({
+      discountValue: Number(r.discount_value),
+      lines: r.student_invoices.invoice_lines.map((l) => ({
+        feeItemId: l.fee_item_id,
+        feeItemName: l.fee_items?.name ?? "—",
+        amount: Number(l.amount),
+      })),
+    })),
+  );
 }
 
 export type DailyRemittanceItem = {

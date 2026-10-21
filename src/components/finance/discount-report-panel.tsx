@@ -48,6 +48,8 @@ export function DiscountReportPanel() {
 
   const rows = data?.rows ?? [];
   const grandTotal = data?.grandTotal ?? 0;
+  const paymentTotal = data?.paymentTotal ?? 0;
+  const waivedTotal = data?.waivedTotal ?? 0;
 
   return (
     <>
@@ -96,8 +98,11 @@ export function DiscountReportPanel() {
               <TableHeader>
                 <TableRow>
                   <TableHead>รายการค่าใช้จ่าย</TableHead>
-                  <TableHead className="text-right">จำนวนครั้ง</TableHead>
-                  <TableHead className="text-right">ยอดส่วนลดรวม</TableHead>
+                  <TableHead className="text-right">ส่วนลดตอนชำระ (ครั้ง)</TableHead>
+                  <TableHead className="text-right">ส่วนลดตอนชำระ (บาท)</TableHead>
+                  <TableHead className="text-right">ยกเว้นทั้งใบ (ใบ)</TableHead>
+                  <TableHead className="text-right">ยกเว้นทั้งใบ (บาท)</TableHead>
+                  <TableHead className="text-right">รวม</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -108,11 +113,25 @@ export function DiscountReportPanel() {
                     <TableCell className="text-right tabular-nums">
                       {formatBaht(row.totalDiscount)}
                     </TableCell>
+                    <TableCell className="text-right tabular-nums">{row.waivedCount}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatBaht(row.waivedTotal)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatBaht(row.totalDiscount + row.waivedTotal)}
+                    </TableCell>
                   </TableRow>
                 ))}
                 <TableRow className="border-t-2 font-semibold">
                   <TableCell>รวมทั้งช่วง</TableCell>
                   <TableCell />
+                  <TableCell className="text-right tabular-nums">
+                    {formatBaht(paymentTotal)}
+                  </TableCell>
+                  <TableCell />
+                  <TableCell className="text-right tabular-nums">
+                    {formatBaht(waivedTotal)}
+                  </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {formatBaht(grandTotal)}
                   </TableCell>
