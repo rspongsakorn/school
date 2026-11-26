@@ -131,9 +131,9 @@ export function StudentRosterPanel() {
 
   return (
     <>
-      <AppHeader title="รายงานรายบุคคล" basePath="/reports/students" clearGradeClassroomOnChange />
+      <AppHeader title="รายบุคคล" basePath="/reports/students" clearGradeClassroomOnChange />
       <main className="p-4 lg:p-6">
-        <ReportLetterhead title="รายงานสรุปรายบุคคล" yearName={ctx?.academicYearName} semesterNumber={ctx?.semesterNumber} />
+        <ReportLetterhead title="รายงานรายบุคคล" yearName={ctx?.academicYearName} semesterNumber={ctx?.semesterNumber} />
         <Card className="border-border shadow-sm">
         <CardContent className="space-y-4">
           <div className="report-toolbar flex flex-wrap items-center gap-2">

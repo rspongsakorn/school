@@ -238,7 +238,7 @@ export function OutstandingReportPanel() {
       <style>{"@media print { @page { size: A4 landscape; margin: 10mm; } }"}</style>
       <main className="p-4 lg:p-6 print:p-0">
         <ReportLetterhead
-          title="รายงานลูกหนี้ค้างชำระ"
+          title="รายงานค้างชำระ"
           yearName={ctx?.academicYearName}
           semesterNumber={ctx?.semesterNumber}
         />

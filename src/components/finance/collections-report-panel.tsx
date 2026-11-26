@@ -98,7 +98,7 @@ export function CollectionsReportPanel() {
 
   return (
     <>
-      <AppHeader title="รายงานการจัดเก็บ" basePath="/reports/collections" />
+      <AppHeader title="สถิติการเก็บ" basePath="/reports/collections" />
       <main className="p-4 lg:p-6">
         <ReportLetterhead
           title="สถิติการเก็บเงิน"
@@ -124,7 +124,9 @@ export function CollectionsReportPanel() {
                 ))}
               </SelectContent>
             </Select>
-            <ReportToolbar />
+            <div className="ml-auto">
+              <ReportToolbar />
+            </div>
           </div>
 
           {/* Never let a figure render before its query has answered: the

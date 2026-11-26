@@ -129,14 +129,14 @@ export function DebtorsReportPanel() {
 
   return (
     <>
-      <AppHeader title="รายชื่อลูกหนี้รายห้อง" basePath="/reports/debtors" />
+      <AppHeader title="ลูกหนี้รายห้อง" basePath="/reports/debtors" />
       <style>{"@media print { @page { size: A4 portrait; margin: 10mm; } }"}</style>
       <main className="p-4 lg:p-6 print:p-0">
         <ReportLetterhead
           title={
             formParam === "unpaid"
               ? "รายงานรายชื่อนักเรียนค้างชำระค่าธรรมเนียม"
-              : "รายงานรายชื่อลูกหนี้รายห้อง"
+              : "รายงานลูกหนี้รายห้อง"
           }
           yearName={ctx?.academicYearName}
           semesterNumber={ctx?.semesterNumber}
