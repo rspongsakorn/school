@@ -78,3 +78,46 @@ describe("computeReceiptLineItems", () => {
     expect(result.subtotal).toBe(0);
   });
 });
+
+describe("computeReceiptLineItems with recorded lines", () => {
+  const allocation = {
+    amount: "10500",
+    student_invoices: {
+      invoice_types: { name: "ค่าธรรมเนียม" },
+      invoice_lines: [
+        { amount: "8000", fee_items: { name: "ค่าเทอม" } },
+        { amount: "2500", fee_items: { name: "ค่าอาหาร" } },
+        { amount: "1500", fee_items: { name: "ค่าห้องปรับอากาศ" } },
+      ],
+    },
+  };
+
+  it("lists only the lines the payment settled, at their real amounts", () => {
+    const result = computeReceiptLineItems([allocation], [], [
+      { amount: "8000", invoice_lines: { amount: "8000", fee_items: { name: "ค่าเทอม" } } },
+      { amount: "2500", invoice_lines: { amount: "2500", fee_items: { name: "ค่าอาหาร" } } },
+    ]);
+    expect(result.lineItems).toEqual([
+      { name: "ค่าเทอม", amount: 8000 },
+      { name: "ค่าอาหาร", amount: 2500 },
+    ]);
+    expect(result.subtotal).toBe(10500);
+    expect(result.discounts).toEqual([]);
+  });
+
+  it("shows a discounted line at full price with the discount listed apart", () => {
+    const result = computeReceiptLineItems(
+      [{ ...allocation, amount: "10000" }],
+      [{ amount: "500", fee_items: { name: "ค่าเทอม" } }],
+      [
+        { amount: "7500", invoice_lines: { amount: "8000", fee_items: { name: "ค่าเทอม" } } },
+        { amount: "2500", invoice_lines: { amount: "2500", fee_items: { name: "ค่าอาหาร" } } },
+      ],
+    );
+    expect(result.lineItems).toEqual([
+      { name: "ค่าเทอม", amount: 8000 },
+      { name: "ค่าอาหาร", amount: 2500 },
+    ]);
+    expect(result.discounts).toEqual([{ name: "ค่าเทอม", amount: 500 }]);
+  });
+});

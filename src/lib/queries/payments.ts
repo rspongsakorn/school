@@ -1,7 +1,12 @@
 import { formatStudentName, formatThaiDate, formatThaiDateLong } from "@/lib/format";
 import { buildStudentSearchOrFilter } from "@/lib/students/search";
 import { createClient } from "@/lib/supabase/client";
-import { computeReceiptLineItems, type ReceiptLineItem, type ReceiptDiscount } from "@/lib/finance/receipt-line-items";
+import {
+  computeReceiptLineItems,
+  type ReceiptDiscount,
+  type ReceiptLineAllocationRaw,
+  type ReceiptLineItem,
+} from "@/lib/finance/receipt-line-items";
 
 async function getStudentGradeMap(
   semesterId: string,
@@ -220,6 +225,7 @@ type PaymentDetailQueryRow = {
     } | null;
   }>;
   payment_discounts: Array<{ amount: string; fee_items: { name: string } | null }>;
+  payment_line_allocations: ReceiptLineAllocationRaw[] | null;
 };
 
 export async function fetchPaymentDetail(paymentId: string): Promise<PaymentDetail | null> {
@@ -245,6 +251,10 @@ export async function fetchPaymentDetail(paymentId: string): Promise<PaymentDeta
       payment_discounts (
         amount,
         fee_items ( name )
+      ),
+      payment_line_allocations (
+        amount,
+        invoice_lines ( amount, fee_items ( name ) )
       )
     `,
     )
@@ -258,6 +268,7 @@ export async function fetchPaymentDetail(paymentId: string): Promise<PaymentDeta
   const { lineItems, subtotal, discounts } = computeReceiptLineItems(
     payment.payment_allocations ?? [],
     payment.payment_discounts ?? [],
+    payment.payment_line_allocations ?? [],
   );
 
   const semesterNumber =

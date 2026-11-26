@@ -1,5 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
-import { computeReceiptLineItems } from "@/lib/finance/receipt-line-items";
+import {
+  computeReceiptLineItems,
+  type ReceiptLineAllocationRaw,
+} from "@/lib/finance/receipt-line-items";
 
 export type ReceiptPrintData = {
   receiptNumber: string;
@@ -47,6 +50,7 @@ type RawPayment = {
     } | null;
   }>;
   payment_discounts: Array<{ amount: string; fee_items: { name: string } | null }>;
+  payment_line_allocations: ReceiptLineAllocationRaw[] | null;
 };
 
 export async function getReceiptPrintData(
@@ -76,6 +80,10 @@ export async function getReceiptPrintData(
       payment_discounts (
         amount,
         fee_items ( name )
+      ),
+      payment_line_allocations (
+        amount,
+        invoice_lines ( amount, fee_items ( name ) )
       )
     `,
     )
@@ -90,6 +98,7 @@ export async function getReceiptPrintData(
   const { lineItems, subtotal, discounts } = computeReceiptLineItems(
     payment.payment_allocations ?? [],
     payment.payment_discounts ?? [],
+    payment.payment_line_allocations ?? [],
   );
 
   const semesterNumber =
