@@ -97,6 +97,15 @@ function NavReportsDropdown({ role }: { role?: Role }) {
     (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
   );
   const [open, setOpen] = useState(active);
+  // The first render often has no role yet (the profile is still loading), so
+  // `active` starts false and the group would stay shut on the very page it
+  // holds. Open it whenever the current page newly belongs to it; the user can
+  // still close it. Adjusting state during render, not in an effect.
+  const [wasActive, setWasActive] = useState(active);
+  if (active !== wasActive) {
+    setWasActive(active);
+    if (active) setOpen(true);
+  }
 
   return (
     <div>
