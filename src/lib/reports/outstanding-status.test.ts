@@ -74,6 +74,7 @@ function inv(overrides: Partial<OutstandingReportRow> = {}): OutstandingReportRo
     lastPaidAt: null,
     discountType: null,
     discountValue: null,
+    unpaidLinesLabel: "",
     ...overrides,
   };
 }

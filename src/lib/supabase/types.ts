@@ -151,6 +151,13 @@ export type Database = {
         discount_value: number;
         amount: number;
       }>;
+      payment_line_allocations: TableDef<{
+        id: string;
+        payment_id: string;
+        invoice_line_id: string;
+        amount: number;
+        created_at: string;
+      }>;
       invoice_discount_log: TableDef<{
         id: string;
         invoice_id: string;
@@ -221,8 +228,20 @@ export type Database = {
           p_invoice_type_id: string;
           p_snapshot: Record<string, unknown>;
           p_discounts: Record<string, unknown>[];
+          p_line_ids?: string[] | null;
         };
         Returns: { payment_id: string; receipt_number: string }[];
+      };
+      invoice_line_states: {
+        Args: { p_invoice_ids: string[] };
+        Returns: {
+          invoice_id: string;
+          invoice_line_id: string;
+          description: string;
+          amount: number;
+          is_paid: boolean;
+          invoice_tracked: boolean;
+        }[];
       };
       record_backfill_payment: {
         Args: {

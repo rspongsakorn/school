@@ -1,3 +1,4 @@
+import { groupLineStates, type PayableLine } from "@/lib/finance/line-payment";
 import { parsePriceTier, type PriceTier } from "@/lib/finance/price-tier";
 import { formatClassroom, formatStudentName } from "@/lib/format";
 import { getStudentGradeMap, getStudentGradeSortMap } from "@/lib/data/enrollments";
@@ -49,7 +50,9 @@ export type OutstandingInvoiceRow = {
   paidAmount: number;
   outstanding: number;
   createdAt: string;
-  lines: InvoiceLine[];
+  /** Paid by ticking lines; false = legacy amount entry. */
+  tracked: boolean;
+  lines: PayableLine[];
 };
 
 export async function listInvoicesPaginated(params: {
@@ -206,13 +209,25 @@ export async function getStudentOutstandingInvoices(
     invoice_lines: { id: string; description: string; amount: number }[] | null;
   };
 
-  return ((data ?? []) as unknown as Row[]).map((row) => {
+  const rows = (data ?? []) as unknown as Row[];
+  const { data: stateRows, error: statesError } = rows.length
+    ? await supabase.rpc("invoice_line_states", { p_invoice_ids: rows.map((r) => r.id) })
+    : { data: [], error: null };
+  // Without line states every invoice would look legacy and the cashier
+  // would hit a confusing refusal on save; fail the load instead.
+  if (statesError) throw new Error("โหลดรายการในใบแจ้งไม่สำเร็จ");
+  const statesByInvoice = groupLineStates(stateRows ?? []);
+
+  return rows.map((row) => {
     const totalAmount = Number(row.total_amount);
     const paidAmount = Number(row.paid_amount);
-    const lines: InvoiceLine[] = (row.invoice_lines ?? []).map((l) => ({
+    const states = statesByInvoice.get(row.id);
+    const paidById = new Map((states?.lines ?? []).map((l) => [l.id, l.isPaid]));
+    const lines: PayableLine[] = (row.invoice_lines ?? []).map((l) => ({
       id: l.id,
       description: l.description,
       amount: Number(l.amount),
+      isPaid: paidById.get(l.id) ?? false,
     }));
     return {
       id: row.id,
@@ -221,6 +236,7 @@ export async function getStudentOutstandingInvoices(
       paidAmount,
       outstanding: Math.max(0, round2(totalAmount - paidAmount)),
       createdAt: row.created_at,
+      tracked: lines.length > 0 && (states?.tracked ?? false),
       lines,
     };
   });

@@ -1,4 +1,10 @@
 import { parsePriceTier, type PriceTier } from "@/lib/finance/price-tier";
+import {
+  groupLineStates,
+  outstandingLinesLabel,
+  type InvoiceLineStates,
+  type LineStateRow,
+} from "@/lib/finance/line-payment";
 import { buildDiscountReport, type DiscountReportResult } from "@/lib/finance/discount-report";
 import { createClient } from "@/lib/supabase/client";
 import { fetchAllPages } from "@/lib/supabase/paginate";
@@ -38,6 +44,8 @@ export type OutstandingReportRow = {
   lastPaidAt: string | null;
   discountType: "fixed" | "percent" | null;
   discountValue: number | null;
+  /** "รายการที่ค้าง": owed line names on a partly paid invoice, else blank. */
+  unpaidLinesLabel: string;
 };
 
 export type CollectionsReportRow = {
@@ -221,10 +229,21 @@ export async function fetchOutstandingReport(params: {
     return (await query.range(from, to)) as unknown as { data: Row[] | null; error: unknown };
   });
   const invoiceIds = rows.map((row) => row.id);
-  const [lastPaidByInvoice, gradeByStudent] = await Promise.all([
+  // Only a partly paid invoice can have some lines owed and some not.
+  const partialIds = rows.filter((row) => row.status === "partial").map((row) => row.id);
+  const [lastPaidByInvoice, gradeByStudent, lineStateRows] = await Promise.all([
     fetchLastPaidAtByInvoiceIds(supabase, invoiceIds),
     gradeByStudentPromise,
+    fetchInBatches<LineStateRow>(partialIds, (chunk, from, to) =>
+      supabase
+        .rpc("invoice_line_states", { p_invoice_ids: chunk })
+        // Paging needs a stable order, or pages can overlap and skip rows.
+        .order("invoice_id")
+        .order("invoice_line_id")
+        .range(from, to),
+    ),
   ]);
+  const lineStatesByInvoice = groupLineStates(lineStateRows);
 
   return rows.map((row) => {
     const totalAmount = Number(row.total_amount);
@@ -247,7 +266,20 @@ export async function fetchOutstandingReport(params: {
       lastPaidAt: lastPaidByInvoice.get(row.id) ?? null,
       discountType: row.discount_type,
       discountValue: row.discount_value != null ? Number(row.discount_value) : null,
+      unpaidLinesLabel: unpaidLinesLabelFor(row.status, lineStatesByInvoice.get(row.id)),
     };
+  });
+}
+
+function unpaidLinesLabelFor(
+  status: "unpaid" | "partial" | "paid",
+  states: InvoiceLineStates | undefined,
+): string {
+  const lines = states?.lines ?? [];
+  return outstandingLinesLabel({
+    status,
+    tracked: lines.length > 0 && (states?.tracked ?? false),
+    unpaidLineNames: lines.filter((l) => !l.isPaid).map((l) => l.description),
   });
 }
 

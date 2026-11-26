@@ -43,8 +43,16 @@ import { useSemesterContext } from "@/hooks/use-semester-context";
 import { recordPayment } from "@/lib/actions/payments";
 import { formatBaht } from "@/lib/format";
 import { invalidateFinanceQueries } from "@/lib/queries/invalidate";
-import { fetchInvoiceLines } from "@/lib/queries/invoices";
+import { fetchInvoiceLineStates } from "@/lib/queries/invoices";
 import type { InvoiceListRow } from "@/lib/queries/invoices";
+import {
+  InvoiceLinePicker,
+  LEGACY_INVOICE_NOTE,
+  defaultSelection,
+  draftDiscountAmount,
+  pickerTotal,
+  type LineDiscountDraft,
+} from "@/components/finance/invoice-line-picker";
 
 const METHOD_ITEMS = [
   { value: "cash", label: "เงินสด" },
@@ -72,28 +80,29 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  // invoiceLineId -> { value: string; unit: "fixed" | "percent" }
-  const [lineDiscounts, setLineDiscounts] = useState<
-    Record<string, { value: string; unit: "fixed" | "percent" }>
-  >({});
+  // invoiceLineId -> discount being typed
+  const [lineDiscounts, setLineDiscounts] = useState<Record<string, LineDiscountDraft>>({});
+  // Lines ticked for payment (tracked invoices only).
+  const [selectedLines, setSelectedLines] = useState<Set<string>>(new Set());
 
-  const { data: lines = [] } = useQuery({
-    queryKey: ["invoice-lines", invoice?.id],
-    queryFn: () => fetchInvoiceLines(invoice!.id),
+  const { data: lineStates } = useQuery({
+    queryKey: ["invoice-line-states", invoice?.id],
+    queryFn: () => fetchInvoiceLineStates(invoice!.id),
     enabled: !!invoice?.id && open,
   });
+  const lines = lineStates?.lines ?? [];
+  const tracked = lineStates?.tracked ?? false;
+  const discountsEnabled = (invoice?.paidAmount ?? 0) <= 0;
 
-  function resolveOne(lineAmount: number, raw?: { value: string; unit: "fixed" | "percent" }) {
-    if (!raw) return 0;
-    const v = Number.parseFloat(raw.value);
-    if (!Number.isFinite(v) || v <= 0) return 0;
-    const amt = raw.unit === "percent" ? (lineAmount * v) / 100 : v;
-    return Math.min(Math.round(amt * 100) / 100, lineAmount);
-  }
+  // Tick every owed line whenever this invoice's line states (re)load.
+  useEffect(() => {
+    if (!open || !lineStates) return;
+    setSelectedLines(defaultSelection(lineStates.lines)); // eslint-disable-line react-hooks/set-state-in-effect
+  }, [open, lineStates]);
 
   const totalDiscount =
     Math.round(
-      lines.reduce((sum, l) => sum + resolveOne(l.amount, lineDiscounts[l.id]), 0) * 100,
+      lines.reduce((sum, l) => sum + draftDiscountAmount(l.amount, lineDiscounts[l.id]), 0) * 100,
     ) / 100;
   const hasDiscount = totalDiscount > 0;
   // Base the discount net-due on the sum of line amounts (the invoice
@@ -115,7 +124,17 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
   // When discounting, the effective amount is always netDue (computed from
   // the discount inputs). We derive it here so the submission path reads a
   // consistent value regardless of the controlled-input state.
-  const effectiveAmount = hasDiscount ? (netDue > 0 ? String(netDue) : "") : amount;
+  // A tracked invoice pays exactly the ticked lines; the amount follows them.
+  const linesTotal = pickerTotal(lines, selectedLines, lineDiscounts);
+  const effectiveAmount = tracked
+    ? linesTotal > 0
+      ? String(linesTotal)
+      : ""
+    : hasDiscount
+      ? netDue > 0
+        ? String(netDue)
+        : ""
+      : amount;
 
   function printReceipt(paymentId: string) {
     if (iframeRef.current) {
@@ -129,6 +148,10 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
     e.preventDefault();
     if (!invoice || !ctx) return;
 
+    if (tracked && selectedLines.size === 0) {
+      toast.error("เลือกรายการที่ชำระอย่างน้อย 1 รายการ");
+      return;
+    }
     const parsed = Number.parseFloat(effectiveAmount);
     if (!Number.isFinite(parsed) || parsed <= 0) {
       toast.error("กรุณาระบุจำนวนเงิน");
@@ -150,6 +173,7 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
     if (!invoice || !ctx) return;
 
     const discounts = lines
+      .filter((l) => !tracked || selectedLines.has(l.id))
       .map((l) => {
         const d = lineDiscounts[l.id];
         if (!d) return null;
@@ -171,6 +195,7 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
       remark: remark.trim() || undefined,
       note: note.trim() || undefined,
       discounts: discounts.length > 0 ? discounts : undefined,
+      lineIds: tracked ? [...selectedLines] : undefined,
     });
     setSubmitting(false);
 
@@ -222,51 +247,23 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
                           {formatBaht(invoice.outstanding)}
                         </TableCell>
                       </TableRow>
-                      {lines.map((line) => {
-                        const d = lineDiscounts[line.id] ?? { value: "", unit: "fixed" as const };
-                        const resolved = resolveOne(line.amount, d);
-                        return (
-                          <TableRow key={line.id} className="border-0">
-                            <TableCell className="py-0.5 pl-5 text-xs break-words text-muted-foreground">
-                              · {line.description}
-                            </TableCell>
-                            <TableCell className="py-0.5 text-right text-xs tabular-nums text-muted-foreground">
-                              <div className="flex items-center justify-end gap-1 whitespace-nowrap">
-                                {resolved > 0 ? (
-                                  <span className="shrink-0 text-[10px] text-green-700">−{formatBaht(resolved)}</span>
-                                ) : null}
-                                <Input
-                                  value={d.value}
-                                  onChange={(e) =>
-                                    setLineDiscounts((prev) => ({
-                                      ...prev,
-                                      [line.id]: { value: e.target.value, unit: d.unit },
-                                    }))
-                                  }
-                                  placeholder="ส่วนลด"
-                                  className="h-6 w-24 shrink-0 text-right text-xs"
-                                />
-                                <button
-                                  type="button"
-                                  className="w-6 shrink-0 text-[10px] text-primary hover:underline"
-                                  onClick={() =>
-                                    setLineDiscounts((prev) => ({
-                                      ...prev,
-                                      [line.id]: { value: d.value, unit: d.unit === "fixed" ? "percent" : "fixed" },
-                                    }))
-                                  }
-                                >
-                                  {d.unit === "fixed" ? "บาท" : "%"}
-                                </button>
-                                <span className="w-16 shrink-0 text-right tabular-nums">{formatBaht(line.amount)}</span>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
+                      <InvoiceLinePicker
+                        lines={lines}
+                        tracked={tracked}
+                        active
+                        selected={selectedLines}
+                        onSelectedChange={setSelectedLines}
+                        discounts={lineDiscounts}
+                        onDiscountsChange={setLineDiscounts}
+                        discountsEnabled={discountsEnabled}
+                      />
                     </Fragment>
                   </TableBody>
                 </Table>
+
+                {lineStates && !tracked && invoice.paidAmount > 0 ? (
+                  <p className="text-xs text-muted-foreground">{LEGACY_INVOICE_NOTE}</p>
+                ) : null}
 
                 {hasDiscount ? (
                   <div className="flex justify-between text-sm">
@@ -286,6 +283,10 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
                       type="button"
                       className="text-xs text-primary hover:underline"
                       onClick={() => {
+                        if (tracked) {
+                          setSelectedLines(defaultSelection(lines));
+                          return;
+                        }
                         setAmount(String(invoice.outstanding));
                         setTimeout(() => {
                           amountInputRef.current?.focus();
@@ -311,7 +312,7 @@ export function InvoicePaymentDialog({ invoice, open, onOpenChange }: Props) {
                     value={effectiveAmount}
                     onChange={(e) => setAmount(e.target.value)}
                     className="tabular-nums"
-                    readOnly={hasDiscount}
+                    readOnly={tracked || hasDiscount}
                     required
                   />
                   <Select

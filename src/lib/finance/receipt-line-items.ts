@@ -14,6 +14,12 @@ export type ReceiptDiscountRaw = {
   fee_items: { name: string } | null;
 };
 
+/** A `payment_line_allocations` row: one invoice line this payment settled. */
+export type ReceiptLineAllocationRaw = {
+  amount: string;
+  invoice_lines: { amount: string; fee_items: { name: string } | null } | null;
+};
+
 export type ReceiptLineItem = { name: string; amount: number };
 export type ReceiptDiscount = { name: string; amount: number };
 
@@ -30,14 +36,23 @@ export type ReceiptLineItemsResult = {
  * proportionally to the amount actually paid (its true per-fee split isn't
  * knowable from a partial amount), with the last line absorbing any
  * rounding remainder so the lines still sum exactly to the paid amount.
+ *
+ * A payment that recorded its lines (pay by line) lists exactly those lines at
+ * their billed amounts instead; any discount is listed apart, as above.
  */
 export function computeReceiptLineItems(
   paymentAllocations: ReceiptAllocationRaw[],
   paymentDiscounts: ReceiptDiscountRaw[],
+  paymentLineAllocations: ReceiptLineAllocationRaw[] = [],
 ): ReceiptLineItemsResult {
   const hasDiscount = paymentDiscounts.length > 0;
 
-  const lineItems = paymentAllocations.flatMap((pa) => {
+  const lineItems: ReceiptLineItem[] = paymentLineAllocations.length > 0
+    ? paymentLineAllocations.map((pla) => ({
+        name: pla.invoice_lines?.fee_items?.name ?? "รายการค่าธรรมเนียม",
+        amount: Number(pla.invoice_lines?.amount ?? pla.amount),
+      }))
+    : paymentAllocations.flatMap((pa) => {
     const inv = pa.student_invoices;
     if (!inv) return [];
     const allocAmount = Number(pa.amount);

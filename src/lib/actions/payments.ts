@@ -13,6 +13,13 @@ import { parsePriceTier } from "@/lib/finance/price-tier";
 import { getDefaultInvoiceTypeId } from "@/lib/data/invoice-types";
 import { resolveSingleInvoicePayment } from "@/lib/finance/single-invoice-allocation";
 import { resolvePaymentDiscounts, type ResolvedDiscountRow } from "@/lib/finance/payment-discount";
+import {
+  groupLineStates,
+  invoiceDiscountBlockedReason,
+  paidLinesForSnapshot,
+  recordPaymentErrorMessage,
+  resolveLineSelection,
+} from "@/lib/finance/line-payment";
 import { insuranceWaiverBlockedReason } from "@/lib/finance/insurance-waiver";
 import { createClient } from "@/lib/supabase/server";
 import { formatStudentName } from "@/lib/format";
@@ -44,6 +51,9 @@ type RecordPaymentInput = {
     discountType: "percent" | "fixed";
     discountValue: number;
   }[];
+  // Lines this payment settles. Required for a tracked invoice, refused for a
+  // legacy one (see invoice_line_states).
+  lineIds?: string[];
 };
 
 export async function recordPayment(input: RecordPaymentInput): Promise<RecordPaymentResult> {
@@ -98,8 +108,37 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
     netTotal = discountResult.netDue;
   }
 
-  if (resolvedDiscounts.length > 0 && round2(input.amount) !== round2(netTotal)) {
-    return { ok: false, error: "เมื่อมีส่วนลด ต้องชำระเต็มยอดสุทธิ" };
+  const { data: stateRows, error: statesError } = await supabase.rpc("invoice_line_states", {
+    p_invoice_ids: [invoice.id],
+  });
+  if (statesError) return { ok: false, error: "โหลดรายการในใบแจ้งไม่สำเร็จ" };
+  const states = groupLineStates(stateRows ?? []).get(invoice.id);
+  const tracked = !!states && states.lines.length > 0 && states.tracked;
+
+  let lineIds: string[] | null = null;
+  let paidLines: { invoiceLineId: string; description: string; amount: number }[] = [];
+  if (tracked) {
+    if (!input.lineIds || input.lineIds.length === 0) {
+      return { ok: false, error: "กรุณาเลือกรายการที่ชำระ" };
+    }
+    const selection = resolveLineSelection({
+      lines: states.lines,
+      selectedLineIds: input.lineIds,
+      discountByLineId: new Map(resolvedDiscounts.map((d) => [d.invoiceLineId, d.amount])),
+    });
+    if (!selection.ok) return { ok: false, error: selection.error };
+    if (round2(input.amount) !== selection.amount) {
+      return { ok: false, error: "ยอดเงินไม่ตรงกับรายการที่เลือก" };
+    }
+    lineIds = selection.allocations.map((a) => a.invoiceLineId);
+    paidLines = paidLinesForSnapshot(states.lines, lineIds);
+  } else {
+    if (input.lineIds && input.lineIds.length > 0) {
+      return { ok: false, error: "ใบแจ้งนี้เลือกรายการไม่ได้" };
+    }
+    if (resolvedDiscounts.length > 0 && round2(input.amount) !== round2(netTotal)) {
+      return { ok: false, error: "เมื่อมีส่วนลด ต้องชำระเต็มยอดสุทธิ" };
+    }
   }
 
   const outstanding = Math.max(
@@ -148,6 +187,8 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
     recordedByName: auth.profile.display_name ?? "เจ้าหน้าที่",
     paidAtIso: new Date().toISOString(),
     discounts: resolvedDiscounts,
+    lineIds,
+    paidLines,
   });
 
   if (!executed.ok) return executed;
@@ -226,13 +267,18 @@ export async function recordPaymentsBulk(
 
   // The grade map doesn't depend on the invoice/student prefetch below, so
   // fetch it in parallel instead of paying for an extra round trip.
-  const [invoicesResponse, gradeByStudent] = await Promise.all([
+  const [invoicesResponse, gradeByStudent, statesResponse] = await Promise.all([
     supabase
       .from("student_invoices")
       .select("id, student_id, total_amount, paid_amount, invoice_type_id, invoice_types ( name )")
       .in("id", ids),
     getStudentGradeMap(input.semesterId),
+    supabase.rpc("invoice_line_states", { p_invoice_ids: ids }),
   ]);
+  if (statesResponse.error) {
+    return { ok: false, error: "โหลดรายการในใบแจ้งไม่สำเร็จ" };
+  }
+  const statesByInvoice = groupLineStates(statesResponse.data ?? []);
 
   const { data: invoiceRows, error: invoicesError } = invoicesResponse as unknown as {
     data: BulkInvoiceRow[] | null;
@@ -330,6 +376,13 @@ export async function recordPaymentsBulk(
         continue;
       }
 
+      // A tracked invoice settles every line still owed, so it stays tracked.
+      const states = statesByInvoice.get(invoiceId);
+      const owedLines =
+        states && states.tracked && states.lines.length > 0
+          ? states.lines.filter((l) => !l.isPaid)
+          : null;
+
       const executed = await executeRecordPayment({
         supabase,
         invoiceId: invoice.id,
@@ -351,10 +404,14 @@ export async function recordPaymentsBulk(
         recordedByName,
         paidAtIso: new Date().toISOString(),
         discounts: [],
+        lineIds: owedLines ? owedLines.map((l) => l.id) : null,
+        paidLines: owedLines
+          ? paidLinesForSnapshot(owedLines, owedLines.map((l) => l.id))
+          : [],
       });
 
       if (!executed.ok) {
-        failed.push({ invoiceId, studentCode, studentName, reason: "บันทึกการชำระไม่ได้" });
+        failed.push({ invoiceId, studentCode, studentName, reason: executed.error });
         continue;
       }
 
@@ -379,8 +436,12 @@ export async function recordPaymentsBulk(
 export async function getStudentOutstandingAction(studentId: string, semesterId: string) {
   const auth = await requireFinanceAction();
   if (!auth.ok) return auth;
-  const invoices = await getStudentOutstandingInvoices(studentId, semesterId);
-  return { ok: true as const, invoices };
+  try {
+    const invoices = await getStudentOutstandingInvoices(studentId, semesterId);
+    return { ok: true as const, invoices };
+  } catch {
+    return { ok: false as const, error: "โหลดใบค้างชำระไม่สำเร็จ ลองเลือกนักเรียนใหม่อีกครั้ง" };
+  }
 }
 
 export type ImportPreviewStudent = {
@@ -571,7 +632,13 @@ export async function importPaymentsBackfill(input: {
       continue;
     }
 
-    const outstanding = await getStudentOutstandingInvoices(student.id, input.semesterId);
+    let outstanding: Awaited<ReturnType<typeof getStudentOutstandingInvoices>>;
+    try {
+      outstanding = await getStudentOutstandingInvoices(student.id, input.semesterId);
+    } catch {
+      failed.push({ lineNumber: row.lineNumber, studentCode: row.studentCode, reason: "โหลดยอดค้างไม่สำเร็จ" });
+      continue;
+    }
     const totalDue = outstanding.reduce((sum, inv) => sum + inv.outstanding, 0);
 
     if (row.amount <= 0) {
@@ -801,6 +868,21 @@ export async function importPaymentsXlsxBackfill(input: {
         continue;
       }
     } else {
+      const { data: stateRows, error: statesError } = await supabase.rpc("invoice_line_states", {
+        p_invoice_ids: [group.invoiceId],
+      });
+      if (statesError) {
+        failed.push({ rowNumber: group.rowNumber, studentCode: group.studentCode, reason: "โหลดรายการในใบแจ้งไม่สำเร็จ" });
+        continue;
+      }
+      const blocked = invoiceDiscountBlockedReason(
+        groupLineStates(stateRows ?? []).get(group.invoiceId),
+      );
+      if (blocked) {
+        failed.push({ rowNumber: group.rowNumber, studentCode: group.studentCode, reason: blocked });
+        continue;
+      }
+
       const { error: rpcError } = await supabase.rpc("record_backfill_invoice_discount", {
         p_invoice_id: group.invoiceId,
         p_discount_value: group.discount,
@@ -986,6 +1068,10 @@ type ExecuteRecordPaymentArgs = {
   recordedByName: string;
   paidAtIso: string;
   discounts: ResolvedDiscountRow[];
+  /** Lines settled (tracked invoice) or null (legacy invoice). */
+  lineIds: string[] | null;
+  /** Printed into the receipt snapshot; empty for a legacy invoice. */
+  paidLines: { invoiceLineId: string; description: string; amount: number }[];
 };
 
 /**
@@ -1012,7 +1098,12 @@ async function executeRecordPayment(
     transferReference: args.remark,
     amount: args.amount,
     allocations: [
-      { invoiceId: args.invoiceId, invoiceName: args.invoiceName, amount: args.amount },
+      {
+        invoiceId: args.invoiceId,
+        invoiceName: args.invoiceName,
+        amount: args.amount,
+        ...(args.lineIds ? { lines: args.paidLines } : {}),
+      },
     ],
     recordedBy: args.recordedByName,
   };
@@ -1038,11 +1129,12 @@ async function executeRecordPayment(
       discountValue: d.discountValue,
       amount: d.amount,
     })),
+    p_line_ids: args.lineIds,
   });
 
   const result = rpcRows?.[0];
   if (rpcError || !result) {
-    return { ok: false, error: "ไม่สามารถบันทึกการชำระได้" };
+    return { ok: false, error: recordPaymentErrorMessage(rpcError?.message) };
   }
 
   snapshot.receiptNumber = result.receipt_number;

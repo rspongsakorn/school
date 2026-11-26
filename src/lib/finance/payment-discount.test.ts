@@ -26,6 +26,14 @@ describe("resolvePaymentDiscounts", () => {
     { id: "l3", feeItemId: "f3", amount: 1500 },
   ];
 
+  it("refuses two discounts on the same line", () => {
+    const result = resolvePaymentDiscounts(11500, lines, [
+      { invoiceLineId: "l1", discountType: "fixed", discountValue: 500 },
+      { invoiceLineId: "l1", discountType: "fixed", discountValue: 300 },
+    ]);
+    expect(result).toEqual({ ok: false, error: "ให้ส่วนลดได้รายการละครั้ง" });
+  });
+
   it("computes net due and resolved rows for valid input", () => {
     const input: DiscountInput[] = [
       { invoiceLineId: "l1", discountType: "fixed", discountValue: 500 },
