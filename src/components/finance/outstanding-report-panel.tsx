@@ -46,11 +46,22 @@ import { ReportToolbar } from "@/components/finance/report-toolbar";
 import { ReportLetterhead } from "@/components/finance/report-letterhead";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
+import { LEGACY_OUTSTANDING_LABEL } from "@/lib/finance/line-payment";
+import { cn } from "@/lib/utils";
 
 const REIMBURSABLE_ITEMS = [
   { value: "all", label: "ทุกประเภท" },
   ...PRICE_TIERS.map((tier) => ({ value: tier, label: priceTierLabel(tier) })),
 ];
+
+/** "รายการที่ค้าง" cell: wraps; the unknown-lines label is muted. */
+function unpaidLinesClass(label: string, extra = "text-sm"): string {
+  return cn(
+    "whitespace-normal break-words",
+    extra,
+    label === LEGACY_OUTSTANDING_LABEL ? "text-muted-foreground" : "text-amber-700",
+  );
+}
 
 function formatDiscount(discountType: "fixed" | "percent" | null, discountValue: number | null): string | null {
   if (!discountType || discountValue == null) return null;
@@ -386,6 +397,11 @@ export function OutstandingReportPanel() {
                       <p className="mt-0.5 text-sm text-muted-foreground">
                         {row.studentCode} · {row.gradeClassroom}
                       </p>
+                      {row.unpaidLinesLabel ? (
+                        <p className={unpaidLinesClass(row.unpaidLinesLabel, "mt-0.5 text-xs")}>
+                          ค้าง: {row.unpaidLinesLabel}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
                       <span className="font-semibold tabular-nums text-amber-700">
@@ -442,6 +458,7 @@ export function OutstandingReportPanel() {
                             <TableHead className="text-right">ต้องชำระ</TableHead>
                             <TableHead className="text-right">ชำระแล้ว</TableHead>
                             <TableHead className="text-right">ค้าง</TableHead>
+                            <TableHead>รายการที่ค้าง</TableHead>
                             <TableHead>ส่วนลด</TableHead>
                             <TableHead>สถานะ</TableHead>
                             <TableHead>วันที่ออกใบ</TableHead>
@@ -457,6 +474,9 @@ export function OutstandingReportPanel() {
                               <TableCell className="text-right tabular-nums">{formatBaht(row.totalAmount)}</TableCell>
                               <TableCell className="text-right tabular-nums">{formatBaht(row.paidAmount)}</TableCell>
                               <TableCell className="text-right tabular-nums font-medium">{formatBaht(row.outstanding)}</TableCell>
+                              <TableCell className={unpaidLinesClass(row.unpaidLinesLabel)}>
+                                {row.unpaidLinesLabel}
+                              </TableCell>
                               <TableCell className="text-red-700">
                                 {formatDiscount(row.discountType, row.discountValue) ?? "—"}
                               </TableCell>
@@ -487,6 +507,7 @@ export function OutstandingReportPanel() {
                   <TableHead className="text-right">ต้องชำระ</TableHead>
                   <TableHead className="text-right">ชำระแล้ว</TableHead>
                   <TableHead className="text-right">ค้าง</TableHead>
+                  <TableHead>รายการที่ค้าง</TableHead>
                   <TableHead>ส่วนลด</TableHead>
                   <TableHead>สถานะ</TableHead>
                   <TableHead>วันที่ออกใบ</TableHead>
@@ -496,13 +517,13 @@ export function OutstandingReportPanel() {
               <TableBody>
                 {rowsLoading ? (
                   <TableRow>
-                    <TableCell colSpan={12} className="py-6 text-center text-muted-foreground">
+                    <TableCell colSpan={13} className="py-6 text-center text-muted-foreground">
                       กำลังโหลด...
                     </TableCell>
                   </TableRow>
                 ) : rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={12} className="py-6 text-center text-muted-foreground">
+                    <TableCell colSpan={13} className="py-6 text-center text-muted-foreground">
                       ไม่พบรายการค้างชำระ
                     </TableCell>
                   </TableRow>
@@ -532,6 +553,9 @@ export function OutstandingReportPanel() {
                       <TableCell className="text-right tabular-nums font-medium">
                         {formatBaht(row.outstanding)}
                       </TableCell>
+                      <TableCell className={unpaidLinesClass(row.unpaidLinesLabel)}>
+                        {row.unpaidLinesLabel}
+                      </TableCell>
                       <TableCell className="text-red-700">
                         {formatDiscount(row.discountType, row.discountValue) ?? "—"}
                       </TableCell>
@@ -550,7 +574,7 @@ export function OutstandingReportPanel() {
                     <TableCell className="text-right tabular-nums">{formatBaht(listTotals.totalAmount)}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatBaht(listTotals.paidAmount)}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatBaht(listTotals.outstanding)}</TableCell>
-                    <TableCell colSpan={4} />
+                    <TableCell colSpan={5} />
                   </TableRow>
                 ) : null}
               </TableBody>
