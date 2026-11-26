@@ -67,7 +67,7 @@ export function CollectionsReportPanel() {
     enabled: !!ctx && level === "grade",
   });
 
-  const { data: classroomRows = [] } = useQuery({
+  const { data: classroomRows = [], isLoading: classroomLoading } = useQuery({
     queryKey: [
       "collections-by-classroom",
       ctx?.semesterId,
@@ -79,7 +79,7 @@ export function CollectionsReportPanel() {
     enabled: !!ctx && level === "classroom",
   });
 
-  const { data: summary } = useQuery({
+  const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: [
       "collections-summary",
       ctx?.semesterId,
@@ -122,7 +122,15 @@ export function CollectionsReportPanel() {
             <ReportToolbar />
           </div>
 
-          {level === "all" ? (
+          {/* Never let a figure render before its query has answered: the
+              cards used to read 0 / ฿0 / 0% for the whole load. */}
+          {level === "all" && summaryLoading ? (
+            <div className="h-40 animate-pulse rounded-lg bg-muted" />
+          ) : level === "classroom" && classroomLoading ? (
+            <div className="h-40 animate-pulse rounded-lg bg-muted" />
+          ) : level === "classroom" && classroomRows.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">ไม่มีข้อมูล</p>
+          ) : level === "all" ? (
             <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardContent className="p-4">
