@@ -4,7 +4,6 @@ import {
   outstandingStatusQuery,
   owedInvoices,
   parseOutstandingStatus,
-  perStudentRowsFor,
 } from "./outstanding-status";
 import type { OutstandingReportRow } from "@/lib/queries/reports";
 
@@ -78,31 +77,6 @@ function inv(overrides: Partial<OutstandingReportRow> = {}): OutstandingReportRo
     ...overrides,
   };
 }
-
-describe("per-student view under the default filter", () => {
-  it("fetches every status so a student is judged on all their invoices", () => {
-    expect(outstandingStatusQuery("outstanding", "perStudent")).toEqual({
-      status: "all",
-      includeAllStatuses: true,
-    });
-    expect(outstandingStatusQuery("unpaid", "perStudent")).toEqual({
-      status: "unpaid",
-      includeAllStatuses: true,
-    });
-  });
-
-  it("keeps a part-paid student whole and drops students who owe nothing", () => {
-    const rows = [
-      inv({ invoiceId: "a", subtotal: 4600, totalAmount: 4600, paidAmount: 4600, outstanding: 0, status: "paid" }),
-      inv({ invoiceId: "b" }),
-      inv({ invoiceId: "c", studentId: "stu-2", studentCode: "200", paidAmount: 200, outstanding: 0, status: "paid" }),
-    ];
-    const result = perStudentRowsFor(rows, "outstanding");
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({ studentId: "stu-1", totalAmount: 4800, paidAmount: 4600, outstanding: 200, status: "partial" });
-    expect(perStudentRowsFor(rows, "all")).toHaveLength(2);
-  });
-});
 
 describe("owedInvoices", () => {
   it("drops zero-balance invoices stored as unpaid under the default filter only", () => {

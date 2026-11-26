@@ -1,3 +1,5 @@
+import { parseOutstandingStatus } from "./outstanding-status";
+
 /**
  * Report filters live in the URL so that Back, refresh and a copied link all
  * bring the same report back. A filter at its default is left out of the URL;
@@ -69,4 +71,30 @@ export function knownOr(value: string, ids: readonly string[], loaded: boolean):
  */
 export function isCommittableDate(value: string): boolean {
   return parseDateParam(value, "") === value && value !== "" && Number(value.slice(0, 4)) >= 2000;
+}
+
+/** The named params of a query string, in the order they appear there. */
+export function pickQuery(query: string, keys: string[]): string {
+  const source = new URLSearchParams(query.startsWith("?") ? query.slice(1) : query);
+  const picked = new URLSearchParams();
+  for (const [key, value] of source) {
+    if (keys.includes(key)) picked.append(key, value);
+  }
+  return picked.toString();
+}
+
+/**
+ * The per-student roster's query for the same view of the school the
+ * outstanding report is showing: term, grade and room carry over; the status
+ * filter is translated (the report's default is "still owed", the roster's is
+ * everyone). Price tier and invoice type have no field on the roster, so they
+ * are dropped.
+ */
+export function rosterQueryFromOutstanding(query: string): string {
+  const base = pickQuery(query, ["year", "semester", "grade", "classroom"]);
+  const status = parseOutstandingStatus(new URLSearchParams(query).get("status"));
+  if (status === "all") return base;
+  const params = new URLSearchParams(base);
+  params.set("status", status);
+  return params.toString();
 }

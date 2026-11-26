@@ -5,7 +5,9 @@ import {
   mergeQuery,
   parseDateParam,
   parseEnumParam,
+  pickQuery,
   rosterHref,
+  rosterQueryFromOutstanding,
   statementHref,
 } from "./url-filters";
 
@@ -100,5 +102,42 @@ describe("isCommittableDate", () => {
     for (const partial of ["0002-09-01", "0020-09-01", "0202-09-01", "", "2026-02-30"]) {
       expect(isCommittableDate(partial)).toBe(false);
     }
+  });
+});
+
+describe("pickQuery", () => {
+  it("keeps only the named params, in the order they appear", () => {
+    expect(pickQuery("year=y1&grade=g1&variant=free&semester=2", ["year", "semester", "grade"])).toBe(
+      "year=y1&grade=g1&semester=2",
+    );
+  });
+
+  it("returns an empty string when none are present", () => {
+    expect(pickQuery("variant=free", ["year"])).toBe("");
+  });
+});
+
+describe("rosterQueryFromOutstanding", () => {
+  it("carries term, grade and room, and drops what the roster has no field for", () => {
+    expect(
+      rosterQueryFromOutstanding("year=y1&semester=1&grade=g1&classroom=c1&variant=free&invoiceType=t1&view=perStudent"),
+    ).toBe("year=y1&semester=1&grade=g1&classroom=c1&status=outstanding");
+  });
+
+  it("maps the outstanding report's default (no status) to the roster's still-owed filter", () => {
+    expect(rosterQueryFromOutstanding("")).toBe("status=outstanding");
+  });
+
+  it("maps all statuses to no status filter", () => {
+    expect(rosterQueryFromOutstanding("status=all&year=y1")).toBe("year=y1");
+  });
+
+  it("keeps a single status as it is", () => {
+    expect(rosterQueryFromOutstanding("status=paid")).toBe("status=paid");
+    expect(rosterQueryFromOutstanding("status=partial")).toBe("status=partial");
+  });
+
+  it("reads an unknown status as the default", () => {
+    expect(rosterQueryFromOutstanding("status=bogus")).toBe("status=outstanding");
   });
 });

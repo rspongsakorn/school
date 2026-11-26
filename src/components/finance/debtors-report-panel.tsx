@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { pickQuery } from "@/lib/reports/url-filters";
 import { useQuery } from "@tanstack/react-query";
 import { AppHeader } from "@/components/app-header";
 import { useAuth, useRequireRole } from "@/components/providers/auth-provider";
@@ -196,7 +198,20 @@ export function DebtorsReportPanel() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground print:hidden">
-                ยอดค้างรวมทุกใบแจ้งหนี้ทุกปีการศึกษาของนักเรียนแต่ละคน
+                ยอดค้างสะสมทุกปีการศึกษา รวมนักเรียนที่ออกไปแล้ว · ดูเฉพาะภาคนี้ที่{" "}
+                <Link
+                  href={`/reports/outstanding?${new URLSearchParams({
+                    view: "byRoom",
+                    ...Object.fromEntries(
+                      new URLSearchParams(
+                        pickQuery(searchParams.toString(), ["year", "semester", "grade", "classroom"]),
+                      ),
+                    ),
+                  }).toString()}`}
+                  className="underline hover:text-foreground"
+                >
+                  รายงานค้างชำระ →
+                </Link>
               </p>
               <div className="ml-auto">
                 <ReportToolbar />
