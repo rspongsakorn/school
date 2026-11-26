@@ -45,7 +45,13 @@ export function StudentStatementPanel({ studentId }: { studentId: string }) {
 
   return (
     <>
-      <AppHeader title="ใบแจ้งยอดรายบุคคล" basePath={`/reports/students/${studentId}`} />
+      <AppHeader
+        title="ใบแจ้งยอดรายบุคคล"
+        basePath={`/reports/students/${studentId}`}
+        // The roster's grade and room ride along for the back link, and they
+        // belong to one term: drop them when the term changes here.
+        clearGradeClassroomOnChange
+      />
       <main className="p-4 lg:p-6">
         <ReportLetterhead
           title="ใบแจ้งยอดค่าใช้จ่ายนักเรียน"

@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  isCommittableDate,
+  knownOr,
   mergeQuery,
   parseDateParam,
   parseEnumParam,
@@ -74,5 +76,29 @@ describe("statement and roster links", () => {
   it("leaves no dangling question mark when there are no filters", () => {
     expect(statementHref("stu-1", "")).toBe("/reports/students/stu-1");
     expect(rosterHref("?")).toBe("/reports/students");
+  });
+});
+
+describe("knownOr", () => {
+  it("falls back to all for an id the loaded list does not have", () => {
+    expect(knownOr("old-term-grade", ["g1", "g2"], true)).toBe("all");
+  });
+
+  it("keeps a known id, and keeps anything while the list is still loading", () => {
+    expect(knownOr("g1", ["g1", "g2"], true)).toBe("g1");
+    expect(knownOr("g9", [], false)).toBe("g9");
+    expect(knownOr("all", ["g1"], true)).toBe("all");
+  });
+});
+
+describe("isCommittableDate", () => {
+  it("accepts a plausible complete date", () => {
+    expect(isCommittableDate("2026-09-01")).toBe(true);
+  });
+
+  it("rejects the in-between values a browser reports while a year is typed", () => {
+    for (const partial of ["0002-09-01", "0020-09-01", "0202-09-01", "", "2026-02-30"]) {
+      expect(isCommittableDate(partial)).toBe(false);
+    }
   });
 });

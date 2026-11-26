@@ -10,7 +10,7 @@ import { useSemesterContext } from "@/hooks/use-semester-context";
 import { useUrlFilters } from "@/hooks/use-url-filters";
 import { fetchOutstandingReport } from "@/lib/queries/reports";
 import { buildStudentRoster } from "@/lib/reports/roster";
-import { parseEnumParam, statementHref } from "@/lib/reports/url-filters";
+import { knownOr, parseEnumParam, statementHref } from "@/lib/reports/url-filters";
 import { fetchGradeLevels, fetchClassroomsBySemester } from "@/lib/queries/classrooms";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -47,8 +47,28 @@ export function StudentRosterPanel() {
 
   const searchParams = useSearchParams();
   const setFilters = useUrlFilters();
-  const grade = searchParams.get("grade") ?? "all";
-  const classroom = searchParams.get("classroom") ?? "all";
+  const { data: grades = [], isSuccess: gradesLoaded } = useQuery({
+    queryKey: ["grade-levels", ctx?.semesterId],
+    queryFn: () => fetchGradeLevels(ctx!.semesterId),
+    enabled: !!ctx,
+  });
+  const { data: classrooms = [], isSuccess: classroomsLoaded } = useQuery({
+    queryKey: ["classrooms", ctx?.semesterId],
+    queryFn: () => fetchClassroomsBySemester(ctx!.semesterId),
+    enabled: !!ctx,
+  });
+  // An id from another term (an old link, or a term changed elsewhere) would
+  // filter the roster down to nobody; read it as "all" once the lists are in.
+  const grade = knownOr(
+    searchParams.get("grade") ?? "all",
+    grades.map((g) => g.id),
+    gradesLoaded,
+  );
+  const classroom = knownOr(
+    searchParams.get("classroom") ?? "all",
+    classrooms.map((c) => c.id),
+    classroomsLoaded,
+  );
   const status = parseEnumParam(
     searchParams.get("status"),
     ["all", "outstanding", "unpaid", "partial", "paid"] as const,
@@ -60,6 +80,16 @@ export function StudentRosterPanel() {
   // What is typed shows at once; the URL follows 300 ms after typing stops,
   // replacing the entry so a search is one step of Back, not one per key.
   const [searchText, setSearchText] = useState(query);
+  // Follow the URL when q changes from outside (Back, the sidebar link): the
+  // box must say what the list is filtered by. Comparing trimmed text keeps
+  // the round trip of our own debounced write from eating a trailing space.
+  // Changing searchText also re-runs the effect below, whose cleanup drops a
+  // still-pending write that would otherwise put the old q back.
+  const [seenQuery, setSeenQuery] = useState(query);
+  if (query !== seenQuery) {
+    setSeenQuery(query);
+    if (query !== searchText.trim()) setSearchText(query);
+  }
   useEffect(() => {
     if (searchText === query) return;
     const t = setTimeout(() => setFilters({ q: searchText.trim() }, defaults, { replace: true }), 300);
@@ -68,7 +98,7 @@ export function StudentRosterPanel() {
   }, [searchText]);
 
   // Status and search filter the loaded rows; only the term and room refetch.
-  const { data: invoiceRows = [], isLoading } = useQuery({
+  const { data: invoiceRows = [], isPending } = useQuery({
     queryKey: ["student-roster", ctx?.semesterId, ctx?.academicYearId, grade, classroom, teacherProfileId],
     queryFn: () =>
       fetchOutstandingReport({
@@ -81,21 +111,15 @@ export function StudentRosterPanel() {
         includeAllStatuses: true,
         teacherProfileId,
       }),
-    enabled: !!ctx,
+    // Wait for the term's grade and room lists before filtering on an id from
+    // the URL, or a stale one flashes "ไม่พบนักเรียน" before knownOr resets it.
+    enabled:
+      !!ctx &&
+      (!searchParams.get("grade") || gradesLoaded) &&
+      (!searchParams.get("classroom") || classroomsLoaded),
   });
   const rows = buildStudentRoster(invoiceRows, { status, query });
   const rosterQuery = searchParams.toString();
-
-  const { data: grades = [] } = useQuery({
-    queryKey: ["grade-levels", ctx?.semesterId],
-    queryFn: () => fetchGradeLevels(ctx!.semesterId),
-    enabled: !!ctx,
-  });
-  const { data: classrooms = [] } = useQuery({
-    queryKey: ["classrooms", ctx?.semesterId],
-    queryFn: () => fetchClassroomsBySemester(ctx!.semesterId),
-    enabled: !!ctx,
-  });
 
   const gradeItems = [{ value: "all", label: "ทุกชั้น" }, ...grades.map((g) => ({ value: g.id, label: g.name }))];
   const classroomItems = [
@@ -129,7 +153,7 @@ export function StudentRosterPanel() {
             <div className="ml-auto"><ReportToolbar /></div>
           </div>
 
-          {isLoading ? (
+          {isPending ? (
             <TableSkeleton rows={8} />
           ) : rows.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">ไม่พบนักเรียน</p>

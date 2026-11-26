@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
-import { parseDateParam } from "@/lib/reports/url-filters";
+import { isCommittableDate } from "@/lib/reports/url-filters";
 
 /**
  * A date filter whose value lives in the URL. While a date is being typed the
@@ -34,7 +34,7 @@ export function DateFilterInput({
       onChange={(e) => {
         const next = e.target.value;
         setText(next);
-        if (parseDateParam(next, "") === next && next !== value) onCommit(next);
+        if (isCommittableDate(next) && next !== value) onCommit(next);
       }}
       className={className}
     />

@@ -50,3 +50,23 @@ export function statementHref(studentId: string, rosterQuery: string): string {
 export function rosterHref(statementQuery: string): string {
   return withQuery("/reports/students", statementQuery);
 }
+
+/**
+ * A grade or classroom id from the URL, or "all" once the term's list has
+ * loaded and does not hold it — an id from another term, or an old link,
+ * would otherwise filter the report down to nobody. Kept as-is while the list
+ * is loading, so a slow load does not reset a valid filter.
+ */
+export function knownOr(value: string, ids: readonly string[], loaded: boolean): string {
+  if (value === "all" || !loaded) return value;
+  return ids.includes(value) ? value : "all";
+}
+
+/**
+ * Whether a date field's value is worth writing to the URL. While a year is
+ * typed the browser reports each step as a complete date (0002-, 0020-,
+ * 0202-…); committing those would add a history entry and a query apiece.
+ */
+export function isCommittableDate(value: string): boolean {
+  return parseDateParam(value, "") === value && value !== "" && Number(value.slice(0, 4)) >= 2000;
+}
