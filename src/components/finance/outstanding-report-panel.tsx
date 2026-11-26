@@ -1,6 +1,5 @@
 "use client";
 
-import { useCallback } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { AppHeader } from "@/components/app-header";
@@ -33,12 +32,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { compareGradeLevelNames, formatBaht, formatThaiDate } from "@/lib/format";
-import { aggregateOutstandingByStudent } from "@/lib/reports/per-student";
 import { INVOICE_STATUS_LABELS } from "@/lib/finance/constants";
 import {
   OUTSTANDING_STATUS_ITEMS,
   outstandingStatusQuery,
+  owedInvoices,
   parseOutstandingStatus,
+  perStudentRowsFor,
 } from "@/lib/reports/outstanding-status";
 import { ReportToolbar } from "@/components/finance/report-toolbar";
 import { ReportLetterhead } from "@/components/finance/report-letterhead";
@@ -91,7 +91,7 @@ export function OutstandingReportPanel() {
 
   const teacherProfileId = profile?.role === "teacher" ? profile.id : undefined;
 
-  const { data: rows = [], isLoading: rowsLoading } = useQuery({
+  const { data: fetchedRows = [], isLoading: rowsLoading } = useQuery({
     queryKey: [
       "outstanding-report",
       ctx?.semesterId,
@@ -99,6 +99,9 @@ export function OutstandingReportPanel() {
       gradeParam,
       classroomParam,
       statusParam,
+      // Only the per-student view fetches differently (every status under the
+      // default filter), so the other two views share one cache entry.
+      viewParam === "perStudent",
       variantValue,
       invoiceTypeParam,
       teacherProfileId,
@@ -109,7 +112,7 @@ export function OutstandingReportPanel() {
         academicYearId: ctx!.academicYearId,
         gradeLevelId: gradeParam !== "all" ? gradeParam : undefined,
         classroomId: classroomParam !== "all" ? classroomParam : undefined,
-        ...outstandingStatusQuery(statusParam),
+        ...outstandingStatusQuery(statusParam, viewParam),
         variant: variantValue,
         invoiceTypeId: invoiceTypeParam !== "all" ? invoiceTypeParam : undefined,
         teacherProfileId,
@@ -120,6 +123,8 @@ export function OutstandingReportPanel() {
     },
     enabled: !!ctx,
   });
+
+  const rows = owedInvoices(fetchedRows, statusParam);
 
   const { data: grades = [] } = useQuery({
     queryKey: ["grade-levels", ctx?.semesterId],
@@ -147,8 +152,9 @@ export function OutstandingReportPanel() {
     view: viewParam,
   };
 
-  const pushParams = useCallback(
-    (next: Partial<typeof params>) => {
+  // A plain function: `params` is rebuilt every render, so a useCallback on it
+  // never held, and the React compiler memoises this on its own.
+  const pushParams = (next: Partial<typeof params>) => {
       const query = new URLSearchParams(window.location.search);
       const grade = next.grade ?? params.grade;
       const classroom = next.classroom ?? params.classroom;
@@ -172,9 +178,7 @@ export function OutstandingReportPanel() {
       else query.delete("view");
 
       router.push(`${pathname}?${query.toString()}`);
-    },
-    [params, pathname, router],
-  );
+  };
 
   const gradeItems = [
     { value: "all", label: "ทุกชั้น" },
@@ -216,7 +220,7 @@ export function OutstandingReportPanel() {
     { subtotal: 0, totalAmount: 0, paidAmount: 0, outstanding: 0 },
   );
 
-  const perStudentRows = aggregateOutstandingByStudent(rows);
+  const perStudentRows = perStudentRowsFor(fetchedRows, statusParam);
   const perStudentTotals = perStudentRows.reduce(
     (acc, r) => ({
       subtotal: acc.subtotal + r.subtotal,

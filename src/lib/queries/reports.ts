@@ -569,7 +569,7 @@ export async function fetchStudentRoster(params: {
   academicYearId: string;
   gradeLevelId?: string;
   classroomId?: string;
-  status?: "unpaid" | "partial" | "paid" | "all";
+  status?: "outstanding" | "unpaid" | "partial" | "paid" | "all";
   query?: string;
   teacherProfileId?: string;
 }): Promise<StudentRosterRow[]> {

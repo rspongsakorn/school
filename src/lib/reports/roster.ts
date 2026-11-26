@@ -11,14 +11,16 @@ import { aggregateOutstandingByStudent } from "./per-student";
  */
 export function buildStudentRoster(
   rows: OutstandingReportRow[],
-  opts: { status?: "unpaid" | "partial" | "paid" | "all"; query?: string },
+  opts: { status?: "outstanding" | "unpaid" | "partial" | "paid" | "all"; query?: string },
 ): StudentRosterRow[] {
   const students = aggregateOutstandingByStudent(rows);
 
   const byStatus =
-    opts.status && opts.status !== "all"
-      ? students.filter((s) => s.status === opts.status)
-      : students;
+    !opts.status || opts.status === "all"
+      ? students
+      : opts.status === "outstanding"
+        ? students.filter((s) => s.status !== "paid")
+        : students.filter((s) => s.status === opts.status);
 
   const q = opts.query?.trim().toLowerCase();
   const matched = q

@@ -97,4 +97,13 @@ describe("buildStudentRoster", () => {
     );
     expect(result.map((r) => r.studentCode)).toEqual(["9999", "12400"]);
   });
+  it("outstanding keeps everyone who still owes, part-paid included", () => {
+    const rows = [
+      paid({ invoiceId: "a", studentId: "stu-1", studentCode: "100" }),
+      unpaid200({ invoiceId: "b", studentId: "stu-1", studentCode: "100" }),
+      unpaid200({ invoiceId: "c", studentId: "stu-2", studentCode: "200" }),
+      paid({ invoiceId: "d", studentId: "stu-3", studentCode: "300" }),
+    ];
+    expect(buildStudentRoster(rows, { status: "outstanding" }).map((r) => r.studentId)).toEqual(["stu-1", "stu-2"]);
+  });
 });

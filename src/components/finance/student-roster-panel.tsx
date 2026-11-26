@@ -23,11 +23,16 @@ import { formatBaht } from "@/lib/format";
 import { INVOICE_STATUS_LABELS } from "@/lib/finance/constants";
 import { Card, CardContent } from "@/components/ui/card";
 
+// The student's combined status, judged after their invoices are collapsed.
+// Same words as the outstanding report's filter: ยังไม่ชำระ is "paid nothing",
+// so a student who paid tuition and still owes a fee is under ชำระบางส่วน —
+// and both are under ยังค้างชำระ.
 const STATUS_ITEMS = [
   { value: "all", label: "ทุกสถานะ" },
-  { value: "unpaid", label: "ค้างชำระ" },
+  { value: "outstanding", label: "ยังค้างชำระ" },
+  { value: "unpaid", label: "ยังไม่ชำระ" },
   { value: "partial", label: "ชำระบางส่วน" },
-  { value: "paid", label: "ชำระครบ" },
+  { value: "paid", label: "ชำระแล้ว" },
 ];
 
 export function StudentRosterPanel() {
@@ -38,7 +43,7 @@ export function StudentRosterPanel() {
 
   const [grade, setGrade] = useState("all");
   const [classroom, setClassroom] = useState("all");
-  const [status, setStatus] = useState<"all" | "unpaid" | "partial" | "paid">("all");
+  const [status, setStatus] = useState<"all" | "outstanding" | "unpaid" | "partial" | "paid">("all");
   const [search, setSearch] = useState("");
 
   const { data: rows = [], isLoading } = useQuery({
