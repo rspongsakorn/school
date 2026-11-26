@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { useUrlFilters } from "@/hooks/use-url-filters";
+import { parseEnumParam } from "@/lib/reports/url-filters";
 import { AppHeader } from "@/components/app-header";
 import { useAuth, useRequireRole } from "@/components/providers/auth-provider";
 import { useSemesterContext } from "@/hooks/use-semester-context";
@@ -44,7 +46,10 @@ export function CollectionsReportPanel() {
 
   const teacherProfileId = profile?.role === "teacher" ? profile.id : undefined;
 
-  const [level, setLevel] = useState<"all" | "grade" | "classroom">("grade");
+  const searchParams = useSearchParams();
+  const setFilters = useUrlFilters();
+  const level = parseEnumParam(searchParams.get("level"), ["all", "grade", "classroom"] as const, "grade");
+  const setLevel = (v: string) => setFilters({ level: v }, { level: "grade" });
 
   const sumRows = (list: Array<{ studentCount: number; totalDue: number; totalPaid: number; outstanding: number }>) => {
     const studentCount = list.reduce((s, r) => s + r.studentCount, 0);

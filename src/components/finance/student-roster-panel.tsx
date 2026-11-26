@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { AppHeader } from "@/components/app-header";
 import { useAuth, useRequireRole } from "@/components/providers/auth-provider";
 import { useSemesterContext } from "@/hooks/use-semester-context";
-import { fetchStudentRoster } from "@/lib/queries/reports";
+import { useUrlFilters } from "@/hooks/use-url-filters";
+import { fetchOutstandingReport } from "@/lib/queries/reports";
+import { buildStudentRoster } from "@/lib/reports/roster";
+import { parseEnumParam, statementHref } from "@/lib/reports/url-filters";
 import { fetchGradeLevels, fetchClassroomsBySemester } from "@/lib/queries/classrooms";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -41,25 +45,46 @@ export function StudentRosterPanel() {
   const { ctx } = useSemesterContext();
   const teacherProfileId = profile?.role === "teacher" ? profile.id : undefined;
 
-  const [grade, setGrade] = useState("all");
-  const [classroom, setClassroom] = useState("all");
-  const [status, setStatus] = useState<"all" | "outstanding" | "unpaid" | "partial" | "paid">("all");
-  const [search, setSearch] = useState("");
+  const searchParams = useSearchParams();
+  const setFilters = useUrlFilters();
+  const grade = searchParams.get("grade") ?? "all";
+  const classroom = searchParams.get("classroom") ?? "all";
+  const status = parseEnumParam(
+    searchParams.get("status"),
+    ["all", "outstanding", "unpaid", "partial", "paid"] as const,
+    "all",
+  );
+  const query = searchParams.get("q") ?? "";
+  const defaults = { grade: "all", classroom: "all", status: "all", q: "" };
 
-  const { data: rows = [], isLoading } = useQuery({
-    queryKey: ["student-roster", ctx?.semesterId, ctx?.academicYearId, grade, classroom, status, search, teacherProfileId],
+  // What is typed shows at once; the URL follows 300 ms after typing stops,
+  // replacing the entry so a search is one step of Back, not one per key.
+  const [searchText, setSearchText] = useState(query);
+  useEffect(() => {
+    if (searchText === query) return;
+    const t = setTimeout(() => setFilters({ q: searchText.trim() }, defaults, { replace: true }), 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the text drives this
+  }, [searchText]);
+
+  // Status and search filter the loaded rows; only the term and room refetch.
+  const { data: invoiceRows = [], isLoading } = useQuery({
+    queryKey: ["student-roster", ctx?.semesterId, ctx?.academicYearId, grade, classroom, teacherProfileId],
     queryFn: () =>
-      fetchStudentRoster({
+      fetchOutstandingReport({
         semesterId: ctx!.semesterId,
         academicYearId: ctx!.academicYearId,
         gradeLevelId: grade !== "all" ? grade : undefined,
         classroomId: classroom !== "all" ? classroom : undefined,
-        status,
-        query: search,
+        status: "all",
+        variant: "all",
+        includeAllStatuses: true,
         teacherProfileId,
       }),
     enabled: !!ctx,
   });
+  const rows = buildStudentRoster(invoiceRows, { status, query });
+  const rosterQuery = searchParams.toString();
 
   const { data: grades = [] } = useQuery({
     queryKey: ["grade-levels", ctx?.semesterId],
@@ -82,25 +107,25 @@ export function StudentRosterPanel() {
 
   return (
     <>
-      <AppHeader title="รายงานรายบุคคล" basePath="/reports/students" />
+      <AppHeader title="รายงานรายบุคคล" basePath="/reports/students" clearGradeClassroomOnChange />
       <main className="p-4 lg:p-6">
         <ReportLetterhead title="รายงานสรุปรายบุคคล" yearName={ctx?.academicYearName} semesterNumber={ctx?.semesterNumber} />
         <Card className="border-border shadow-sm">
         <CardContent className="space-y-4">
           <div className="report-toolbar flex flex-wrap items-center gap-2">
-            <Select value={grade} onValueChange={(v) => { setGrade(v ?? "all"); setClassroom("all"); }} items={gradeItems}>
+            <Select value={grade} onValueChange={(v) => setFilters({ grade: v ?? "all", classroom: "all" }, defaults)} items={gradeItems}>
               <SelectTrigger className="w-[140px]"><SelectValue placeholder="ชั้น" /></SelectTrigger>
               <SelectContent>{gradeItems.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
             </Select>
-            <Select value={classroom} onValueChange={(v) => setClassroom(v ?? "all")} items={classroomItems}>
+            <Select value={classroom} onValueChange={(v) => setFilters({ classroom: v ?? "all" }, defaults)} items={classroomItems}>
               <SelectTrigger className="w-[160px]"><SelectValue placeholder="ห้อง" /></SelectTrigger>
               <SelectContent>{classroomItems.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
             </Select>
-            <Select value={status} onValueChange={(v) => setStatus((v ?? "all") as typeof status)} items={STATUS_ITEMS}>
+            <Select value={status} onValueChange={(v) => setFilters({ status: v ?? "all" }, defaults)} items={STATUS_ITEMS}>
               <SelectTrigger className="w-[150px]"><SelectValue placeholder="สถานะ" /></SelectTrigger>
               <SelectContent>{STATUS_ITEMS.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
             </Select>
-            <Input placeholder="ค้นหาชื่อ/รหัส" value={search} onChange={(e) => setSearch(e.target.value)} className="w-[200px]" />
+            <Input placeholder="ค้นหาชื่อ/รหัส" value={searchText} onChange={(e) => setSearchText(e.target.value)} className="w-[200px]" />
             <div className="ml-auto"><ReportToolbar /></div>
           </div>
 
@@ -126,7 +151,7 @@ export function StudentRosterPanel() {
                   <TableRow key={row.studentId} className="cursor-pointer">
                     <TableCell className="tabular-nums">{row.studentCode}</TableCell>
                     <TableCell>
-                      <Link href={`/reports/students/${row.studentId}`} className="hover:underline">
+                      <Link href={statementHref(row.studentId, rosterQuery)} className="hover:underline">
                         {row.studentName}
                       </Link>
                     </TableCell>

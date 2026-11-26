@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { useUrlFilters } from "@/hooks/use-url-filters";
+import { parseDateParam } from "@/lib/reports/url-filters";
 import { AppHeader } from "@/components/app-header";
 import { useRequireRole } from "@/components/providers/auth-provider";
 import { useSemesterContext } from "@/hooks/use-semester-context";
 import { ReportToolbar } from "@/components/finance/report-toolbar";
 import { ReportLetterhead } from "@/components/finance/report-letterhead";
-import { Input } from "@/components/ui/input";
+import { DateFilterInput } from "@/components/finance/date-filter-input";
 import {
   Table,
   TableBody,
@@ -32,8 +34,13 @@ function today(): string {
 export function DiscountReportPanel() {
   useRequireRole(["admin", "finance"]);
   const { ctx } = useSemesterContext();
-  const [dateFrom, setDateFrom] = useState(firstOfMonth());
-  const [dateTo, setDateTo] = useState(today());
+  const searchParams = useSearchParams();
+  const setFilters = useUrlFilters();
+  const defaults = { from: firstOfMonth(), to: today() };
+  const dateFrom = parseDateParam(searchParams.get("from"), defaults.from);
+  const dateTo = parseDateParam(searchParams.get("to"), defaults.to);
+  const setDateFrom = (v: string) => setFilters({ from: v }, defaults);
+  const setDateTo = (v: string) => setFilters({ to: v }, defaults);
 
   const { data, isLoading } = useQuery({
     queryKey: ["discount-report", ctx?.academicYearId, dateFrom, dateTo],
@@ -66,21 +73,11 @@ export function DiscountReportPanel() {
           <div className="report-toolbar flex flex-wrap items-end gap-2">
             <div>
               <label className="text-xs text-muted-foreground">ตั้งแต่</label>
-              <Input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="w-[160px]"
-              />
+              <DateFilterInput value={dateFrom} onCommit={setDateFrom} className="w-[160px]" />
             </div>
             <div>
               <label className="text-xs text-muted-foreground">ถึง</label>
-              <Input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="w-[160px]"
-              />
+              <DateFilterInput value={dateTo} onCommit={setDateTo} className="w-[160px]" />
             </div>
             <div className="ml-auto">
               <ReportToolbar />

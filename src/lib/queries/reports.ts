@@ -13,7 +13,6 @@ import { bangkokDateKey } from "@/lib/reports/date";
 import { groupDailyRevenue, type DailyRevenueRow } from "@/lib/reports/daily";
 import { groupRevenueByUser, type UserRevenueRow } from "@/lib/reports/by-user";
 import { latestPaidAtByInvoice } from "@/lib/reports/last-paid";
-import { buildStudentRoster } from "@/lib/reports/roster";
 import {
   buildDebtorRows,
   summarizeEnrollments,
@@ -563,31 +562,6 @@ export type StudentRosterRow = {
   outstanding: number;
   status: "unpaid" | "partial" | "paid";
 };
-
-export async function fetchStudentRoster(params: {
-  semesterId: string;
-  academicYearId: string;
-  gradeLevelId?: string;
-  classroomId?: string;
-  status?: "outstanding" | "unpaid" | "partial" | "paid" | "all";
-  query?: string;
-  teacherProfileId?: string;
-}): Promise<StudentRosterRow[]> {
-  const rows = await fetchOutstandingReport({
-    semesterId: params.semesterId,
-    academicYearId: params.academicYearId,
-    gradeLevelId: params.gradeLevelId,
-    classroomId: params.classroomId,
-    // Every invoice, whatever the filter: the status is judged per student
-    // once the invoices are collapsed, not per invoice here.
-    status: "all",
-    variant: "all",
-    includeAllStatuses: true,
-    teacherProfileId: params.teacherProfileId,
-  });
-
-  return buildStudentRoster(rows, { status: params.status, query: params.query });
-}
 
 export type CollectionsSummary = {
   studentCount: number;

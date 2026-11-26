@@ -1,7 +1,10 @@
 "use client";
 
 import { Fragment, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { useUrlFilters } from "@/hooks/use-url-filters";
+import { parseDateParam, parseEnumParam } from "@/lib/reports/url-filters";
 import { AppHeader } from "@/components/app-header";
 import { useRequireRole } from "@/components/providers/auth-provider";
 import { useSemesterContext } from "@/hooks/use-semester-context";
@@ -11,7 +14,7 @@ import { ReportLetterhead } from "@/components/finance/report-letterhead";
 import { ReceiptIssuanceView } from "@/components/finance/receipt-issuance-view";
 import { DailyRemittanceSlip } from "@/components/finance/daily-remittance-slip";
 import { ReceiptsByUserPanel } from "@/components/finance/receipts-by-user-panel";
-import { Input } from "@/components/ui/input";
+import { DateFilterInput } from "@/components/finance/date-filter-input";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -58,10 +61,21 @@ export function DailyRevenuePanel() {
   useRequireRole(["admin", "finance"]);
 
   const { ctx } = useSemesterContext();
-  const [dateFrom, setDateFrom] = useState(firstOfMonth());
-  const [dateTo, setDateTo] = useState(today());
-  const [method, setMethod] = useState<"all" | "cash" | "transfer">("all");
-  const [docType, setDocType] = useState<"summary" | "receipts" | "remittance" | "by-user">("summary");
+  const searchParams = useSearchParams();
+  const setFilters = useUrlFilters();
+  const defaults = { from: firstOfMonth(), to: today(), method: "all", doc: "summary" };
+  const dateFrom = parseDateParam(searchParams.get("from"), defaults.from);
+  const dateTo = parseDateParam(searchParams.get("to"), defaults.to);
+  const method = parseEnumParam(searchParams.get("method"), ["all", "cash", "transfer"] as const, "all");
+  const docType = parseEnumParam(
+    searchParams.get("doc"),
+    ["summary", "receipts", "remittance", "by-user"] as const,
+    "summary",
+  );
+  const setDateFrom = (v: string) => setFilters({ from: v }, defaults);
+  const setDateTo = (v: string) => setFilters({ to: v }, defaults);
+  const setMethod = (v: string) => setFilters({ method: v }, defaults);
+  const setDocType = (v: string) => setFilters({ doc: v }, defaults);
   const [openDate, setOpenDate] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
@@ -121,11 +135,11 @@ export function DailyRevenuePanel() {
           <div className="report-toolbar flex flex-wrap items-end gap-2">
             <div>
               <label className="text-xs text-muted-foreground">ตั้งแต่</label>
-              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-[160px]" />
+              <DateFilterInput value={dateFrom} onCommit={setDateFrom} className="w-[160px]" />
             </div>
             <div>
               <label className="text-xs text-muted-foreground">ถึง</label>
-              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-[160px]" />
+              <DateFilterInput value={dateTo} onCommit={setDateTo} className="w-[160px]" />
             </div>
             <Select value={method} onValueChange={(v) => setMethod((v ?? "all") as typeof method)} items={METHOD_ITEMS}>
               <SelectTrigger className="w-[140px]">
