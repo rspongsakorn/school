@@ -6,7 +6,6 @@ describe("teacherMayVisit", () => {
     for (const path of [
       "/reports",
       "/reports/outstanding",
-      "/reports/debtors",
       "/reports/collections",
       "/reports/students",
     ]) {
@@ -18,8 +17,8 @@ describe("teacherMayVisit", () => {
     expect(teacherMayVisit("/reports/students/a815f217-a7bb-459c-976e-b3077d597133")).toBe(true);
   });
 
-  it("refuses the finance-only reports and everything outside reports", () => {
-    for (const path of ["/reports/daily", "/reports/discounts", "/", "/students", "/invoices", "/accounting"]) {
+  it("refuses the finance-only reports (the debtors report sums every year, which a teacher's row-level view cannot supply) and everything outside reports", () => {
+    for (const path of ["/reports/daily", "/reports/discounts", "/reports/debtors", "/", "/students", "/invoices", "/accounting"]) {
       expect(teacherMayVisit(path)).toBe(false);
     }
   });

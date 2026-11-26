@@ -345,10 +345,17 @@ export function OutstandingReportPanel() {
           </div>
 
           <p className="text-xs text-muted-foreground print:hidden">
-            ยอดของภาคเรียนที่เลือกเท่านั้น · ยอดค้างสะสมทุกปี ดูที่{" "}
-            <Link href={debtorsHref} className="underline hover:text-foreground">
-              ลูกหนี้รายห้อง →
-            </Link>
+            ยอดของภาคเรียนที่เลือกเท่านั้น
+            {/* The debtors report is not offered to teachers (see
+                teacher-routes.ts), so neither is the way to it. */}
+            {profile?.role === "teacher" ? null : (
+              <>
+                {" · "}ยอดค้างสะสมทุกปี ดูที่{" "}
+                <Link href={debtorsHref} className="underline hover:text-foreground">
+                  ลูกหนี้รายห้อง →
+                </Link>
+              </>
+            )}
             {" · "}
             <Link href={rosterHref} className="underline hover:text-foreground">
               ดูยอดรวมรายคน → รายบุคคล

@@ -51,7 +51,7 @@ const STATUS_BADGE_CLASSES = {
 } as const;
 
 export function DebtorsReportPanel() {
-  useRequireRole(["admin", "finance", "teacher"]);
+  useRequireRole(["admin", "finance"]);
 
   const { profile } = useAuth();
   const { ctx } = useSemesterContext();
