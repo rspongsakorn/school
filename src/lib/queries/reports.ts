@@ -737,10 +737,15 @@ export async function fetchDailyRevenue(params: {
   const fromIso = `${params.dateFrom}T00:00:00+07:00`;
   const toIso = `${params.dateTo}T23:59:59.999+07:00`;
 
-  let query = supabase
-    .from("payments")
-    .select(
-      `
+  // Paged: a term holds more receipts than PostgREST's 1000-row cap, and the
+  // cut used to drop the oldest silently, so day and range totals ran short.
+  // A fresh builder per page, ordered by paid_at then id so pages never
+  // overlap on receipts sharing a timestamp.
+  const pageQuery = (rangeFrom: number, rangeTo: number) => {
+    let query = supabase
+      .from("payments")
+      .select(
+        `
       id,
       receipt_number,
       amount,
@@ -752,15 +757,18 @@ export async function fetchDailyRevenue(params: {
       students!inner ( student_code, first_name, last_name ),
       profiles!payments_recorded_by_fkey ( display_name )
     `,
-    )
-    .eq("academic_year_id", params.academicYearId)
-    .gte("paid_at", fromIso)
-    .lte("paid_at", toIso)
-    .order("paid_at", { ascending: false });
-
-  if (params.method && params.method !== "all") {
-    query = query.eq("payment_method", params.method);
-  }
+      )
+      .eq("academic_year_id", params.academicYearId)
+      .gte("paid_at", fromIso)
+      .lte("paid_at", toIso);
+    if (params.method && params.method !== "all") {
+      query = query.eq("payment_method", params.method);
+    }
+    return query
+      .order("paid_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(rangeFrom, rangeTo);
+  };
 
   type Row = {
     id: string;
@@ -775,11 +783,13 @@ export async function fetchDailyRevenue(params: {
     profiles: { display_name: string } | null;
   };
 
-  const [{ data }, gradeByStudent] = await Promise.all([
-    query,
+  const [rows, gradeByStudent] = await Promise.all([
+    fetchAllPages<Row>(
+      async (rangeFrom, rangeTo) =>
+        (await pageQuery(rangeFrom, rangeTo)) as unknown as { data: Row[] | null; error: unknown },
+    ),
     getStudentGradeMap(params.semesterId),
   ]);
-  const rows = (data ?? []) as unknown as Row[];
 
   const summary = groupDailyRevenue(
     rows.map((r) => ({
@@ -943,25 +953,37 @@ export async function fetchDiscountReport(params: {
   const from = `${params.dateFrom}T00:00:00+07:00`;
   const to = `${params.dateTo}T23:59:59+07:00`;
 
-  const [{ data }, { data: waiverData }] = await Promise.all([
-    supabase
-      .from("payment_discounts")
-      .select("amount, fee_item_id, fee_items ( name ), payments!inner ( status, academic_year_id, paid_at )")
-      .eq("payments.status", "active")
-      .eq("payments.academic_year_id", params.academicYearId)
-      .gte("payments.paid_at", from)
-      .lte("payments.paid_at", to),
+  // Both paged: a term's discount lines pass PostgREST's 1000-row cap easily,
+  // and a cut list would print a short total as if it were complete.
+  const [data, waiverData] = await Promise.all([
+    fetchAllPages<unknown>(
+      async (rangeFrom, rangeTo) =>
+        (await supabase
+          .from("payment_discounts")
+          .select("amount, fee_item_id, fee_items ( name ), payments!inner ( status, academic_year_id, paid_at )")
+          .eq("payments.status", "active")
+          .eq("payments.academic_year_id", params.academicYearId)
+          .gte("payments.paid_at", from)
+          .lte("payments.paid_at", to)
+          .order("id", { ascending: true })
+          .range(rangeFrom, rangeTo)) as unknown as { data: unknown[] | null; error: unknown },
+    ),
     // Invoices closed with no cash (the insurance promotion, XLSX write-offs)
     // leave a log row instead of a payment_discounts row. Dated by the log row,
     // like the ledger does.
-    supabase
-      .from("invoice_discount_log")
-      .select(
-        "discount_value, student_invoices!inner ( academic_year_id, invoice_lines ( amount, fee_item_id, fee_items ( name ) ) )",
-      )
-      .eq("student_invoices.academic_year_id", params.academicYearId)
-      .gte("created_at", from)
-      .lte("created_at", to),
+    fetchAllPages<unknown>(
+      async (rangeFrom, rangeTo) =>
+        (await supabase
+          .from("invoice_discount_log")
+          .select(
+            "discount_value, student_invoices!inner ( academic_year_id, invoice_lines ( amount, fee_item_id, fee_items ( name ) ) )",
+          )
+          .eq("student_invoices.academic_year_id", params.academicYearId)
+          .gte("created_at", from)
+          .lte("created_at", to)
+          .order("id", { ascending: true })
+          .range(rangeFrom, rangeTo)) as unknown as { data: unknown[] | null; error: unknown },
+    ),
   ]);
 
   type PaymentRow = { amount: string; fee_item_id: string; fee_items: { name: string } | null };
@@ -1004,23 +1026,27 @@ export async function fetchDailyRemittanceItems(params: {
 }): Promise<DailyRemittanceItem[]> {
   const supabase = createClient();
 
-  let query = supabase
-    .from("payment_allocations")
-    .select(
-      `
+  // Paged for the same reason as fetchDailyRevenue: a remittance slip over a
+  // term has more allocation rows than the 1000-row cap.
+  const pageQuery = (rangeFrom: number, rangeTo: number) => {
+    let query = supabase
+      .from("payment_allocations")
+      .select(
+        `
       amount,
       payments!inner ( status, academic_year_id, paid_at, payment_method ),
       student_invoices!inner ( invoice_type_id, invoice_types ( code, name ) )
     `,
-    )
-    .eq("payments.status", "active")
-    .eq("payments.academic_year_id", params.academicYearId)
-    .gte("payments.paid_at", `${params.dateFrom}T00:00:00+07:00`)
-    .lte("payments.paid_at", `${params.dateTo}T23:59:59.999+07:00`);
-
-  if (params.method && params.method !== "all") {
-    query = query.eq("payments.payment_method", params.method);
-  }
+      )
+      .eq("payments.status", "active")
+      .eq("payments.academic_year_id", params.academicYearId)
+      .gte("payments.paid_at", `${params.dateFrom}T00:00:00+07:00`)
+      .lte("payments.paid_at", `${params.dateTo}T23:59:59.999+07:00`);
+    if (params.method && params.method !== "all") {
+      query = query.eq("payments.payment_method", params.method);
+    }
+    return query.order("id", { ascending: true }).range(rangeFrom, rangeTo);
+  };
 
   type Row = {
     amount: string;
@@ -1030,8 +1056,10 @@ export async function fetchDailyRemittanceItems(params: {
     };
   };
 
-  const { data } = await query;
-  const rows = (data ?? []) as unknown as Row[];
+  const rows = await fetchAllPages<Row>(
+    async (rangeFrom, rangeTo) =>
+      (await pageQuery(rangeFrom, rangeTo)) as unknown as { data: Row[] | null; error: unknown },
+  );
 
   const byType = new Map<string, DailyRemittanceItem>();
   for (const r of rows) {
