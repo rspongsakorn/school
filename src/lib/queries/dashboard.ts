@@ -113,11 +113,19 @@ export async function fetchDashboardData(
       .eq("semester_id", semesterId)
       .eq("status", "enrolled"),
     fetchAllInvoiceStatusRows(supabase, academicYearId, semesterId),
-    supabase
-      .from("payments")
-      .select("amount")
-      .eq("academic_year_id", academicYearId)
-      .eq("status", "active"),
+    // Paged like the invoices beside it: a year passes PostgREST's 1000-row
+    // cap, and the cut was silent — ยอดเก็บได้ read ฿29,900 short on the test
+    // DB (1,000 of 1,010 receipts).
+    fetchAllPages<{ amount: number }>(
+      async (from, to) =>
+        await supabase
+          .from("payments")
+          .select("amount")
+          .eq("academic_year_id", academicYearId)
+          .eq("status", "active")
+          .order("id", { ascending: true })
+          .range(from, to),
+    ).then((data) => ({ data })),
     supabase
       .from("payments")
       .select("receipt_number, amount, paid_at, student_id")
