@@ -101,3 +101,57 @@ export function outstandingLinesLabel(input: {
   if (!input.tracked) return LEGACY_OUTSTANDING_LABEL;
   return input.unpaidLineNames.join(", ");
 }
+
+const RELOAD_HINT = "กรุณาเลือกนักเรียนใหม่เพื่อโหลดยอดล่าสุด";
+
+/**
+ * Thai message for a `record_payment` failure. The RPC raises English
+ * messages; the ones a cashier can act on get their own wording, so a line
+ * paid a moment ago by someone else doesn't look like a broken save.
+ */
+export function recordPaymentErrorMessage(rpcMessage: string | undefined): string {
+  switch (rpcMessage) {
+    case "line not payable":
+      return `มีรายการที่ชำระไปแล้ว ${RELOAD_HINT}`;
+    case "p_new_paid must equal current paid_amount + p_amount":
+    case "payment would overpay the invoice":
+      return `มีการชำระใบแจ้งนี้เข้ามาก่อนแล้ว ${RELOAD_HINT}`;
+    case "amount does not match selected lines":
+      return "ยอดเงินไม่ตรงกับรายการที่เลือก";
+    case "discount on an unselected line":
+      return "ให้ส่วนลดได้เฉพาะรายการที่เลือก";
+    case "line selection required for this invoice":
+      return "กรุณาเลือกรายการที่ชำระ";
+    case "this invoice does not take a line selection":
+      return "ใบแจ้งนี้เลือกรายการไม่ได้";
+    default:
+      return "ไม่สามารถบันทึกการชำระได้";
+  }
+}
+
+/**
+ * Paid lines as stored in the receipt snapshot: billed amounts, matching the
+ * printed receipt (discounts are recorded on their own).
+ */
+export function paidLinesForSnapshot(
+  lines: PayableLine[],
+  lineIds: string[],
+): { invoiceLineId: string; description: string; amount: number }[] {
+  const byId = new Map(lines.map((l) => [l.id, l]));
+  return lineIds.map((id) => ({
+    invoiceLineId: id,
+    description: byId.get(id)?.description ?? "",
+    amount: byId.get(id)?.amount ?? 0,
+  }));
+}
+
+/**
+ * An invoice-level discount (write-off) is spread over every line, which
+ * would contradict lines already settled by line. Refuse it then.
+ */
+export function invoiceDiscountBlockedReason(states: InvoiceLineStates | undefined): string | null {
+  if (!states?.tracked) return null;
+  return states.lines.some((l) => l.isPaid && l.amount > 0)
+    ? "ใบแจ้งนี้ชำระแบบเลือกรายการไปแล้ว ให้ส่วนลดทั้งใบไม่ได้"
+    : null;
+}

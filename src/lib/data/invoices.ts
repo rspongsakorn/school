@@ -210,9 +210,12 @@ export async function getStudentOutstandingInvoices(
   };
 
   const rows = (data ?? []) as unknown as Row[];
-  const { data: stateRows } = rows.length
+  const { data: stateRows, error: statesError } = rows.length
     ? await supabase.rpc("invoice_line_states", { p_invoice_ids: rows.map((r) => r.id) })
-    : { data: [] };
+    : { data: [], error: null };
+  // Without line states every invoice would look legacy and the cashier
+  // would hit a confusing refusal on save; fail the load instead.
+  if (statesError) throw new Error("โหลดรายการในใบแจ้งไม่สำเร็จ");
   const statesByInvoice = groupLineStates(stateRows ?? []);
 
   return rows.map((row) => {

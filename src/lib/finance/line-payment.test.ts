@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   groupLineStates,
+  invoiceDiscountBlockedReason,
+  paidLinesForSnapshot,
+  recordPaymentErrorMessage,
   outstandingLinesLabel,
   resolveLineSelection,
   type PayableLine,
@@ -161,5 +164,76 @@ describe("groupLineStates", () => {
   it("keeps a zero line paid", () => {
     const map = groupLineStates([row("I1", "Z", "0", true)]);
     expect(map.get("I1")?.lines[0]).toEqual({ id: "Z", description: "d-Z", amount: 0, isPaid: true });
+  });
+});
+
+describe("recordPaymentErrorMessage", () => {
+  it("tells the cashier a line was already paid", () => {
+    expect(recordPaymentErrorMessage("line not payable")).toBe(
+      "มีรายการที่ชำระไปแล้ว กรุณาเลือกนักเรียนใหม่เพื่อโหลดยอดล่าสุด",
+    );
+  });
+
+  it("tells the cashier someone else paid this invoice first", () => {
+    const msg = "มีการชำระใบแจ้งนี้เข้ามาก่อนแล้ว กรุณาเลือกนักเรียนใหม่เพื่อโหลดยอดล่าสุด";
+    expect(recordPaymentErrorMessage("p_new_paid must equal current paid_amount + p_amount")).toBe(msg);
+    expect(recordPaymentErrorMessage("payment would overpay the invoice")).toBe(msg);
+  });
+
+  it("explains a selection the server refused", () => {
+    expect(recordPaymentErrorMessage("amount does not match selected lines")).toBe(
+      "ยอดเงินไม่ตรงกับรายการที่เลือก",
+    );
+    expect(recordPaymentErrorMessage("discount on an unselected line")).toBe(
+      "ให้ส่วนลดได้เฉพาะรายการที่เลือก",
+    );
+    expect(recordPaymentErrorMessage("line selection required for this invoice")).toBe(
+      "กรุณาเลือกรายการที่ชำระ",
+    );
+    expect(recordPaymentErrorMessage("this invoice does not take a line selection")).toBe(
+      "ใบแจ้งนี้เลือกรายการไม่ได้",
+    );
+  });
+
+  it("falls back to the generic message", () => {
+    expect(recordPaymentErrorMessage("something else")).toBe("ไม่สามารถบันทึกการชำระได้");
+    expect(recordPaymentErrorMessage(undefined)).toBe("ไม่สามารถบันทึกการชำระได้");
+  });
+});
+
+describe("paidLinesForSnapshot", () => {
+  it("records each paid line at its billed amount, like the printed receipt", () => {
+    expect(paidLinesForSnapshot(lines, ["B", "A"])).toEqual([
+      { invoiceLineId: "B", description: "ค่าอาหาร", amount: 2500 },
+      { invoiceLineId: "A", description: "ค่าเทอม", amount: 8000 },
+    ]);
+  });
+});
+
+describe("invoiceDiscountBlockedReason", () => {
+  it("refuses an invoice-level discount once lines have been paid by line", () => {
+    expect(
+      invoiceDiscountBlockedReason({
+        tracked: true,
+        lines: [
+          { ...lines[0], isPaid: true },
+          lines[1],
+        ],
+      }),
+    ).toBe("ใบแจ้งนี้ชำระแบบเลือกรายการไปแล้ว ให้ส่วนลดทั้งใบไม่ได้");
+  });
+
+  it("allows it before anything is paid, on legacy invoices, and ignores zero lines", () => {
+    expect(invoiceDiscountBlockedReason({ tracked: true, lines })).toBeNull();
+    expect(
+      invoiceDiscountBlockedReason({ tracked: false, lines: [{ ...lines[0], isPaid: true }] }),
+    ).toBeNull();
+    expect(
+      invoiceDiscountBlockedReason({
+        tracked: true,
+        lines: [{ id: "Z", description: "z", amount: 0, isPaid: true }, lines[0]],
+      }),
+    ).toBeNull();
+    expect(invoiceDiscountBlockedReason(undefined)).toBeNull();
   });
 });

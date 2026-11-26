@@ -52,6 +52,9 @@ export function resolvePaymentDiscounts(
     if (!line) {
       return { ok: false, error: "ส่วนลดอ้างถึงรายการที่ไม่อยู่ในใบแจ้ง" };
     }
+    if (rows.some((r) => r.invoiceLineId === d.invoiceLineId)) {
+      return { ok: false, error: "ให้ส่วนลดได้รายการละครั้ง" };
+    }
     if (!Number.isFinite(d.discountValue) || d.discountValue < 0) {
       return { ok: false, error: "มูลค่าส่วนลดไม่ถูกต้อง" };
     }
