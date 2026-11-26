@@ -99,7 +99,7 @@ export function OutstandingReportPanel() {
 
   const teacherProfileId = profile?.role === "teacher" ? profile.id : undefined;
 
-  const { data: fetchedRows = [], isLoading: rowsLoading } = useQuery({
+  const { data: fetchedRows = [], isLoading: fetching } = useQuery({
     queryKey: [
       "outstanding-report",
       ctx?.semesterId,
@@ -126,9 +126,12 @@ export function OutstandingReportPanel() {
         a.studentCode.localeCompare(b.studentCode, "th", { numeric: true }),
       );
     },
-    enabled: !!ctx,
+    // Not for an old ?view=perStudent link: it is being sent to the roster.
+    enabled: !!ctx && !legacyPerStudent,
   });
 
+  // An old per-student link shows the skeleton until it is sent to the roster.
+  const rowsLoading = fetching || legacyPerStudent;
   const rows = owedInvoices(fetchedRows, statusParam);
 
   const { data: grades = [] } = useQuery({

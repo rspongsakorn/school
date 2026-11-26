@@ -98,3 +98,9 @@ export function rosterQueryFromOutstanding(query: string): string {
   params.set("status", status);
   return params.toString();
 }
+
+/** The outstanding report's by-room view for the term, grade and room a debtors report is showing. */
+export function outstandingByRoomQuery(query: string): string {
+  const carried = pickQuery(query, ["year", "semester", "grade", "classroom"]);
+  return carried ? `view=byRoom&${carried}` : "view=byRoom";
+}

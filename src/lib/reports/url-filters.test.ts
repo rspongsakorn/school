@@ -3,6 +3,7 @@ import {
   isCommittableDate,
   knownOr,
   mergeQuery,
+  outstandingByRoomQuery,
   parseDateParam,
   parseEnumParam,
   pickQuery,
@@ -139,5 +140,17 @@ describe("rosterQueryFromOutstanding", () => {
 
   it("reads an unknown status as the default", () => {
     expect(rosterQueryFromOutstanding("status=bogus")).toBe("status=outstanding");
+  });
+});
+
+describe("outstandingByRoomQuery", () => {
+  it("opens the by-room view with the term, grade and room carried over", () => {
+    expect(outstandingByRoomQuery("year=y1&semester=1&grade=g1&classroom=c1&form=unpaid")).toBe(
+      "view=byRoom&year=y1&semester=1&grade=g1&classroom=c1",
+    );
+  });
+
+  it("is just the view when nothing carries over", () => {
+    expect(outstandingByRoomQuery("")).toBe("view=byRoom");
   });
 });

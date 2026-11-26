@@ -2,8 +2,8 @@ import type { PriceTier } from "@/lib/finance/price-tier";
 import type { OutstandingReportRow } from "@/lib/queries/reports";
 
 /**
- * One student's invoices collapsed into a single line — the shape the
- * "รวมรายคน" view of the outstanding report prints.
+ * One student's invoices collapsed into a single line — what the per-student
+ * report (buildStudentRoster) is built from.
  */
 export type PerStudentOutstandingRow = {
   studentId: string;
