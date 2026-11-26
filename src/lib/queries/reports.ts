@@ -2,6 +2,7 @@ import { parsePriceTier, type PriceTier } from "@/lib/finance/price-tier";
 import { buildDiscountReport, type DiscountReportResult } from "@/lib/finance/discount-report";
 import { createClient } from "@/lib/supabase/client";
 import { fetchAllPages } from "@/lib/supabase/paginate";
+import { mapLimit } from "@/lib/supabase/map-limit";
 import {
   formatClassroom,
   formatStudentName,
@@ -57,23 +58,30 @@ async function getStudentGradeMap(semesterId: string): Promise<Map<string, strin
     classrooms: { name: string; grade_levels: { name: string } | null } | null;
   };
 
-  const { data } = await supabase
-    .from("student_enrollments")
-    .select(
-      `
+  // Paged: a school past 1000 enrolled students would otherwise lose the rest
+  // silently, and their rows would print "—" for the room.
+  const data = await fetchAllPages<EnrollmentRow>(
+    async (from, to) =>
+      (await supabase
+        .from("student_enrollments")
+        .select(
+          `
       student_id,
       classrooms (
         name,
         grade_levels ( name )
       )
     `,
-    )
-    .eq("semester_id", semesterId)
-    .eq("status", "enrolled");
+        )
+        .eq("semester_id", semesterId)
+        .eq("status", "enrolled")
+        .order("id", { ascending: true })
+        .range(from, to)) as unknown as { data: EnrollmentRow[] | null; error: unknown },
+  );
 
   const map = new Map<string, string>();
 
-  for (const row of (data ?? []) as unknown as EnrollmentRow[]) {
+  for (const row of data) {
     const classroom = row.classrooms;
     const gradeName = classroom?.grade_levels?.name ?? null;
     map.set(row.student_id, formatClassroom(gradeName, classroom?.name ?? null));
@@ -94,7 +102,11 @@ export async function fetchOutstandingReport(params: {
   includeAllStatuses?: boolean;
 }): Promise<OutstandingReportRow[]> {
   const supabase = createClient();
-  const gradeByStudent = await getStudentGradeMap(params.semesterId);
+  // Started now, awaited at the end: it shares nothing with the lookups below.
+  const gradeByStudentPromise = getStudentGradeMap(params.semesterId);
+  // The early returns below never await it; keep a failure there from
+  // surfacing as an unhandled rejection. The await at the end still throws.
+  gradeByStudentPromise.catch(() => {});
 
   let allowedStudentIds: string[] | null = null;
 
@@ -209,7 +221,10 @@ export async function fetchOutstandingReport(params: {
     return (await query.range(from, to)) as unknown as { data: Row[] | null; error: unknown };
   });
   const invoiceIds = rows.map((row) => row.id);
-  const lastPaidByInvoice = await fetchLastPaidAtByInvoiceIds(supabase, invoiceIds);
+  const [lastPaidByInvoice, gradeByStudent] = await Promise.all([
+    fetchLastPaidAtByInvoiceIds(supabase, invoiceIds),
+    gradeByStudentPromise,
+  ]);
 
   return rows.map((row) => {
     const totalAmount = Number(row.total_amount);
@@ -247,17 +262,21 @@ async function fetchInBatches<T>(
   ids: string[],
   query: (chunk: string[], from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>,
 ): Promise<T[]> {
-  const rows: T[] = [];
+  const chunks: string[][] = [];
   for (let i = 0; i < ids.length; i += STUDENT_ID_BATCH_SIZE) {
-    const chunk = ids.slice(i, i + STUDENT_ID_BATCH_SIZE);
-    const page = await fetchAllPages<T>(
+    chunks.push(ids.slice(i, i + STUDENT_ID_BATCH_SIZE));
+  }
+  const pages = await mapLimit(chunks, BATCH_CONCURRENCY, (chunk) =>
+    fetchAllPages<T>(
       async (from, to) =>
         (await query(chunk, from, to)) as unknown as { data: T[] | null; error: unknown },
-    );
-    rows.push(...page);
-  }
-  return rows;
+    ),
+  );
+  return pages.flat();
 }
+
+/** Id chunks fetched at once: enough to overlap round trips, not to flood. */
+const BATCH_CONCURRENCY = 4;
 
 const STUDENT_ID_BATCH_SIZE = 200;
 
@@ -429,16 +448,18 @@ async function fetchLastPaidAtByInvoiceIds(
     payments: { paid_at: string; status: "active" | "voided" };
   };
 
-  const batches: AllocationRow[][] = [];
+  const chunks: string[][] = [];
   for (let i = 0; i < invoiceIds.length; i += INVOICE_ID_BATCH_SIZE) {
-    const chunk = invoiceIds.slice(i, i + INVOICE_ID_BATCH_SIZE);
+    chunks.push(invoiceIds.slice(i, i + INVOICE_ID_BATCH_SIZE));
+  }
+  const batches = await mapLimit(chunks, BATCH_CONCURRENCY, async (chunk) => {
     const { data, error } = await supabase
       .from("payment_allocations")
       .select("invoice_id, payments!inner ( paid_at, status )")
       .in("invoice_id", chunk);
     if (error) throw error;
-    batches.push((data ?? []) as unknown as AllocationRow[]);
-  }
+    return (data ?? []) as unknown as AllocationRow[];
+  });
 
   const allocationRows = batches.flat();
 
@@ -562,47 +583,6 @@ export type StudentRosterRow = {
   outstanding: number;
   status: "unpaid" | "partial" | "paid";
 };
-
-export async function fetchStudentRoster(params: {
-  semesterId: string;
-  academicYearId: string;
-  gradeLevelId?: string;
-  classroomId?: string;
-  status?: "unpaid" | "partial" | "paid" | "all";
-  query?: string;
-  teacherProfileId?: string;
-}): Promise<StudentRosterRow[]> {
-  const rows = await fetchOutstandingReport({
-    semesterId: params.semesterId,
-    academicYearId: params.academicYearId,
-    gradeLevelId: params.gradeLevelId,
-    classroomId: params.classroomId,
-    status: params.status,
-    variant: "all",
-    includeAllStatuses: true,
-    teacherProfileId: params.teacherProfileId,
-  });
-
-  const q = params.query?.trim().toLowerCase();
-  const filtered = q
-    ? rows.filter(
-        (r) =>
-          r.studentName.toLowerCase().includes(q) ||
-          r.studentCode.toLowerCase().includes(q),
-      )
-    : rows;
-
-  return filtered.map((r) => ({
-    studentId: r.studentId,
-    studentCode: r.studentCode,
-    studentName: r.studentName,
-    gradeClassroom: r.gradeClassroom,
-    totalAmount: r.totalAmount,
-    paidAmount: r.paidAmount,
-    outstanding: r.outstanding,
-    status: r.status,
-  }));
-}
 
 export type CollectionsSummary = {
   studentCount: number;
@@ -757,10 +737,15 @@ export async function fetchDailyRevenue(params: {
   const fromIso = `${params.dateFrom}T00:00:00+07:00`;
   const toIso = `${params.dateTo}T23:59:59.999+07:00`;
 
-  let query = supabase
-    .from("payments")
-    .select(
-      `
+  // Paged: a term holds more receipts than PostgREST's 1000-row cap, and the
+  // cut used to drop the oldest silently, so day and range totals ran short.
+  // A fresh builder per page, ordered by paid_at then id so pages never
+  // overlap on receipts sharing a timestamp.
+  const pageQuery = (rangeFrom: number, rangeTo: number) => {
+    let query = supabase
+      .from("payments")
+      .select(
+        `
       id,
       receipt_number,
       amount,
@@ -772,15 +757,18 @@ export async function fetchDailyRevenue(params: {
       students!inner ( student_code, first_name, last_name ),
       profiles!payments_recorded_by_fkey ( display_name )
     `,
-    )
-    .eq("academic_year_id", params.academicYearId)
-    .gte("paid_at", fromIso)
-    .lte("paid_at", toIso)
-    .order("paid_at", { ascending: false });
-
-  if (params.method && params.method !== "all") {
-    query = query.eq("payment_method", params.method);
-  }
+      )
+      .eq("academic_year_id", params.academicYearId)
+      .gte("paid_at", fromIso)
+      .lte("paid_at", toIso);
+    if (params.method && params.method !== "all") {
+      query = query.eq("payment_method", params.method);
+    }
+    return query
+      .order("paid_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(rangeFrom, rangeTo);
+  };
 
   type Row = {
     id: string;
@@ -795,11 +783,13 @@ export async function fetchDailyRevenue(params: {
     profiles: { display_name: string } | null;
   };
 
-  const [{ data }, gradeByStudent] = await Promise.all([
-    query,
+  const [rows, gradeByStudent] = await Promise.all([
+    fetchAllPages<Row>(
+      async (rangeFrom, rangeTo) =>
+        (await pageQuery(rangeFrom, rangeTo)) as unknown as { data: Row[] | null; error: unknown },
+    ),
     getStudentGradeMap(params.semesterId),
   ]);
-  const rows = (data ?? []) as unknown as Row[];
 
   const summary = groupDailyRevenue(
     rows.map((r) => ({
@@ -963,25 +953,37 @@ export async function fetchDiscountReport(params: {
   const from = `${params.dateFrom}T00:00:00+07:00`;
   const to = `${params.dateTo}T23:59:59+07:00`;
 
-  const [{ data }, { data: waiverData }] = await Promise.all([
-    supabase
-      .from("payment_discounts")
-      .select("amount, fee_item_id, fee_items ( name ), payments!inner ( status, academic_year_id, paid_at )")
-      .eq("payments.status", "active")
-      .eq("payments.academic_year_id", params.academicYearId)
-      .gte("payments.paid_at", from)
-      .lte("payments.paid_at", to),
+  // Both paged: a term's discount lines pass PostgREST's 1000-row cap easily,
+  // and a cut list would print a short total as if it were complete.
+  const [data, waiverData] = await Promise.all([
+    fetchAllPages<unknown>(
+      async (rangeFrom, rangeTo) =>
+        (await supabase
+          .from("payment_discounts")
+          .select("amount, fee_item_id, fee_items ( name ), payments!inner ( status, academic_year_id, paid_at )")
+          .eq("payments.status", "active")
+          .eq("payments.academic_year_id", params.academicYearId)
+          .gte("payments.paid_at", from)
+          .lte("payments.paid_at", to)
+          .order("id", { ascending: true })
+          .range(rangeFrom, rangeTo)) as unknown as { data: unknown[] | null; error: unknown },
+    ),
     // Invoices closed with no cash (the insurance promotion, XLSX write-offs)
     // leave a log row instead of a payment_discounts row. Dated by the log row,
     // like the ledger does.
-    supabase
-      .from("invoice_discount_log")
-      .select(
-        "discount_value, student_invoices!inner ( academic_year_id, invoice_lines ( amount, fee_item_id, fee_items ( name ) ) )",
-      )
-      .eq("student_invoices.academic_year_id", params.academicYearId)
-      .gte("created_at", from)
-      .lte("created_at", to),
+    fetchAllPages<unknown>(
+      async (rangeFrom, rangeTo) =>
+        (await supabase
+          .from("invoice_discount_log")
+          .select(
+            "discount_value, student_invoices!inner ( academic_year_id, invoice_lines ( amount, fee_item_id, fee_items ( name ) ) )",
+          )
+          .eq("student_invoices.academic_year_id", params.academicYearId)
+          .gte("created_at", from)
+          .lte("created_at", to)
+          .order("id", { ascending: true })
+          .range(rangeFrom, rangeTo)) as unknown as { data: unknown[] | null; error: unknown },
+    ),
   ]);
 
   type PaymentRow = { amount: string; fee_item_id: string; fee_items: { name: string } | null };
@@ -1024,23 +1026,27 @@ export async function fetchDailyRemittanceItems(params: {
 }): Promise<DailyRemittanceItem[]> {
   const supabase = createClient();
 
-  let query = supabase
-    .from("payment_allocations")
-    .select(
-      `
+  // Paged for the same reason as fetchDailyRevenue: a remittance slip over a
+  // term has more allocation rows than the 1000-row cap.
+  const pageQuery = (rangeFrom: number, rangeTo: number) => {
+    let query = supabase
+      .from("payment_allocations")
+      .select(
+        `
       amount,
       payments!inner ( status, academic_year_id, paid_at, payment_method ),
       student_invoices!inner ( invoice_type_id, invoice_types ( code, name ) )
     `,
-    )
-    .eq("payments.status", "active")
-    .eq("payments.academic_year_id", params.academicYearId)
-    .gte("payments.paid_at", `${params.dateFrom}T00:00:00+07:00`)
-    .lte("payments.paid_at", `${params.dateTo}T23:59:59.999+07:00`);
-
-  if (params.method && params.method !== "all") {
-    query = query.eq("payments.payment_method", params.method);
-  }
+      )
+      .eq("payments.status", "active")
+      .eq("payments.academic_year_id", params.academicYearId)
+      .gte("payments.paid_at", `${params.dateFrom}T00:00:00+07:00`)
+      .lte("payments.paid_at", `${params.dateTo}T23:59:59.999+07:00`);
+    if (params.method && params.method !== "all") {
+      query = query.eq("payments.payment_method", params.method);
+    }
+    return query.order("id", { ascending: true }).range(rangeFrom, rangeTo);
+  };
 
   type Row = {
     amount: string;
@@ -1050,8 +1056,10 @@ export async function fetchDailyRemittanceItems(params: {
     };
   };
 
-  const { data } = await query;
-  const rows = (data ?? []) as unknown as Row[];
+  const rows = await fetchAllPages<Row>(
+    async (rangeFrom, rangeTo) =>
+      (await pageQuery(rangeFrom, rangeTo)) as unknown as { data: Row[] | null; error: unknown },
+  );
 
   const byType = new Map<string, DailyRemittanceItem>();
   for (const r of rows) {
@@ -1181,4 +1189,36 @@ export async function fetchStudentStatementAllYears(
     totalPaid: round2(totalPaid),
     outstanding: Math.max(0, round2(totalDue - totalPaid)),
   };
+}
+
+/**
+ * The Bangkok calendar day of the year's most recent active receipt, or null
+ * when there is none. Lets an empty date range say where the data is.
+ */
+export async function fetchLatestPaymentDate(academicYearId: string): Promise<string | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("payments")
+    .select("paid_at")
+    .eq("academic_year_id", academicYearId)
+    .eq("status", "active")
+    .order("paid_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? bangkokDateKey(data.paid_at as string) : null;
+}
+
+/** A semester's own start and end days, either of which may be unset. */
+export async function fetchSemesterDates(
+  semesterId: string,
+): Promise<{ start: string | null; end: string | null }> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("semesters")
+    .select("start_date, end_date")
+    .eq("id", semesterId)
+    .maybeSingle();
+  if (error) throw error;
+  return { start: data?.start_date ?? null, end: data?.end_date ?? null };
 }

@@ -5,8 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider } from "@/hooks/use-sidebar";
-
-const TEACHER_ALLOWED_PATH = "/reports/outstanding";
+import { TEACHER_HOME, teacherMayVisit } from "@/lib/auth/teacher-routes";
 
 export default function DashboardLayout({
   children,
@@ -19,8 +18,8 @@ export default function DashboardLayout({
 
   useEffect(() => {
     if (isLoading || !profile) return;
-    if (profile.role === "teacher" && pathname !== TEACHER_ALLOWED_PATH) {
-      router.replace(TEACHER_ALLOWED_PATH);
+    if (profile.role === "teacher" && !teacherMayVisit(pathname)) {
+      router.replace(TEACHER_HOME);
     }
   }, [isLoading, profile, pathname, router]);
 

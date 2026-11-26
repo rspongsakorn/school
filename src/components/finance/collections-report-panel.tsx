@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { useUrlFilters } from "@/hooks/use-url-filters";
+import { parseEnumParam } from "@/lib/reports/url-filters";
 import { AppHeader } from "@/components/app-header";
 import { useAuth, useRequireRole } from "@/components/providers/auth-provider";
 import { useSemesterContext } from "@/hooks/use-semester-context";
@@ -44,7 +46,10 @@ export function CollectionsReportPanel() {
 
   const teacherProfileId = profile?.role === "teacher" ? profile.id : undefined;
 
-  const [level, setLevel] = useState<"all" | "grade" | "classroom">("grade");
+  const searchParams = useSearchParams();
+  const setFilters = useUrlFilters();
+  const level = parseEnumParam(searchParams.get("level"), ["all", "grade", "classroom"] as const, "grade");
+  const setLevel = (v: string) => setFilters({ level: v }, { level: "grade" });
 
   const sumRows = (list: Array<{ studentCount: number; totalDue: number; totalPaid: number; outstanding: number }>) => {
     const studentCount = list.reduce((s, r) => s + r.studentCount, 0);
@@ -67,7 +72,7 @@ export function CollectionsReportPanel() {
     enabled: !!ctx && level === "grade",
   });
 
-  const { data: classroomRows = [] } = useQuery({
+  const { data: classroomRows = [], isLoading: classroomLoading } = useQuery({
     queryKey: [
       "collections-by-classroom",
       ctx?.semesterId,
@@ -79,7 +84,7 @@ export function CollectionsReportPanel() {
     enabled: !!ctx && level === "classroom",
   });
 
-  const { data: summary } = useQuery({
+  const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: [
       "collections-summary",
       ctx?.semesterId,
@@ -93,7 +98,7 @@ export function CollectionsReportPanel() {
 
   return (
     <>
-      <AppHeader title="รายงานการจัดเก็บ" basePath="/reports/collections" />
+      <AppHeader title="สถิติการเก็บ" basePath="/reports/collections" />
       <main className="p-4 lg:p-6">
         <ReportLetterhead
           title="สถิติการเก็บเงิน"
@@ -119,10 +124,20 @@ export function CollectionsReportPanel() {
                 ))}
               </SelectContent>
             </Select>
-            <ReportToolbar />
+            <div className="ml-auto">
+              <ReportToolbar />
+            </div>
           </div>
 
-          {level === "all" ? (
+          {/* Never let a figure render before its query has answered: the
+              cards used to read 0 / ฿0 / 0% for the whole load. */}
+          {level === "all" && summaryLoading ? (
+            <div className="h-40 animate-pulse rounded-lg bg-muted" />
+          ) : level === "classroom" && classroomLoading ? (
+            <div className="h-40 animate-pulse rounded-lg bg-muted" />
+          ) : level === "classroom" && classroomRows.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">ไม่มีข้อมูล</p>
+          ) : level === "all" ? (
             <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardContent className="p-4">

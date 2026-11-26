@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { rosterHref } from "@/lib/reports/url-filters";
 import { AppHeader } from "@/components/app-header";
 import { useRequireRole } from "@/components/providers/auth-provider";
 import { useSemesterContext } from "@/hooks/use-semester-context";
@@ -20,6 +24,9 @@ import { formatBaht } from "@/lib/format";
 export function StudentStatementPanel({ studentId }: { studentId: string }) {
   useRequireRole(["admin", "finance", "teacher"]);
   const { ctx } = useSemesterContext();
+  // The roster's filters ride along in this page's URL (see statementHref);
+  // the back link returns them, with whatever term is chosen here now.
+  const backHref = rosterHref(useSearchParams().toString());
   const [mode, setMode] = useState<"semester" | "all">("semester");
 
   const { data: s, isLoading, isFetching } = useQuery({
@@ -38,7 +45,13 @@ export function StudentStatementPanel({ studentId }: { studentId: string }) {
 
   return (
     <>
-      <AppHeader title="ใบแจ้งยอดรายบุคคล" basePath="/reports/students" />
+      <AppHeader
+        title="ใบแจ้งยอดรายบุคคล"
+        basePath={`/reports/students/${studentId}`}
+        // The roster's grade and room ride along for the back link, and they
+        // belong to one term: drop them when the term changes here.
+        clearGradeClassroomOnChange
+      />
       <main className="p-4 lg:p-6">
         <ReportLetterhead
           title="ใบแจ้งยอดค่าใช้จ่ายนักเรียน"
@@ -46,6 +59,14 @@ export function StudentStatementPanel({ studentId }: { studentId: string }) {
           semesterNumber={showYearCol ? undefined : ctx?.semesterNumber}
           subtitle={s ? `${s.studentName} (${s.studentCode}) · ${s.gradeClassroom}` : undefined}
         />
+
+        <Link
+          href={backHref}
+          className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground print:hidden"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          กลับไปรายชื่อ
+        </Link>
 
         {/* Mode toggle */}
         <div className="mb-4 flex items-center justify-between gap-2">

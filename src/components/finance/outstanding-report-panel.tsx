@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback } from "react";
+import { useEffect } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { AppHeader } from "@/components/app-header";
@@ -33,19 +34,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { compareGradeLevelNames, formatBaht, formatThaiDate } from "@/lib/format";
-import { aggregateOutstandingByStudent } from "@/lib/reports/per-student";
 import { INVOICE_STATUS_LABELS } from "@/lib/finance/constants";
+import {
+  OUTSTANDING_STATUS_ITEMS,
+  outstandingStatusQuery,
+  owedInvoices,
+  parseOutstandingStatus,
+} from "@/lib/reports/outstanding-status";
+import { pickQuery, rosterQueryFromOutstanding } from "@/lib/reports/url-filters";
 import { ReportToolbar } from "@/components/finance/report-toolbar";
 import { ReportLetterhead } from "@/components/finance/report-letterhead";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
-
-const STATUS_ITEMS = [
-  { value: "all", label: "ทุกสถานะ" },
-  { value: "unpaid", label: "ค้างชำระ" },
-  { value: "partial", label: "ชำระบางส่วน" },
-  { value: "paid", label: "ชำระแล้ว" },
-];
 
 const REIMBURSABLE_ITEMS = [
   { value: "all", label: "ทุกประเภท" },
@@ -66,7 +66,6 @@ const STATUS_BADGE_CLASSES: Record<"unpaid" | "partial" | "paid", string> = {
 const VIEW_ITEMS = [
   { value: "list", label: "ตามรายชื่อ" },
   { value: "byRoom", label: "จัดกลุ่มตามห้อง" },
-  { value: "perStudent", label: "รวมรายคน" },
 ];
 
 export function OutstandingReportPanel() {
@@ -80,11 +79,7 @@ export function OutstandingReportPanel() {
 
   const gradeParam = searchParams.get("grade") ?? "all";
   const classroomParam = searchParams.get("classroom") ?? "all";
-  const rawStatus = searchParams.get("status");
-  const statusParam =
-    rawStatus === "unpaid" || rawStatus === "partial" || rawStatus === "paid"
-      ? rawStatus
-      : ("all" as const);
+  const statusParam = parseOutstandingStatus(searchParams.get("status"));
 
   const variantParam = searchParams.get("variant") ?? "all";
   const variantValue: PriceTier | "all" = parsePriceTier(variantParam) ?? "all";
@@ -92,12 +87,19 @@ export function OutstandingReportPanel() {
   const invoiceTypeParam = searchParams.get("invoiceType") ?? "all";
 
   const rawView = searchParams.get("view");
-  const viewParam: "list" | "byRoom" | "perStudent" =
-    rawView === "byRoom" || rawView === "perStudent" ? rawView : "list";
+  const viewParam: "list" | "byRoom" = rawView === "byRoom" ? "byRoom" : "list";
+  const rosterHref = `/reports/students?${rosterQueryFromOutstanding(searchParams.toString())}`;
+
+  // "รวมรายคน" used to be a view of this report; the per-student report is the
+  // same thing, so an old link to it lands there with the same filters.
+  const legacyPerStudent = rawView === "perStudent";
+  useEffect(() => {
+    if (legacyPerStudent) router.replace(rosterHref);
+  }, [legacyPerStudent, rosterHref, router]);
 
   const teacherProfileId = profile?.role === "teacher" ? profile.id : undefined;
 
-  const { data: rows = [], isLoading: rowsLoading } = useQuery({
+  const { data: fetchedRows = [], isLoading: fetching } = useQuery({
     queryKey: [
       "outstanding-report",
       ctx?.semesterId,
@@ -115,18 +117,22 @@ export function OutstandingReportPanel() {
         academicYearId: ctx!.academicYearId,
         gradeLevelId: gradeParam !== "all" ? gradeParam : undefined,
         classroomId: classroomParam !== "all" ? classroomParam : undefined,
-        status: statusParam,
+        ...outstandingStatusQuery(statusParam),
         variant: variantValue,
         invoiceTypeId: invoiceTypeParam !== "all" ? invoiceTypeParam : undefined,
         teacherProfileId,
-        includeAllStatuses: true,
       });
       return [...data].sort((a, b) =>
         a.studentCode.localeCompare(b.studentCode, "th", { numeric: true }),
       );
     },
-    enabled: !!ctx,
+    // Not for an old ?view=perStudent link: it is being sent to the roster.
+    enabled: !!ctx && !legacyPerStudent,
   });
+
+  // An old per-student link shows the skeleton until it is sent to the roster.
+  const rowsLoading = fetching || legacyPerStudent;
+  const rows = owedInvoices(fetchedRows, statusParam);
 
   const { data: grades = [] } = useQuery({
     queryKey: ["grade-levels", ctx?.semesterId],
@@ -154,8 +160,9 @@ export function OutstandingReportPanel() {
     view: viewParam,
   };
 
-  const pushParams = useCallback(
-    (next: Partial<typeof params>) => {
+  // A plain function: `params` is rebuilt every render, so a useCallback on it
+  // never held, and the React compiler memoises this on its own.
+  const pushParams = (next: Partial<typeof params>) => {
       const query = new URLSearchParams(window.location.search);
       const grade = next.grade ?? params.grade;
       const classroom = next.classroom ?? params.classroom;
@@ -168,7 +175,8 @@ export function OutstandingReportPanel() {
       else query.delete("grade");
       if (classroom !== "all") query.set("classroom", classroom);
       else query.delete("classroom");
-      if (status !== "all") query.set("status", status);
+      // The default (still owed) needs no param; "all" has to be spelled out.
+      if (status !== "outstanding") query.set("status", status);
       else query.delete("status");
       if (variant !== "all") query.set("variant", variant);
       else query.delete("variant");
@@ -178,9 +186,7 @@ export function OutstandingReportPanel() {
       else query.delete("view");
 
       router.push(`${pathname}?${query.toString()}`);
-    },
-    [params, pathname, router],
-  );
+  };
 
   const gradeItems = [
     { value: "all", label: "ทุกชั้น" },
@@ -212,17 +218,19 @@ export function OutstandingReportPanel() {
     return [...groups.entries()].sort((a, b) => compareGradeLevelNames(a[0], b[0]));
   })();
 
-  const perStudentRows = aggregateOutstandingByStudent(rows);
-  const perStudentTotals = perStudentRows.reduce(
+  const listTotals = rows.reduce(
     (acc, r) => ({
       subtotal: acc.subtotal + r.subtotal,
       totalAmount: acc.totalAmount + r.totalAmount,
       paidAmount: acc.paidAmount + r.paidAmount,
       outstanding: acc.outstanding + r.outstanding,
-      discountAmount: acc.discountAmount + r.discountAmount,
     }),
-    { subtotal: 0, totalAmount: 0, paidAmount: 0, outstanding: 0, discountAmount: 0 },
+    { subtotal: 0, totalAmount: 0, paidAmount: 0, outstanding: 0 },
   );
+
+  // Where the same filters lead on the debtors report (all years, leavers
+  // included). Price tier and invoice type have no field there.
+  const debtorsHref = `/reports/debtors?${pickQuery(searchParams.toString(), ["year", "semester", "grade", "classroom"])}`;
 
   return (
     <>
@@ -230,7 +238,7 @@ export function OutstandingReportPanel() {
       <style>{"@media print { @page { size: A4 landscape; margin: 10mm; } }"}</style>
       <main className="p-4 lg:p-6 print:p-0">
         <ReportLetterhead
-          title="รายงานลูกหนี้ค้างชำระ"
+          title="รายงานค้างชำระ"
           yearName={ctx?.academicYearName}
           semesterNumber={ctx?.semesterNumber}
         />
@@ -271,14 +279,14 @@ export function OutstandingReportPanel() {
             </Select>
             <Select
               value={params.status}
-              onValueChange={(v) => pushParams({ status: v ?? "all" })}
-              items={STATUS_ITEMS}
+              onValueChange={(v) => pushParams({ status: parseOutstandingStatus(v ?? null) })}
+              items={OUTSTANDING_STATUS_ITEMS}
             >
               <SelectTrigger className="w-[160px]">
                 <SelectValue placeholder="สถานะ" />
               </SelectTrigger>
               <SelectContent>
-                {STATUS_ITEMS.map((item) => (
+                {OUTSTANDING_STATUS_ITEMS.map((item) => (
                   <SelectItem key={item.value} value={item.value}>
                     {item.label}
                   </SelectItem>
@@ -336,6 +344,24 @@ export function OutstandingReportPanel() {
             <ReportToolbar />
           </div>
 
+          <p className="text-xs text-muted-foreground print:hidden">
+            ยอดของภาคเรียนที่เลือกเท่านั้น
+            {/* The debtors report is not offered to teachers (see
+                teacher-routes.ts), so neither is the way to it. */}
+            {profile?.role === "teacher" ? null : (
+              <>
+                {" · "}ยอดค้างสะสมทุกปี ดูที่{" "}
+                <Link href={debtorsHref} className="underline hover:text-foreground">
+                  ลูกหนี้รายห้อง →
+                </Link>
+              </>
+            )}
+            {" · "}
+            <Link href={rosterHref} className="underline hover:text-foreground">
+              ดูยอดรวมรายคน → รายบุคคล
+            </Link>
+          </p>
+
           {/* Mobile stacked cards */}
           {rowsLoading ? (
             <div className="sm:hidden h-40 animate-pulse rounded-lg bg-muted" />
@@ -343,44 +369,6 @@ export function OutstandingReportPanel() {
             <p className="sm:hidden py-6 text-center text-sm text-muted-foreground">
               ไม่พบรายการค้างชำระ
             </p>
-          ) : viewParam === "perStudent" ? (
-            <div className="sm:hidden space-y-2">
-              {perStudentRows.map((row) => (
-                <div key={row.studentId} className="rounded-lg border border-border px-4 py-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="truncate font-medium">{row.studentName}</p>
-                        {row.priceTier !== "standard" ? (
-                          <Badge className={priceTierBadgeClass(row.priceTier)}>
-                            {priceTierLabel(row.priceTier)}
-                          </Badge>
-                        ) : null}
-                      </div>
-                      <p className="mt-0.5 text-sm text-muted-foreground">
-                        {row.studentCode} · {row.gradeClassroom} · {row.invoiceCount} ใบแจ้ง
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      <span className="font-semibold tabular-nums text-amber-700">
-                        ค้าง {formatBaht(row.outstanding)}
-                      </span>
-                      <Badge variant="outline" className={STATUS_BADGE_CLASSES[row.status]}>{INVOICE_STATUS_LABELS[row.status]}</Badge>
-                    </div>
-                  </div>
-                  <div className="mt-2 flex gap-4 text-sm text-muted-foreground">
-                    <span>ต้องชำระ <span className="tabular-nums text-foreground">{formatBaht(row.totalAmount)}</span></span>
-                    <span>ชำระแล้ว <span className="tabular-nums text-foreground">{formatBaht(row.paidAmount)}</span></span>
-                    {row.discountAmount > 0 ? (
-                      <span className="text-red-700">ลด {formatBaht(row.discountAmount)}</span>
-                    ) : null}
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    จ่ายล่าสุด {row.lastPaidAt ? formatThaiDate(row.lastPaidAt) : "—"}
-                  </div>
-                </div>
-              ))}
-            </div>
           ) : (
             <div className="sm:hidden space-y-2">
               {rows.map((row) => (
@@ -423,81 +411,7 @@ export function OutstandingReportPanel() {
           )}
 
           {/* Desktop table */}
-          {viewParam === "perStudent" ? (
-            rowsLoading ? (
-              <div className="hidden sm:block">
-                <TableSkeleton rows={8} />
-              </div>
-            ) : perStudentRows.length === 0 ? (
-              <p className="hidden sm:block py-6 text-center text-sm text-muted-foreground">
-                ไม่พบรายการค้างชำระ
-              </p>
-            ) : (
-              <div className="hidden sm:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10">ลำดับ</TableHead>
-                      <TableHead>รหัส</TableHead>
-                      <TableHead>ชื่อ-นามสกุล</TableHead>
-                      <TableHead>ชั้น/ห้อง</TableHead>
-                      <TableHead className="text-right">ใบแจ้ง</TableHead>
-                      <TableHead className="text-right">ค่าใช้จ่าย</TableHead>
-                      <TableHead className="text-right">ส่วนลด</TableHead>
-                      <TableHead className="text-right">ต้องชำระ</TableHead>
-                      <TableHead className="text-right">ชำระแล้ว</TableHead>
-                      <TableHead className="text-right">ค้าง</TableHead>
-                      <TableHead>สถานะ</TableHead>
-                      <TableHead>จ่ายล่าสุด</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {perStudentRows.map((row, index) => (
-                      <TableRow key={row.studentId}>
-                        <TableCell className="tabular-nums text-muted-foreground">{index + 1}</TableCell>
-                        <TableCell className="tabular-nums">{row.studentCode}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <span>{row.studentName}</span>
-                            {row.priceTier !== "standard" ? (
-                              <Badge className={priceTierBadgeClass(row.priceTier)}>
-                                {priceTierLabel(row.priceTier)}
-                              </Badge>
-                            ) : null}
-                          </div>
-                        </TableCell>
-                        <TableCell>{row.gradeClassroom}</TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground">{row.invoiceCount}</TableCell>
-                        <TableCell className="text-right tabular-nums">{formatBaht(row.subtotal)}</TableCell>
-                        <TableCell className="text-right tabular-nums text-red-700">
-                          {row.discountAmount > 0 ? formatBaht(row.discountAmount) : "—"}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">{formatBaht(row.totalAmount)}</TableCell>
-                        <TableCell className="text-right tabular-nums">{formatBaht(row.paidAmount)}</TableCell>
-                        <TableCell className="text-right tabular-nums font-medium">{formatBaht(row.outstanding)}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={STATUS_BADGE_CLASSES[row.status]}>{INVOICE_STATUS_LABELS[row.status]}</Badge>
-                        </TableCell>
-                        <TableCell>{row.lastPaidAt ? formatThaiDate(row.lastPaidAt) : "—"}</TableCell>
-                      </TableRow>
-                    ))}
-                    <TableRow className="border-t-2 font-semibold">
-                      <TableCell colSpan={4}>รวม {perStudentRows.length} คน</TableCell>
-                      <TableCell className="text-right tabular-nums">—</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatBaht(perStudentTotals.subtotal)}</TableCell>
-                      <TableCell className="text-right tabular-nums text-red-700">
-                        {formatBaht(perStudentTotals.discountAmount)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{formatBaht(perStudentTotals.totalAmount)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatBaht(perStudentTotals.paidAmount)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatBaht(perStudentTotals.outstanding)}</TableCell>
-                      <TableCell colSpan={2} />
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </div>
-            )
-          ) : viewParam === "byRoom" ? (
+          {viewParam === "byRoom" ? (
             rowsLoading ? (
               <div className="hidden sm:block">
                 <TableSkeleton rows={8} />
@@ -629,6 +543,16 @@ export function OutstandingReportPanel() {
                     </TableRow>
                   ))
                 )}
+                {!rowsLoading && rows.length > 0 ? (
+                  <TableRow className="border-t-2 font-semibold">
+                    <TableCell colSpan={4}>รวม {rows.length} ใบ</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatBaht(listTotals.subtotal)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatBaht(listTotals.totalAmount)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatBaht(listTotals.paidAmount)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatBaht(listTotals.outstanding)}</TableCell>
+                    <TableCell colSpan={4} />
+                  </TableRow>
+                ) : null}
               </TableBody>
             </Table>
           </div>

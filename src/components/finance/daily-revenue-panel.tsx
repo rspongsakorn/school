@@ -1,7 +1,10 @@
 "use client";
 
 import { Fragment, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { useUrlFilters } from "@/hooks/use-url-filters";
+import { parseDateParam, parseEnumParam } from "@/lib/reports/url-filters";
 import { AppHeader } from "@/components/app-header";
 import { useRequireRole } from "@/components/providers/auth-provider";
 import { useSemesterContext } from "@/hooks/use-semester-context";
@@ -11,7 +14,9 @@ import { ReportLetterhead } from "@/components/finance/report-letterhead";
 import { ReceiptIssuanceView } from "@/components/finance/receipt-issuance-view";
 import { DailyRemittanceSlip } from "@/components/finance/daily-remittance-slip";
 import { ReceiptsByUserPanel } from "@/components/finance/receipts-by-user-panel";
-import { Input } from "@/components/ui/input";
+import { DateRangeFilter, EmptyRangeHint, todayKey } from "@/components/finance/date-range-filter";
+import { formatThaiRange } from "@/lib/reports/date-range";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -44,24 +49,25 @@ const DOC_TYPE_ITEMS = [
   { value: "by-user", label: "สรุปยอดตามผู้ใช้งาน" },
 ];
 
-function firstOfMonth(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-}
-
-function today(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 export function DailyRevenuePanel() {
   useRequireRole(["admin", "finance"]);
 
   const { ctx } = useSemesterContext();
-  const [dateFrom, setDateFrom] = useState(firstOfMonth());
-  const [dateTo, setDateTo] = useState(today());
-  const [method, setMethod] = useState<"all" | "cash" | "transfer">("all");
-  const [docType, setDocType] = useState<"summary" | "receipts" | "remittance" | "by-user">("summary");
+  const searchParams = useSearchParams();
+  const setFilters = useUrlFilters();
+  // Opens on today: closing the day and sending in its cash is the daily job.
+  const defaults = { from: todayKey(), to: todayKey(), method: "all", doc: "summary" };
+  const dateFrom = parseDateParam(searchParams.get("from"), defaults.from);
+  const dateTo = parseDateParam(searchParams.get("to"), defaults.to);
+  const method = parseEnumParam(searchParams.get("method"), ["all", "cash", "transfer"] as const, "all");
+  const docType = parseEnumParam(
+    searchParams.get("doc"),
+    ["summary", "receipts", "remittance", "by-user"] as const,
+    "summary",
+  );
+  const setRange = (range: { from?: string; to?: string }) => setFilters(range, defaults);
+  const setMethod = (v: string) => setFilters({ method: v }, defaults);
+  const setDocType = (v: string) => setFilters({ doc: v }, defaults);
   const [openDate, setOpenDate] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
@@ -114,19 +120,12 @@ export function DailyRevenuePanel() {
           title="รายงานรายรับรายวัน"
           yearName={ctx?.academicYearName}
           semesterNumber={ctx?.semesterNumber}
-          subtitle={`ช่วงวันที่ ${dateFrom} ถึง ${dateTo}`}
+          subtitle={`ช่วงวันที่ ${formatThaiRange(dateFrom, dateTo)}`}
         />
         <Card className="border-border shadow-sm">
         <CardContent className="space-y-4">
           <div className="report-toolbar flex flex-wrap items-end gap-2">
-            <div>
-              <label className="text-xs text-muted-foreground">ตั้งแต่</label>
-              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-[160px]" />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">ถึง</label>
-              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-[160px]" />
-            </div>
+            <DateRangeFilter from={dateFrom} to={dateTo} semesterId={ctx?.semesterId} onChange={setRange} />
             <Select value={method} onValueChange={(v) => setMethod((v ?? "all") as typeof method)} items={METHOD_ITEMS}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="วิธีจ่าย" />
@@ -139,27 +138,44 @@ export function DailyRevenuePanel() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={docType} onValueChange={(v) => setDocType((v ?? "summary") as typeof docType)} items={DOC_TYPE_ITEMS}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="รูปแบบเอกสาร" />
-              </SelectTrigger>
-              <SelectContent>
-                {DOC_TYPE_ITEMS.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             <div className="ml-auto">
               <ReportToolbar />
             </div>
           </div>
 
+          {/* The four documents of this report, all in sight rather than in a
+              dropdown with no label. */}
+          <div role="tablist" aria-label="รูปแบบเอกสาร" className="report-toolbar flex flex-wrap gap-1 border-b border-border">
+            {DOC_TYPE_ITEMS.map((item) => {
+              const selected = item.value === docType;
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => setDocType(item.value)}
+                  className={cn(
+                    "-mb-px border-b-2 px-3 py-2 text-sm transition-colors",
+                    selected
+                      ? "border-primary font-semibold text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+
           {isLoading || (docType === "remittance" && isRemittanceLoading) ? (
             <div className="h-40 animate-pulse rounded-lg bg-muted" />
           ) : summary.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">ไม่มีข้อมูลในช่วงที่เลือก</p>
+            <EmptyRangeHint
+              academicYearId={ctx?.academicYearId}
+              message="ไม่มีรายการในช่วงที่เลือก"
+              onJump={(day) => setRange({ from: day, to: day })}
+            />
           ) : docType === "receipts" ? (
             <ReceiptIssuanceView receiptsByDate={receiptsByDate} yearSemesterLabel={yearSemesterLabel} />
           ) : docType === "remittance" ? (

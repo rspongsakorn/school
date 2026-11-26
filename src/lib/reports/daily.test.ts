@@ -39,12 +39,12 @@ describe("groupDailyRevenue", () => {
     });
   });
 
-  it("groups across days and sorts newest first", () => {
+  it("groups across days and sorts oldest first, like the receipt listing", () => {
     const rows = groupDailyRevenue([
       p({ paidAt: "2026-05-27T05:00:00Z" }),
       p({ paidAt: "2026-05-28T05:00:00Z" }),
     ]);
-    expect(rows.map((r) => r.dateKey)).toEqual(["2026-05-28", "2026-05-27"]);
+    expect(rows.map((r) => r.dateKey)).toEqual(["2026-05-27", "2026-05-28"]);
   });
 });
 
