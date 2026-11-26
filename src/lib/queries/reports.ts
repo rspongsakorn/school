@@ -2,6 +2,7 @@ import { parsePriceTier, type PriceTier } from "@/lib/finance/price-tier";
 import { buildDiscountReport, type DiscountReportResult } from "@/lib/finance/discount-report";
 import { createClient } from "@/lib/supabase/client";
 import { fetchAllPages } from "@/lib/supabase/paginate";
+import { mapLimit } from "@/lib/supabase/map-limit";
 import {
   formatClassroom,
   formatStudentName,
@@ -57,23 +58,30 @@ async function getStudentGradeMap(semesterId: string): Promise<Map<string, strin
     classrooms: { name: string; grade_levels: { name: string } | null } | null;
   };
 
-  const { data } = await supabase
-    .from("student_enrollments")
-    .select(
-      `
+  // Paged: a school past 1000 enrolled students would otherwise lose the rest
+  // silently, and their rows would print "—" for the room.
+  const data = await fetchAllPages<EnrollmentRow>(
+    async (from, to) =>
+      (await supabase
+        .from("student_enrollments")
+        .select(
+          `
       student_id,
       classrooms (
         name,
         grade_levels ( name )
       )
     `,
-    )
-    .eq("semester_id", semesterId)
-    .eq("status", "enrolled");
+        )
+        .eq("semester_id", semesterId)
+        .eq("status", "enrolled")
+        .order("id", { ascending: true })
+        .range(from, to)) as unknown as { data: EnrollmentRow[] | null; error: unknown },
+  );
 
   const map = new Map<string, string>();
 
-  for (const row of (data ?? []) as unknown as EnrollmentRow[]) {
+  for (const row of data) {
     const classroom = row.classrooms;
     const gradeName = classroom?.grade_levels?.name ?? null;
     map.set(row.student_id, formatClassroom(gradeName, classroom?.name ?? null));
@@ -94,7 +102,11 @@ export async function fetchOutstandingReport(params: {
   includeAllStatuses?: boolean;
 }): Promise<OutstandingReportRow[]> {
   const supabase = createClient();
-  const gradeByStudent = await getStudentGradeMap(params.semesterId);
+  // Started now, awaited at the end: it shares nothing with the lookups below.
+  const gradeByStudentPromise = getStudentGradeMap(params.semesterId);
+  // The early returns below never await it; keep a failure there from
+  // surfacing as an unhandled rejection. The await at the end still throws.
+  gradeByStudentPromise.catch(() => {});
 
   let allowedStudentIds: string[] | null = null;
 
@@ -209,7 +221,10 @@ export async function fetchOutstandingReport(params: {
     return (await query.range(from, to)) as unknown as { data: Row[] | null; error: unknown };
   });
   const invoiceIds = rows.map((row) => row.id);
-  const lastPaidByInvoice = await fetchLastPaidAtByInvoiceIds(supabase, invoiceIds);
+  const [lastPaidByInvoice, gradeByStudent] = await Promise.all([
+    fetchLastPaidAtByInvoiceIds(supabase, invoiceIds),
+    gradeByStudentPromise,
+  ]);
 
   return rows.map((row) => {
     const totalAmount = Number(row.total_amount);
@@ -247,17 +262,21 @@ async function fetchInBatches<T>(
   ids: string[],
   query: (chunk: string[], from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>,
 ): Promise<T[]> {
-  const rows: T[] = [];
+  const chunks: string[][] = [];
   for (let i = 0; i < ids.length; i += STUDENT_ID_BATCH_SIZE) {
-    const chunk = ids.slice(i, i + STUDENT_ID_BATCH_SIZE);
-    const page = await fetchAllPages<T>(
+    chunks.push(ids.slice(i, i + STUDENT_ID_BATCH_SIZE));
+  }
+  const pages = await mapLimit(chunks, BATCH_CONCURRENCY, (chunk) =>
+    fetchAllPages<T>(
       async (from, to) =>
         (await query(chunk, from, to)) as unknown as { data: T[] | null; error: unknown },
-    );
-    rows.push(...page);
-  }
-  return rows;
+    ),
+  );
+  return pages.flat();
 }
+
+/** Id chunks fetched at once: enough to overlap round trips, not to flood. */
+const BATCH_CONCURRENCY = 4;
 
 const STUDENT_ID_BATCH_SIZE = 200;
 
@@ -429,16 +448,18 @@ async function fetchLastPaidAtByInvoiceIds(
     payments: { paid_at: string; status: "active" | "voided" };
   };
 
-  const batches: AllocationRow[][] = [];
+  const chunks: string[][] = [];
   for (let i = 0; i < invoiceIds.length; i += INVOICE_ID_BATCH_SIZE) {
-    const chunk = invoiceIds.slice(i, i + INVOICE_ID_BATCH_SIZE);
+    chunks.push(invoiceIds.slice(i, i + INVOICE_ID_BATCH_SIZE));
+  }
+  const batches = await mapLimit(chunks, BATCH_CONCURRENCY, async (chunk) => {
     const { data, error } = await supabase
       .from("payment_allocations")
       .select("invoice_id, payments!inner ( paid_at, status )")
       .in("invoice_id", chunk);
     if (error) throw error;
-    batches.push((data ?? []) as unknown as AllocationRow[]);
-  }
+    return (data ?? []) as unknown as AllocationRow[];
+  });
 
   const allocationRows = batches.flat();
 
