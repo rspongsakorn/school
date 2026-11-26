@@ -13,6 +13,7 @@ import { bangkokDateKey } from "@/lib/reports/date";
 import { groupDailyRevenue, type DailyRevenueRow } from "@/lib/reports/daily";
 import { groupRevenueByUser, type UserRevenueRow } from "@/lib/reports/by-user";
 import { latestPaidAtByInvoice } from "@/lib/reports/last-paid";
+import { buildStudentRoster } from "@/lib/reports/roster";
 import {
   buildDebtorRows,
   summarizeEnrollments,
@@ -577,31 +578,15 @@ export async function fetchStudentRoster(params: {
     academicYearId: params.academicYearId,
     gradeLevelId: params.gradeLevelId,
     classroomId: params.classroomId,
-    status: params.status,
+    // Every invoice, whatever the filter: the status is judged per student
+    // once the invoices are collapsed, not per invoice here.
+    status: "all",
     variant: "all",
     includeAllStatuses: true,
     teacherProfileId: params.teacherProfileId,
   });
 
-  const q = params.query?.trim().toLowerCase();
-  const filtered = q
-    ? rows.filter(
-        (r) =>
-          r.studentName.toLowerCase().includes(q) ||
-          r.studentCode.toLowerCase().includes(q),
-      )
-    : rows;
-
-  return filtered.map((r) => ({
-    studentId: r.studentId,
-    studentCode: r.studentCode,
-    studentName: r.studentName,
-    gradeClassroom: r.gradeClassroom,
-    totalAmount: r.totalAmount,
-    paidAmount: r.paidAmount,
-    outstanding: r.outstanding,
-    status: r.status,
-  }));
+  return buildStudentRoster(rows, { status: params.status, query: params.query });
 }
 
 export type CollectionsSummary = {
