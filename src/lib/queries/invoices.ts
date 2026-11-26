@@ -1,3 +1,4 @@
+import { groupLineStates, type InvoiceLineStates } from "@/lib/finance/line-payment";
 import { parsePriceTier, type PriceTier } from "@/lib/finance/price-tier";
 import { formatClassroom, formatStudentName, gradeLevelSortKey } from "@/lib/format";
 import { buildStudentSearchOrFilter } from "@/lib/students/search";
@@ -339,6 +340,16 @@ export async function fetchInvoiceLines(invoiceId: string): Promise<InvoiceLineR
     .eq("invoice_id", invoiceId)
     .order("id");
   return (data ?? []).map((r) => ({ id: r.id, description: r.description, amount: Number(r.amount) }));
+}
+
+/** Each line's paid state, and whether the invoice is paid by ticking lines. */
+export async function fetchInvoiceLineStates(invoiceId: string): Promise<InvoiceLineStates> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("invoice_line_states", { p_invoice_ids: [invoiceId] });
+  if (error) throw new Error("โหลดรายการในใบแจ้งไม่สำเร็จ");
+  const states = groupLineStates(data ?? []).get(invoiceId);
+  if (!states) return { tracked: false, lines: [] };
+  return { tracked: states.tracked, lines: [...states.lines].sort((a, b) => a.id.localeCompare(b.id)) };
 }
 
 function round2(n: number) {
