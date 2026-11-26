@@ -235,7 +235,12 @@ export async function fetchOutstandingReport(params: {
     fetchLastPaidAtByInvoiceIds(supabase, invoiceIds),
     gradeByStudentPromise,
     fetchInBatches<LineStateRow>(partialIds, (chunk, from, to) =>
-      supabase.rpc("invoice_line_states", { p_invoice_ids: chunk }).range(from, to),
+      supabase
+        .rpc("invoice_line_states", { p_invoice_ids: chunk })
+        // Paging needs a stable order, or pages can overlap and skip rows.
+        .order("invoice_id")
+        .order("invoice_line_id")
+        .range(from, to),
     ),
   ]);
   const lineStatesByInvoice = groupLineStates(lineStateRows);

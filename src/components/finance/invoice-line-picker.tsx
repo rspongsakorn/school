@@ -4,6 +4,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { formatBaht } from "@/lib/format";
 import type { PayableLine } from "@/lib/finance/line-payment";
+import { resolveLineDiscount } from "@/lib/finance/payment-discount";
 
 export type LineDiscountDraft = { value: string; unit: "fixed" | "percent" };
 
@@ -13,13 +14,16 @@ function round2(n: number) {
   return Math.round(n * 100) / 100;
 }
 
-/** Baht off one line for a discount being typed; capped at the line amount. */
+/**
+ * Baht off one line for a discount being typed; capped at the line amount.
+ * Uses the server's resolveLineDiscount so a percent discount rounds the same
+ * way on both sides — otherwise the server refuses the amount the screen shows.
+ */
 export function draftDiscountAmount(lineAmount: number, draft?: LineDiscountDraft): number {
   if (!draft) return 0;
   const v = Number.parseFloat(draft.value);
   if (!Number.isFinite(v) || v <= 0) return 0;
-  const amt = draft.unit === "percent" ? (lineAmount * v) / 100 : v;
-  return Math.min(round2(amt), lineAmount);
+  return Math.min(resolveLineDiscount(lineAmount, draft.unit, v), lineAmount);
 }
 
 /** What the ticked lines come to after their discounts. */

@@ -37,6 +37,8 @@ export function groupLineStates(rows: LineStateRow[]): Map<string, InvoiceLineSt
       byInvoice.set(row.invoice_id, entry);
     }
     if (!row.invoice_tracked) entry.tracked = false;
+    // A paged read can hand back the same row twice; list each line once.
+    if (entry.lines.some((l) => l.id === row.invoice_line_id)) continue;
     entry.lines.push({
       id: row.invoice_line_id,
       description: row.description,

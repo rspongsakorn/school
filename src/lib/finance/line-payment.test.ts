@@ -153,6 +153,11 @@ describe("groupLineStates", () => {
     expect(map.get("I1")?.tracked).toBe(false);
   });
 
+  it("lists a line once even if a paged read returns it twice", () => {
+    const map = groupLineStates([row("I1", "A", 1), row("I1", "B", 1), row("I1", "A", 1)]);
+    expect(map.get("I1")?.lines.map((l) => l.id)).toEqual(["A", "B"]);
+  });
+
   it("keeps a zero line paid", () => {
     const map = groupLineStates([row("I1", "Z", "0", true)]);
     expect(map.get("I1")?.lines[0]).toEqual({ id: "Z", description: "d-Z", amount: 0, isPaid: true });
