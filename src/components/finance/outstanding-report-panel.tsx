@@ -35,17 +35,15 @@ import {
 import { compareGradeLevelNames, formatBaht, formatThaiDate } from "@/lib/format";
 import { aggregateOutstandingByStudent } from "@/lib/reports/per-student";
 import { INVOICE_STATUS_LABELS } from "@/lib/finance/constants";
+import {
+  OUTSTANDING_STATUS_ITEMS,
+  outstandingStatusQuery,
+  parseOutstandingStatus,
+} from "@/lib/reports/outstanding-status";
 import { ReportToolbar } from "@/components/finance/report-toolbar";
 import { ReportLetterhead } from "@/components/finance/report-letterhead";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
-
-const STATUS_ITEMS = [
-  { value: "all", label: "ทุกสถานะ" },
-  { value: "unpaid", label: "ค้างชำระ" },
-  { value: "partial", label: "ชำระบางส่วน" },
-  { value: "paid", label: "ชำระแล้ว" },
-];
 
 const REIMBURSABLE_ITEMS = [
   { value: "all", label: "ทุกประเภท" },
@@ -80,11 +78,7 @@ export function OutstandingReportPanel() {
 
   const gradeParam = searchParams.get("grade") ?? "all";
   const classroomParam = searchParams.get("classroom") ?? "all";
-  const rawStatus = searchParams.get("status");
-  const statusParam =
-    rawStatus === "unpaid" || rawStatus === "partial" || rawStatus === "paid"
-      ? rawStatus
-      : ("all" as const);
+  const statusParam = parseOutstandingStatus(searchParams.get("status"));
 
   const variantParam = searchParams.get("variant") ?? "all";
   const variantValue: PriceTier | "all" = parsePriceTier(variantParam) ?? "all";
@@ -115,11 +109,10 @@ export function OutstandingReportPanel() {
         academicYearId: ctx!.academicYearId,
         gradeLevelId: gradeParam !== "all" ? gradeParam : undefined,
         classroomId: classroomParam !== "all" ? classroomParam : undefined,
-        status: statusParam,
+        ...outstandingStatusQuery(statusParam),
         variant: variantValue,
         invoiceTypeId: invoiceTypeParam !== "all" ? invoiceTypeParam : undefined,
         teacherProfileId,
-        includeAllStatuses: true,
       });
       return [...data].sort((a, b) =>
         a.studentCode.localeCompare(b.studentCode, "th", { numeric: true }),
@@ -168,7 +161,8 @@ export function OutstandingReportPanel() {
       else query.delete("grade");
       if (classroom !== "all") query.set("classroom", classroom);
       else query.delete("classroom");
-      if (status !== "all") query.set("status", status);
+      // The default (still owed) needs no param; "all" has to be spelled out.
+      if (status !== "outstanding") query.set("status", status);
       else query.delete("status");
       if (variant !== "all") query.set("variant", variant);
       else query.delete("variant");
@@ -211,6 +205,16 @@ export function OutstandingReportPanel() {
     // alphabetical order — the latter buries อ. below ป. and ม.
     return [...groups.entries()].sort((a, b) => compareGradeLevelNames(a[0], b[0]));
   })();
+
+  const listTotals = rows.reduce(
+    (acc, r) => ({
+      subtotal: acc.subtotal + r.subtotal,
+      totalAmount: acc.totalAmount + r.totalAmount,
+      paidAmount: acc.paidAmount + r.paidAmount,
+      outstanding: acc.outstanding + r.outstanding,
+    }),
+    { subtotal: 0, totalAmount: 0, paidAmount: 0, outstanding: 0 },
+  );
 
   const perStudentRows = aggregateOutstandingByStudent(rows);
   const perStudentTotals = perStudentRows.reduce(
@@ -271,14 +275,14 @@ export function OutstandingReportPanel() {
             </Select>
             <Select
               value={params.status}
-              onValueChange={(v) => pushParams({ status: v ?? "all" })}
-              items={STATUS_ITEMS}
+              onValueChange={(v) => pushParams({ status: parseOutstandingStatus(v ?? null) })}
+              items={OUTSTANDING_STATUS_ITEMS}
             >
               <SelectTrigger className="w-[160px]">
                 <SelectValue placeholder="สถานะ" />
               </SelectTrigger>
               <SelectContent>
-                {STATUS_ITEMS.map((item) => (
+                {OUTSTANDING_STATUS_ITEMS.map((item) => (
                   <SelectItem key={item.value} value={item.value}>
                     {item.label}
                   </SelectItem>
@@ -629,6 +633,16 @@ export function OutstandingReportPanel() {
                     </TableRow>
                   ))
                 )}
+                {!rowsLoading && rows.length > 0 ? (
+                  <TableRow className="border-t-2 font-semibold">
+                    <TableCell colSpan={4}>รวม {rows.length} ใบ</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatBaht(listTotals.subtotal)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatBaht(listTotals.totalAmount)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatBaht(listTotals.paidAmount)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatBaht(listTotals.outstanding)}</TableCell>
+                    <TableCell colSpan={4} />
+                  </TableRow>
+                ) : null}
               </TableBody>
             </Table>
           </div>
