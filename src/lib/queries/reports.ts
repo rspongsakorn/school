@@ -1162,3 +1162,35 @@ export async function fetchStudentStatementAllYears(
     outstanding: Math.max(0, round2(totalDue - totalPaid)),
   };
 }
+
+/**
+ * The Bangkok calendar day of the year's most recent active receipt, or null
+ * when there is none. Lets an empty date range say where the data is.
+ */
+export async function fetchLatestPaymentDate(academicYearId: string): Promise<string | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("payments")
+    .select("paid_at")
+    .eq("academic_year_id", academicYearId)
+    .eq("status", "active")
+    .order("paid_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? bangkokDateKey(data.paid_at as string) : null;
+}
+
+/** A semester's own start and end days, either of which may be unset. */
+export async function fetchSemesterDates(
+  semesterId: string,
+): Promise<{ start: string | null; end: string | null }> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("semesters")
+    .select("start_date, end_date")
+    .eq("id", semesterId)
+    .maybeSingle();
+  if (error) throw error;
+  return { start: data?.start_date ?? null, end: data?.end_date ?? null };
+}

@@ -56,7 +56,7 @@ export function groupDailyRevenue(payments: DailyPayment[]): DailyRevenueRow[] {
     row.total = round2(row.total + amount);
   }
 
-  return [...byDate.values()].sort((a, b) => (a.dateKey < b.dateKey ? 1 : -1));
+  return [...byDate.values()].sort((a, b) => (a.dateKey < b.dateKey ? -1 : 1));
 }
 
 export type MethodSummary = {
